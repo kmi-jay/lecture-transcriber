@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a2e">
+<title>강의전사</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+  --accent: #e94560; --accent2: #533483; --text: #eee; --text2: #aaa;
+  --ok: #4ecca3; --warn: #f0a500; --err: #e94560;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh; padding: 0; }
+
+/* Header */
+.header { background: var(--surface); padding: 16px 20px; display: flex;
+  align-items: center; justify-content: space-between; border-bottom: 1px solid #333; }
+.header h1 { font-size: 18px; font-weight: 600; }
+.header .settings-btn { background: none; border: none; color: var(--text2);
+  font-size: 22px; cursor: pointer; padding: 4px 8px; }
+
+/* Pages */
+.page { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* Buttons */
+.btn { display: block; width: 100%; padding: 16px; border: none; border-radius: 12px;
+  font-size: 16px; font-weight: 600; cursor: pointer; margin: 8px 0;
+  transition: all 0.2s; }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: var(--surface2); color: var(--text); }
+.btn-secondary:hover { background: #1a4a80; }
+.btn-small { width: auto; display: inline-block; padding: 10px 20px; font-size: 14px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Cards */
+.card { background: var(--surface); border-radius: 12px; padding: 20px;
+  margin: 12px 0; border: 1px solid #333; }
+.card h3 { font-size: 15px; color: var(--text2); margin-bottom: 12px; }
+
+/* Input */
+.input-group { margin: 12px 0; }
+.input-group label { display: block; font-size: 13px; color: var(--text2);
+  margin-bottom: 6px; }
+.input-group input, .input-group select {
+  width: 100%; padding: 12px; background: var(--bg); border: 1px solid #444;
+  border-radius: 8px; color: var(--text); font-size: 15px; }
+
+/* Recording */
+.rec-btn { width: 80px; height: 80px; border-radius: 50%; border: 4px solid var(--accent);
+  background: transparent; color: var(--accent); font-size: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; margin: 20px auto;
+  transition: all 0.3s; }
+.rec-btn.recording { background: var(--accent); color: white; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+/* Progress */
+.progress-bar { width: 100%; height: 8px; background: var(--bg); border-radius: 4px;
+  overflow: hidden; margin: 8px 0; }
+.progress-fill { height: 100%; background: var(--ok); transition: width 0.3s;
+  border-radius: 4px; }
+.chunk-list { margin-top: 12px; }
+.chunk-item { display: flex; align-items: center; padding: 8px 0;
+  border-bottom: 1px solid #2a2a3e; font-size: 14px; }
+.chunk-item .status { width: 24px; text-align: center; margin-right: 10px; }
+.chunk-item .api-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  margin-left: auto; }
+.tag-groq { background: #1b5e20; color: #81c784; }
+.tag-openai { background: #4a148c; color: #ce93d8; }
+.tag-pending { background: #333; color: #888; }
+
+/* Result */
+.result-text { background: var(--bg); border-radius: 8px; padding: 16px;
+  font-size: 14px; line-height: 1.7; max-height: 60vh; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-word; margin: 12px 0; }
+
+/* Quota bar */
+.quota-bar { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.quota-bar .bar { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; }
+.quota-bar .bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* Warning box */
+.warn-box { background: #3e2723; border: 1px solid var(--warn); border-radius: 10px;
+  padding: 16px; margin: 12px 0; }
+.warn-box h4 { color: var(--warn); margin-bottom: 8px; }
+.warn-box p { font-size: 14px; color: var(--text2); line-height: 1.5; }
+
+/* Tabs */
+.tab-bar { display: flex; gap: 0; margin: 16px 0 0; border-radius: 8px; overflow: hidden; }
+.tab-bar button { flex: 1; padding: 10px; border: none; background: var(--surface);
+  color: var(--text2); font-size: 13px; cursor: pointer; }
+.tab-bar button.active { background: var(--surface2); color: var(--text); font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Timer */
+.timer { font-size: 48px; font-weight: 300; text-align: center; margin: 12px 0;
+  font-variant-numeric: tabular-nums; color: var(--ok); }
+
+/* Toast */
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+  background: var(--surface2); color: var(--text); padding: 12px 24px;
+  border-radius: 20px; font-size: 14px; z-index: 100; opacity: 0;
+  transition: opacity 0.3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* Responsive */
+@media (max-width: 400px) { .header h1 { font-size: 16px; } }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <h1>📝 강의전사</h1>
+  <button class="settings-btn" onclick="showPage('settings')">⚙️</button>
+</div>
+
+<!-- Page: Home -->
+<div id="page-home" class="page active">
+  <div class="card">
+    <h3>Groq 무료 사용량</h3>
+    <div class="quota-bar">
+      <span id="quota-text" style="font-size:13px; min-width:80px;">0 / 120분</span>
+      <div class="bar"><div class="bar-fill" id="quota-fill" style="width:0%; background:var(--ok);"></div></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" onclick="startRecording()" id="btn-record">
+    🎙️ 녹음 시작
+  </button>
+  <button class="btn btn-secondary" onclick="pickFile()">
+    📁 파일 선택
+  </button>
+  <input type="file" id="file-input" accept="audio/*" style="display:none"
+    onchange="handleFile(this.files[0])">
+
+  <div id="history-section" class="card" style="margin-top:20px; display:none;">
+    <h3>최근 전사</h3>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<!-- Page: Recording -->
+<div id="page-record" class="page">
+  <div style="text-align:center; padding: 20px 0;">
+    <p style="color:var(--text2); font-size:14px;">녹음 중</p>
+    <div class="timer" id="rec-timer">00:00:00</div>
+    <button class="rec-btn recording" id="rec-stop-btn" onclick="stopRecording()">⏹</button>
+    <p style="color:var(--text2); font-size:13px; margin-top:12px;">탭하여 녹음 중지</p>
+  </div>
+</div>
+
+<!-- Page: Pre-check (한도 확인 + 선택지) -->
+<div id="page-precheck" class="page">
+  <div class="card">
+    <h3>파일 정보</h3>
+    <p id="pre-filename" style="font-size:15px;"></p>
+    <p id="pre-duration" style="font-size:14px; color:var(--text2); margin-top:4px;"></p>
+    <p id="pre-chunks" style="font-size:14px; color:var(--text2); margin-top:4px;"></p>
+  </div>
+
+  <div id="pre-warn" class="warn-box" style="display:none;">
+    <h4>⚠️ Groq 한도 부족</h4>
+    <p id="pre-warn-text"></p>
+  </div>
+
+  <div class="input-group">
+    <label>처리 방법</label>
+    <select id="pre-api-choice">
+      <option value="groq-only">Groq 무료 (한도 내에서만)</option>
+      <option value="groq-then-openai">Groq 우선 → 한도 소진 시 OpenAI 전환</option>
+      <option value="openai-only">OpenAI만 사용</option>
+    </select>
+  </div>
+
+  <div class="input-group">
+    <label>전사 언어</label>
+    <select id="pre-language">
+      <option value="ko">한국어 / ko</option>
+      <option value="en">영어 / en</option>
+      <option value="ja">일본어 / ja</option>
+      <option value="zh">중국어 / zh</option>
+      <option value="es">스페인어 / es</option>
+      <option value="fr">프랑스어 / fr</option>
+      <option value="de">독일어 / de</option>
+      <option value="it">이탈리아어 / it</option>
+      <option value="hi">힌디어 / hi</option>
+      <option value="ar">아랍어 / ar</option>
+      <option value="ru">러시아어 / ru</option>
+      <option value="auto">자동감지 / auto</option>
+    </select>
+  </div>
+
+  <div id="pre-cost" class="card" style="display:none;">
+    <h3>예상 비용</h3>
+    <p id="pre-cost-text" style="font-size:14px;"></p>
+  </div>
+
+  <button class="btn btn-primary" onclick="startTranscription()">전사 시작</button>
+  <button class="btn btn-secondary" onclick="showPage('home')">취소</button>
+</div>
+
+<!-- Page: Processing -->
+<div id="page-process" class="page">
+  <div class="card">
+    <h3 id="proc-status">전사 준비 중...</h3>
+    <div class="progress-bar"><div class="progress-fill" id="proc-progress"></div></div>
+    <p id="proc-detail" style="font-size:13px; color:var(--text2); margin-top:8px;"></p>
+  </div>
+  <div class="chunk-list" id="chunk-list"></div>
+</div>
+
+<!-- Page: Result -->
+<div id="page-result" class="page">
+  <div class="card" style="padding:12px 16px;">
+    <p id="res-info" style="font-size:13px; color:var(--text2);"></p>
+  </div>
+  <div class="tab-bar">
+    <button class="active" onclick="switchTab('full')">전문</button>
+    <button onclick="switchTab('summary')">요약</button>
+  </div>
+  <div id="tab-full" class="tab-content active">
+    <div class="result-text" id="res-full"></div>
+  </div>
+  <div id="tab-summary" class="tab-content">
+    <div class="result-text" id="res-summary">요약은 LLM 후보정 사용 시 생성됩니다.</div>
+  </div>
+  <button class="btn btn-primary" onclick="copyResult()">📋 결과 복사</button>
+  <button class="btn btn-secondary" onclick="downloadResult()">💾 텍스트 파일 저장</button>
+  <button class="btn btn-secondary" onclick="showPage('home')">홈으로</button>
+</div>
+
+<!-- Page: Settings -->
+<div id="page-settings" class="page">
+  <h2 style="margin-bottom:16px;">설정</h2>
+  <div class="card">
+    <h3>API 키</h3>
+    <div class="input-group">
+      <label>Groq API Key</label>
+      <input type="password" id="set-groq-key" placeholder="gsk_...">
+    </div>
+    <div class="input-group">
+      <label>OpenAI API Key</label>
+      <input type="password" id="set-openai-key" placeholder="sk-...">
+    </div>
+  </div>
+  <div class="card">
+    <h3>청크 설정</h3>
+    <div class="input-group">
+      <label>청크 길이 (분)</label>
+      <select id="set-chunk-min">
+        <option value="5">5분</option>
+        <option value="10" selected>10분</option>
+        <option value="15">15분</option>
+      </select>
+    </div>
+  </div>
+  <div class="card">
+    <h3>사용량 초기화</h3>
+    <p style="font-size:13px; color:var(--text2); margin-bottom:8px;">
+      오늘 Groq 사용량: <span id="set-usage">0</span>분
+    </p>
+    <button class="btn btn-small btn-secondary" onclick="resetQuota()">사용량 초기화</button>
+  </div>
+  <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:16px;">저장</button>
+  <button class="btn btn-secondary" onclick="showPage('home')">뒤로</button>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+let state = {
+  groqKey: '', openaiKey: '',
+  chunkMin: 10,
+  // Quota tracking: { date: 'YYYY-MM-DD', usedSec: 0 }
+  quota: { date: '', usedSec: 0 },
+  history: []
+};
+
+let currentAudio = null;   // { file: File, duration: number (sec) }
+let mediaRecorder = null;
+let recordChunks = [];
+let recStartTime = null;
+let recTimerInterval = null;
+
+const GROQ_HOURLY_LIMIT = 7200; // seconds
+const OVERLAP_SEC = 30;
+
+// ═══════════════════════════════════════════════════════════════
+// Persistence (IndexedDB simple wrapper)
+// ═══════════════════════════════════════════════════════════════
+const DB_NAME = 'lecture_transcriber';
+const STORE = 'config';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbGet(key) {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+async function dbSet(key, val) {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+  });
+}
+
+async function loadState() {
+  const saved = await dbGet('state');
+  if (saved) Object.assign(state, saved);
+  // Reset quota if new day
+  const today = new Date().toISOString().slice(0, 10);
+  if (state.quota.date !== today) {
+    state.quota = { date: today, usedSec: 0 };
+  }
+  applyStateToUI();
+}
+
+async function saveState() {
+  await dbSet('state', state);
+}
+
+function applyStateToUI() {
+  document.getElementById('set-groq-key').value = state.groqKey;
+  document.getElementById('set-openai-key').value = state.openaiKey;
+  document.getElementById('set-chunk-min').value = state.chunkMin;
+  updateQuotaUI();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Navigation
+// ═══════════════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Quota UI
+// ═══════════════════════════════════════════════════════════════
+function updateQuotaUI() {
+  const usedMin = Math.round(state.quota.usedSec / 60);
+  const totalMin = Math.round(GROQ_HOURLY_LIMIT / 60);
+  const pct = Math.min(100, (state.quota.usedSec / GROQ_HOURLY_LIMIT) * 100);
+  document.getElementById('quota-text').textContent = `${usedMin} / ${totalMin}분`;
+  const fill = document.getElementById('quota-fill');
+  fill.style.width = pct + '%';
+  fill.style.background = pct > 80 ? 'var(--warn)' : pct > 95 ? 'var(--err)' : 'var(--ok)';
+  const setUsage = document.getElementById('set-usage');
+  if (setUsage) setUsage.textContent = usedMin;
+}
+
+function resetQuota() {
+  state.quota = { date: new Date().toISOString().slice(0, 10), usedSec: 0 };
+  saveState();
+  updateQuotaUI();
+  toast('사용량 초기화됨');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Settings
+// ═══════════════════════════════════════════════════════════════
+function saveSettings() {
+  state.groqKey = document.getElementById('set-groq-key').value.trim();
+  state.openaiKey = document.getElementById('set-openai-key').value.trim();
+  state.chunkMin = parseInt(document.getElementById('set-chunk-min').value);
+  saveState();
+  toast('설정 저장됨');
+  showPage('home');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Recording
+// ═══════════════════════════════════════════════════════════════
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: getBestMime() });
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStop;
+    mediaRecorder.start(1000);
+    recStartTime = Date.now();
+    recTimerInterval = setInterval(updateRecTimer, 500);
+    showPage('record');
+  } catch (e) {
+    toast('마이크 접근 실패: ' + e.message);
+  }
+}
+
+function getBestMime() {
+  const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'];
+  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+
+function updateRecTimer() {
+  const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
+  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+  const s = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('rec-timer').textContent = `${h}:${m}:${s}`;
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  }
+  clearInterval(recTimerInterval);
+}
+
+async function onRecordingStop() {
+  const blob = new Blob(recordChunks, { type: mediaRecorder.mimeType });
+  const ext = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
+  const file = new File([blob], `녹음_${fmtNow()}.${ext}`, { type: mediaRecorder.mimeType });
+  await prepareAudio(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// File Selection
+// ═══════════════════════════════════════════════════════════════
+function pickFile() { document.getElementById('file-input').click(); }
+
+async function handleFile(file) {
+  if (!file) return;
+  await prepareAudio(file);
+}
+
+async function prepareAudio(file) {
+  toast('파일 분석 중...');
+  const duration = await getAudioDuration(file);
+  currentAudio = { file, duration };
+  showPrecheck();
+}
+
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.src = URL.createObjectURL(file);
+    audio.addEventListener('loadedmetadata', () => {
+      resolve(audio.duration);
+      URL.revokeObjectURL(audio.src);
+    });
+    audio.addEventListener('error', () => {
+      // Fallback: estimate from file size (assume 128kbps)
+      resolve((file.size * 8) / (128 * 1000));
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pre-check page
+// ═══════════════════════════════════════════════════════════════
+function showPrecheck() {
+  const { file, duration } = currentAudio;
+  const durMin = (duration / 60).toFixed(1);
+  const chunkSec = state.chunkMin * 60;
+  const nChunks = Math.ceil(duration / chunkSec);
+  const remainSec = GROQ_HOURLY_LIMIT - state.quota.usedSec;
+  const remainMin = Math.round(remainSec / 60);
+
+  document.getElementById('pre-filename').textContent = file.name;
+  document.getElementById('pre-duration').textContent = `길이: ${durMin}분 | 크기: ${(file.size/1024/1024).toFixed(1)}MB`;
+  document.getElementById('pre-chunks').textContent = `청크: ${nChunks}개 (${state.chunkMin}분 단위)`;
+
+  // Warning if quota insufficient
+  const warnBox = document.getElementById('pre-warn');
+  const sel = document.getElementById('pre-api-choice');
+  if (duration > remainSec) {
+    warnBox.style.display = 'block';
+    document.getElementById('pre-warn-text').textContent =
+      `이 파일(${durMin}분)은 Groq 남은 한도(${remainMin}분)를 초과합니다. ` +
+      `Groq로 약 ${remainMin}분 처리 후 나머지는 OpenAI로 전환하거나, OpenAI만 사용하세요.`;
+    sel.value = 'groq-then-openai';
+  } else {
+    warnBox.style.display = 'none';
+    sel.value = 'groq-only';
+  }
+
+  // Cost estimate listener
+  sel.onchange = updateCostEstimate;
+  updateCostEstimate();
+
+  showPage('precheck');
+}
+
+function updateCostEstimate() {
+  const choice = document.getElementById('pre-api-choice').value;
+  const dur = currentAudio.duration;
+  const remainSec = GROQ_HOURLY_LIMIT - state.quota.usedSec;
+  const costDiv = document.getElementById('pre-cost');
+  const costText = document.getElementById('pre-cost-text');
+  const RATE = 0.006; // $/min
+  const KRW = 1400;   // approx
+
+  if (choice === 'groq-only') {
+    costDiv.style.display = 'none';
+  } else if (choice === 'openai-only') {
+    const cost = (dur / 60) * RATE;
+    costDiv.style.display = 'block';
+    costText.textContent = `OpenAI: $${cost.toFixed(3)} (≈ ₩${Math.round(cost * KRW)})`;
+  } else {
+    // groq-then-openai
+    const openaiSec = Math.max(0, dur - remainSec);
+    const cost = (openaiSec / 60) * RATE;
+    costDiv.style.display = cost > 0 ? 'block' : 'none';
+    costText.textContent = cost > 0
+      ? `Groq: ${Math.round(Math.min(dur, remainSec)/60)}분 무료 + OpenAI: ${Math.round(openaiSec/60)}분 = $${cost.toFixed(3)} (≈ ₩${Math.round(cost * KRW)})`
+      : '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Transcription Engine
+// ═══════════════════════════════════════════════════════════════
+async function startTranscription() {
+  const choice = document.getElementById('pre-api-choice').value;
+  const lang = document.getElementById('pre-language').value;
+
+  // Validate keys
+  if ((choice === 'groq-only' || choice === 'groq-then-openai') && !state.groqKey) {
+    toast('설정에서 Groq API 키를 입력하세요');
+    return;
+  }
+  if ((choice === 'openai-only' || choice === 'groq-then-openai') && !state.openaiKey) {
+    if (choice === 'openai-only') { toast('설정에서 OpenAI API 키를 입력하세요'); return; }
+    if (choice === 'groq-then-openai') { toast('설정에서 OpenAI API 키를 입력하세요 (전환용)'); return; }
+  }
+
+  showPage('process');
+
+  const { file, duration } = currentAudio;
+  const chunkSec = state.chunkMin * 60;
+  const nChunks = Math.ceil(duration / chunkSec);
+
+  // Build chunk plan
+  const chunks = [];
+  let remainGroq = GROQ_HOURLY_LIMIT - state.quota.usedSec;
+
+  for (let i = 0; i < nChunks; i++) {
+    const startSec = Math.max(0, i * chunkSec - (i > 0 ? OVERLAP_SEC : 0));
+    const endSec = Math.min(duration, (i + 1) * chunkSec);
+    const chunkDur = endSec - startSec;
+
+    let api;
+    if (choice === 'openai-only') {
+      api = 'openai';
+    } else if (choice === 'groq-only') {
+      api = remainGroq >= chunkDur ? 'groq' : 'skip';
+    } else {
+      // groq-then-openai
+      if (remainGroq >= chunkDur) {
+        api = 'groq';
+      } else {
+        api = 'openai';
+      }
+    }
+
+    if (api === 'groq') remainGroq -= chunkDur;
+
+    chunks.push({
+      index: i, startSec, endSec, chunkDur,
+      api, status: api === 'skip' ? 'skipped' : 'pending', text: ''
+    });
+  }
+
+  renderChunks(chunks);
+
+  // Process each chunk
+  const results = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const ch = chunks[i];
+    if (ch.status === 'skipped') continue;
+
+    ch.status = 'processing';
+    renderChunks(chunks);
+    updateProgress(i, chunks.length, `청크 ${i+1}/${nChunks} 처리 중 (${ch.api.toUpperCase()})`);
+
+    try {
+      // Extract chunk audio
+      const chunkBlob = await extractChunk(file, ch.startSec, ch.endSec);
+
+      // Transcribe
+      let text;
+      if (ch.api === 'groq') {
+        text = await transcribeGroq(chunkBlob, lang);
+        state.quota.usedSec += ch.chunkDur;
+        await saveState();
+        updateQuotaUI();
+      } else {
+        text = await transcribeOpenAI(chunkBlob, lang);
+      }
+
+      ch.text = text;
+      ch.status = 'done';
+    } catch (e) {
+      console.error(`Chunk ${i} error:`, e);
+      // If Groq fails (rate limit), try OpenAI fallback
+      if (ch.api === 'groq' && choice === 'groq-then-openai' && state.openaiKey) {
+        try {
+          toast(`Groq 한도 도달 — OpenAI로 전환`);
+          ch.api = 'openai';
+          const chunkBlob = await extractChunk(file, ch.startSec, ch.endSec);
+          ch.text = await transcribeOpenAI(chunkBlob, lang);
+          ch.status = 'done';
+          // Mark remaining chunks as openai
+          chunks.filter(c => c.status === 'pending' && c.api === 'groq')
+            .forEach(c => c.api = 'openai');
+        } catch (e2) {
+          ch.status = 'error';
+          ch.text = `[오류: ${e2.message}]`;
+        }
+      } else {
+        ch.status = 'error';
+        ch.text = `[오류: ${e.message}]`;
+      }
+    }
+    renderChunks(chunks);
+  }
+
+  // Merge results
+  updateProgress(nChunks, nChunks, '결과 병합 중...');
+  const fullText = mergeChunks(chunks);
+
+  // Show result
+  const langName = document.getElementById('pre-language').selectedOptions[0].text;
+  document.getElementById('res-info').textContent =
+    `${file.name} | ${(duration/60).toFixed(1)}분 | ${langName}`;
+  document.getElementById('res-full').textContent = fullText;
+
+  // Save to history
+  const entry = {
+    name: file.name, date: fmtNow(), duration: Math.round(duration),
+    lang, text: fullText
+  };
+  state.history.unshift(entry);
+  if (state.history.length > 10) state.history.pop();
+  await saveState();
+
+  showPage('result');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Audio chunk extraction (Web Audio API)
+// ═══════════════════════════════════════════════════════════════
+async function extractChunk(file, startSec, endSec) {
+  const arrayBuf = await file.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await audioCtx.decodeAudioData(arrayBuf);
+
+  const sampleRate = 16000; // Whisper optimal
+  const startSample = Math.floor(startSec * decoded.sampleRate);
+  const endSample = Math.min(Math.floor(endSec * decoded.sampleRate), decoded.length);
+  const length = endSample - startSample;
+
+  // Downmix to mono + resample to 16kHz
+  const offlineCtx = new OfflineAudioContext(1, Math.ceil(length * sampleRate / decoded.sampleRate), sampleRate);
+  const source = offlineCtx.createBufferSource();
+
+  // Create a buffer with just the chunk
+  const chunkBuf = audioCtx.createBuffer(decoded.numberOfChannels, length, decoded.sampleRate);
+  for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+    const src = decoded.getChannelData(ch);
+    const dst = chunkBuf.getChannelData(ch);
+    for (let i = 0; i < length; i++) dst[i] = src[startSample + i];
+  }
+
+  source.buffer = chunkBuf;
+  source.connect(offlineCtx.destination);
+  source.start();
+
+  const rendered = await offlineCtx.startRendering();
+  audioCtx.close();
+
+  // Encode as WAV
+  return encodeWAV(rendered);
+}
+
+function encodeWAV(audioBuffer) {
+  const numCh = audioBuffer.numberOfChannels;
+  const sampleRate = audioBuffer.sampleRate;
+  const format = 1; // PCM
+  const bitDepth = 16;
+  const data = audioBuffer.getChannelData(0);
+  const dataLength = data.length * (bitDepth / 8);
+  const buffer = new ArrayBuffer(44 + dataLength);
+  const view = new DataView(buffer);
+
+  // RIFF header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, format, true);
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 1 * (bitDepth / 8), true);
+  view.setUint16(32, 1 * (bitDepth / 8), true);
+  view.setUint16(34, bitDepth, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  let offset = 44;
+  for (let i = 0; i < data.length; i++) {
+    const s = Math.max(-1, Math.min(1, data[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, str) {
+  for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// API Calls
+// ═══════════════════════════════════════════════════════════════
+async function transcribeGroq(audioBlob, lang) {
+  const form = new FormData();
+  form.append('file', audioBlob, 'chunk.wav');
+  form.append('model', 'whisper-large-v3');
+  form.append('response_format', 'verbose_json');
+  if (lang && lang !== 'auto') form.append('language', lang);
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${state.groqKey}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Groq ${res.status}: ${err}`);
+  }
+
+  const json = await res.json();
+  return json.text || '';
+}
+
+async function transcribeOpenAI(audioBlob, lang) {
+  const form = new FormData();
+  form.append('file', audioBlob, 'chunk.wav');
+  form.append('model', 'whisper-1');
+  form.append('response_format', 'verbose_json');
+  if (lang && lang !== 'auto') form.append('language', lang);
+
+  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${state.openaiKey}` },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI ${res.status}: ${err}`);
+  }
+
+  const json = await res.json();
+  return json.text || '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Merge chunks (handle overlap dedup)
+// ═══════════════════════════════════════════════════════════════
+function mergeChunks(chunks) {
+  const sorted = chunks.filter(c => c.status === 'done').sort((a, b) => a.startSec - b.startSec);
+  if (sorted.length === 0) return '(전사 결과 없음)';
+
+  let merged = '';
+  for (let i = 0; i < sorted.length; i++) {
+    const ch = sorted[i];
+    const ts = fmtTime(ch.startSec);
+    const text = ch.text.trim();
+    if (i === 0) {
+      merged += `[${ts}] ${text}`;
+    } else {
+      // Simple overlap handling: skip first sentence of overlapping chunk
+      // if it appears at end of previous chunk
+      const sentences = text.split(/(?<=[.!?。])\s+/);
+      const prevEnd = sorted[i-1].text.trim().slice(-100);
+      let startIdx = 0;
+      if (sentences.length > 1 && prevEnd.includes(sentences[0].slice(0, 30))) {
+        startIdx = 1; // skip duplicate first sentence
+      }
+      merged += `\n\n[${ts}] ${sentences.slice(startIdx).join(' ')}`;
+    }
+  }
+  return merged;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI Helpers
+// ═══════════════════════════════════════════════════════════════
+function renderChunks(chunks) {
+  const list = document.getElementById('chunk-list');
+  list.innerHTML = chunks.map(ch => {
+    const icon = ch.status === 'done' ? '✅' :
+                 ch.status === 'processing' ? '⏳' :
+                 ch.status === 'error' ? '❌' :
+                 ch.status === 'skipped' ? '⏭️' : '⬜';
+    const tagCls = ch.api === 'groq' ? 'tag-groq' :
+                   ch.api === 'openai' ? 'tag-openai' : 'tag-pending';
+    const tagName = ch.api === 'skip' ? '건너뜀' : ch.api.toUpperCase();
+    return `<div class="chunk-item">
+      <span class="status">${icon}</span>
+      <span>청크 ${ch.index+1} (${fmtTime(ch.startSec)}~${fmtTime(ch.endSec)})</span>
+      <span class="api-tag ${tagCls}">${tagName}</span>
+    </div>`;
+  }).join('');
+}
+
+function updateProgress(current, total, text) {
+  const pct = Math.round((current / total) * 100);
+  document.getElementById('proc-progress').style.width = pct + '%';
+  document.getElementById('proc-status').textContent = text;
+  document.getElementById('proc-detail').textContent = `${current} / ${total} 청크 완료`;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function copyResult() {
+  const text = document.getElementById('res-full').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('클립보드에 복사됨'));
+}
+
+function downloadResult() {
+  const text = document.getElementById('res-full').textContent;
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `전사_${fmtNow()}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════════════════════
+function fmtTime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+               : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function fmtNow() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════
+loadState();
+</script>
+</body>
+</html>
