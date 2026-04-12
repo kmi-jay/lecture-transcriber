@@ -410,7 +410,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
 
   <div class="field">
-    <div class="field-label">전사 언어</div>
+    <div class="field-label">원문 언어 (강의에서 말하는 언어)</div>
     <select id="pre-language">
       <option value="ko">한국어</option>
       <option value="en">영어</option>
@@ -425,6 +425,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <option value="ru">러시아어</option>
       <option value="auto">자동감지</option>
     </select>
+  </div>
+
+  <div id="llm-toggle-row" class="field" style="display:none">
+    <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px;
+      background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border2)">
+      <input type="checkbox" id="pre-llm-summary" style="width:18px;height:18px;accent-color:var(--accent)">
+      <div>
+        <div style="font-size:14px;font-weight:500">LLM 요약 생성</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Groq로 한국어 요약 생성 (무료, 전사 완료 후 자동 실행)</div>
+      </div>
+    </label>
   </div>
 
   <div style="display:flex;gap:10px;margin-top:8px">
@@ -460,7 +471,11 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="result-text" id="res-full"></div>
   </div>
   <div id="tab-summary" class="tab-content" style="display:none">
-    <div class="result-text" id="res-summary">요약은 LLM 후보정 사용 시 생성됩니다.</div>
+    <div class="result-text" id="res-summary" style="min-height:120px">
+      <span style="color:var(--text3)">요약 탭에서 전사 완료 후 Groq로 한국어 요약을 생성할 수 있습니다.</span>
+    </div>
+    <button id="btn-generate-summary" class="btn btn-ghost" onclick="generateSummary()"
+      style="margin-top:10px;display:none">✨ 요약 생성 (Groq 무료)</button>
   </div>
 
   <div style="display:flex;gap:10px;margin-top:14px">
@@ -545,8 +560,39 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
-  <!-- Chunk Settings -->
+  <!-- Gemini Key -->
+  <div class="api-card">
+    <h3><span style="color:#4285f4">●</span> Gemini API Key <span class="badge badge-free">무료</span></h3>
+    <div class="field" style="margin-bottom:0">
+      <input type="password" id="set-gemini-key" placeholder="AIza...">
+    </div>
+    <div class="hint">
+      <strong>무료 티어 제공</strong> — Gemini 1.5 Flash, 하루 1,500건<br>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> → 구글 로그인 → Create API Key<br>
+      요약에만 사용 (전사에는 사용 안 함)
+    </div>
+  </div>
+
+  <!-- LLM Summary Settings -->
   <div class="settings-section" style="margin-top:20px">
+    <div class="card-label">LLM 요약 설정</div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0">
+        <div class="field-label">요약에 사용할 LLM</div>
+        <select id="set-llm-provider">
+          <option value="auto">자동 (Groq → Gemini 순서)</option>
+          <option value="groq">Groq (Llama 3.3 70B) — 무료, 빠름</option>
+          <option value="gemini">Gemini 1.5 Flash — 무료, 한국어 강점</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-top:8px">
+        두 가지 모두 무료. 자동 선택 시 Groq 키가 있으면 Groq 우선, 없으면 Gemini 사용.
+      </p>
+    </div>
+  </div>
+
+  <!-- Chunk Settings -->
+  <div class="settings-section" style="margin-top:4px">
     <div class="card-label">청크 설정</div>
     <div class="card">
       <div class="field" style="margin-bottom:0">
@@ -601,8 +647,9 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 //  STATE
 // ═════════════════════════════════════════════════════════════════
 let state = {
-  groqKey:'', assemblyaiKey:'', openaiKey:'',
+  groqKey:'', assemblyaiKey:'', openaiKey:'', geminiKey:'',
   chunkMin:10,
+  llmProvider:'auto', // auto | groq | gemini
   quota:{ date:'', usedSec:0 },
   history:[]
 };
@@ -640,6 +687,8 @@ function applyStateToUI(){
   document.getElementById('set-groq-key').value=state.groqKey;
   document.getElementById('set-assemblyai-key').value=state.assemblyaiKey||'';
   document.getElementById('set-openai-key').value=state.openaiKey;
+  document.getElementById('set-gemini-key').value=state.geminiKey||'';
+  document.getElementById('set-llm-provider').value=state.llmProvider||'auto';
   document.getElementById('set-chunk-min').value=state.chunkMin;
   updateQuotaUI();
 }
@@ -685,6 +734,8 @@ function saveSettings(){
   state.groqKey=document.getElementById('set-groq-key').value.trim();
   state.assemblyaiKey=document.getElementById('set-assemblyai-key').value.trim();
   state.openaiKey=document.getElementById('set-openai-key').value.trim();
+  state.geminiKey=document.getElementById('set-gemini-key').value.trim();
+  state.llmProvider=document.getElementById('set-llm-provider').value;
   state.chunkMin=parseInt(document.getElementById('set-chunk-min').value);
   saveState();toast('설정 저장됨');showPage('home');
 }
@@ -776,6 +827,11 @@ function showPrecheck(){
     warnEl.style.display='none';
     sel.value='auto';
   }
+
+  // Show LLM summary toggle if any LLM key is available
+  const hasLLM=!!(state.groqKey||state.geminiKey);
+  const llmRow=document.getElementById('llm-toggle-row');
+  llmRow.style.display=hasLLM?'block':'none';
 
   sel.onchange=updateCostEstimate;
   updateCostEstimate();
@@ -928,7 +984,20 @@ async function startTranscription(){
   state.history.unshift({name:file.name,date:fmtNow(),duration:Math.round(duration),lang,text:fullText});
   if(state.history.length>10) state.history.pop();
   await saveState();renderHistory();
+
+  // Prepare summary tab
+  const wantSummary=document.getElementById('pre-llm-summary')?.checked;
+  const summaryEl=document.getElementById('res-summary');
+  const summaryBtn=document.getElementById('btn-generate-summary');
+  summaryEl.innerHTML='<span style="color:var(--text3)">요약이 생성되지 않았습니다.</span>';
+  summaryBtn.style.display=(state.groqKey||state.geminiKey)?'flex':'none';
+
   showPage('result');
+
+  // Auto-run summary if checkbox was ticked
+  if(wantSummary&&state.groqKey){
+    await generateSummaryFromText(fullText,lang);
+  }
 }
 
 async function tryFallback(ch,error,lang,chunks,file){
@@ -1200,6 +1269,226 @@ function mergeChunks(chunks){
 }
 
 // ═════════════════════════════════════════════════════════════════
+//  LLM SUMMARY (Groq chat completions — free)
+// ═════════════════════════════════════════════════════════════════
+
+// Called from result page "요약 생성" button
+async function generateSummary(){
+  const text=document.getElementById('res-full').textContent;
+  const lang=document.getElementById('pre-language')?.value||'ko';
+  await generateSummaryFromText(text,lang);
+}
+
+// ── Structured LLM error class ──
+class LLMError extends Error {
+  constructor(provider, status, bodyText, retryAfterSec=null){
+    super(`${provider} ${status}`);
+    this.provider=provider; this.status=status; this.bodyText=bodyText;
+    this.retryAfterSec=retryAfterSec;
+    // Classify error type
+    if(status===429) this.type='rate_limit';
+    else if(status===401||status===403) this.type='auth';
+    else if(status>=500) this.type='server';
+    else this.type='unknown';
+  }
+  get friendlyMessage(){
+    const p=this.provider==='groq'?'Groq':'Gemini';
+    if(this.type==='rate_limit'){
+      if(this.retryAfterSec&&this.retryAfterSec<600){
+        const m=Math.ceil(this.retryAfterSec/60);
+        return `${p} 무료 한도에 도달했습니다.\n약 ${m}분 후 다시 사용할 수 있습니다.`;
+      }
+      return `${p} 무료 한도에 도달했습니다.\n${p==='Groq'?'롤링 방식으로 1시간 후 갱신됩니다.':'일일 한도(1,500건) 초과로 내일 자정(태평양 시간) 리셋됩니다.'}`;
+    }
+    if(this.type==='auth') return `${p} API 키가 유효하지 않습니다.\n설정에서 키를 확인해 주세요.`;
+    if(this.type==='server') return `${p} 서버 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.`;
+    return `${p} 오류: ${this.status}`;
+  }
+}
+
+// ── Show LLM error modal with actionable options ──
+function showLLMErrorModal(err, retryFn){
+  const p=err.provider, altProvider=p==='groq'?'gemini':'groq';
+  const altLabel=altProvider==='groq'?'Groq (Llama)':'Gemini';
+  const altKey=altProvider==='groq'?state.groqKey:state.geminiKey;
+  const hasOpenAI=!!state.openaiKey;
+
+  let bodyHTML=`<div style="margin-bottom:12px;line-height:1.7;white-space:pre-line">${err.friendlyMessage}</div>`;
+
+  // Retry timer for rate limits
+  if(err.type==='rate_limit'&&err.retryAfterSec&&err.retryAfterSec<600){
+    bodyHTML+=`<div id="modal-countdown" style="font-family:var(--mono);font-size:18px;color:var(--accent2);margin-bottom:12px;text-align:center"></div>`;
+  }
+
+  const actions=[];
+
+  // Option 1: Switch to other free API
+  if(altKey){
+    actions.push({label:`${altLabel}로 전환 (무료)`,primary:true,fn:()=>{
+      retryFn(altProvider);
+    }});
+  }else{
+    actions.push({label:`${altLabel} 키 등록하러 가기`,primary:false,fn:()=>{showPage('settings')}});
+  }
+
+  // Option 2: Use OpenAI (paid) — only for non-auth errors
+  if(err.type!=='auth'){
+    if(hasOpenAI){
+      actions.push({label:'OpenAI로 전환 (유료 — ~₩9/분)',primary:false,fn:()=>{retryFn('openai')}});
+    }else{
+      actions.push({label:'OpenAI 키 등록 (유료)',primary:false,fn:()=>{showPage('settings')}});
+    }
+  }
+
+  // Option 3: Wait and retry (for rate limits with known timer)
+  if(err.type==='rate_limit'&&err.retryAfterSec&&err.retryAfterSec<600){
+    actions.push({label:'대기 후 재시도',primary:false,fn:()=>{
+      retryFn(p); // retry same provider
+    }});
+  }
+
+  // Option 4: Cancel
+  actions.push({label:'취소',primary:false,fn:()=>{}});
+
+  showModal(err.type==='rate_limit'?'무료 한도 초과':err.type==='auth'?'API 키 오류':'서버 오류',
+    bodyHTML, actions);
+
+  // Start countdown timer if applicable
+  if(err.type==='rate_limit'&&err.retryAfterSec&&err.retryAfterSec<600){
+    let remaining=err.retryAfterSec;
+    const cd=document.getElementById('modal-countdown');
+    if(cd){
+      const tick=()=>{
+        if(remaining<=0){cd.textContent='재시도 가능!';return}
+        const mm=Math.floor(remaining/60),ss=remaining%60;
+        cd.textContent=`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')} 후 재시도 가능`;
+        remaining--;
+        setTimeout(tick,1000);
+      };
+      tick();
+    }
+  }
+}
+
+// ── API call functions with structured errors ──
+async function callGroqChat(systemPrompt,userPrompt){
+  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'llama-3.3-70b-versatile',
+      messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
+      temperature:0.3,max_tokens:1500
+    })
+  });
+  if(!res.ok){
+    const retryAfter=parseInt(res.headers.get('retry-after'))||null;
+    throw new LLMError('groq',res.status,await res.text(),retryAfter);
+  }
+  return(await res.json()).choices?.[0]?.message?.content||'(결과 없음)';
+}
+
+async function callGemini(systemPrompt,userPrompt){
+  const model='gemini-1.5-flash';
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      system_instruction:{parts:[{text:systemPrompt}]},
+      contents:[{parts:[{text:userPrompt}]}],
+      generationConfig:{temperature:0.3,maxOutputTokens:1500}
+    })
+  });
+  if(!res.ok){
+    const retryAfter=parseInt(res.headers.get('retry-after'))||null;
+    throw new LLMError('gemini',res.status,await res.text(),retryAfter);
+  }
+  const data=await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text||'(결과 없음)';
+}
+
+async function callOpenAIChat(systemPrompt,userPrompt){
+  const res=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'gpt-4o-mini',
+      messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
+      temperature:0.3,max_tokens:1500
+    })
+  });
+  if(!res.ok){
+    throw new LLMError('openai',res.status,await res.text(),null);
+  }
+  return(await res.json()).choices?.[0]?.message?.content||'(결과 없음)';
+}
+
+// ── Build prompts ──
+function buildSummaryPrompts(transcriptText,lang){
+  const isKorean=lang==='ko'||lang==='auto';
+  const systemPrompt=isKorean
+    ?'당신은 전문 강의 요약가입니다. 한국어 강의 전사 텍스트를 간결하고 체계적으로 요약합니다.'
+    :'You are a professional lecture summarizer. Summarize lecture transcripts into concise Korean summaries with key terms in English.';
+  const userPrompt=isKorean
+    ?`다음은 강의 전사 텍스트입니다. 아래 형식으로 요약해 주세요:\n\n**핵심 주제**: (1~2문장)\n\n**주요 내용**:\n- (핵심 포인트 5~8개, 각 1~2문장)\n\n**키워드**: (중요 용어/개념 쉼표 구분)\n\n---\n전사 텍스트:\n${transcriptText.slice(0,12000)}`
+    :`Summarize the following ${lang.toUpperCase()} lecture transcript in Korean:\n\n**핵심 주제**: (1~2 sentences in Korean)\n\n**주요 내용**:\n- (5~8 key points in Korean, with important English terms in parentheses)\n\n**키워드**: (key English terms, comma separated)\n\n---\nTranscript:\n${transcriptText.slice(0,12000)}`;
+  return{systemPrompt,userPrompt};
+}
+
+// ── Main summary entry point ──
+async function generateSummaryFromText(transcriptText,lang){
+  const pref=state.llmProvider||'auto';
+  let provider=null;
+  if(pref==='groq'&&state.groqKey) provider='groq';
+  else if(pref==='gemini'&&state.geminiKey) provider='gemini';
+  else if(pref==='auto'){
+    if(state.groqKey) provider='groq';
+    else if(state.geminiKey) provider='gemini';
+  }
+  if(!provider){
+    toast('설정에서 Groq 또는 Gemini API 키를 입력하세요');return;
+  }
+  await _runSummary(provider,transcriptText,lang);
+}
+
+async function _runSummary(provider,transcriptText,lang){
+  const summaryEl=document.getElementById('res-summary');
+  const summaryBtn=document.getElementById('btn-generate-summary');
+  summaryBtn.disabled=true;
+  const label=provider==='groq'?'Groq (Llama)':provider==='gemini'?'Gemini':'OpenAI (유료)';
+  summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...</span>`;
+
+  const{systemPrompt,userPrompt}=buildSummaryPrompts(transcriptText,lang);
+
+  try{
+    let summary;
+    if(provider==='groq') summary=await callGroqChat(systemPrompt,userPrompt);
+    else if(provider==='gemini') summary=await callGemini(systemPrompt,userPrompt);
+    else summary=await callOpenAIChat(systemPrompt,userPrompt);
+
+    summaryEl.style.whiteSpace='pre-wrap';
+    summaryEl.textContent=summary;
+    if(state.history.length>0) state.history[0].summary=summary;
+    await saveState();
+    toast(`요약 완료 (${label})`);
+    summaryBtn.disabled=false;
+  }catch(e){
+    summaryBtn.disabled=false;
+    if(e instanceof LLMError){
+      // Show detailed modal with options
+      summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 한도 초과 또는 오류 발생. 선택지를 확인하세요.</span>`;
+      showLLMErrorModal(e, (newProvider)=>{
+        // User chose to retry with a different or same provider
+        _runSummary(newProvider,transcriptText,lang);
+      });
+    }else{
+      summaryEl.innerHTML=`<span style="color:var(--red)">요약 실패: ${e.message}</span>`;
+    }
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
 //  UI HELPERS
 // ═════════════════════════════════════════════════════════════════
 function renderChunks(chunks){
@@ -1261,6 +1550,16 @@ function showHistoryItem(i){
   const h=state.history[i];if(!h)return;
   document.getElementById('res-info').textContent=`${h.name} · ${Math.round(h.duration/60)}분`;
   document.getElementById('res-full').textContent=h.text;
+  const summaryEl=document.getElementById('res-summary');
+  const summaryBtn=document.getElementById('btn-generate-summary');
+  if(h.summary){
+    summaryEl.style.whiteSpace='pre-wrap';
+    summaryEl.textContent=h.summary;
+    summaryBtn.style.display='flex';
+  }else{
+    summaryEl.innerHTML='<span style="color:var(--text3)">요약이 생성되지 않았습니다.</span>';
+    summaryBtn.style.display=(state.groqKey||state.geminiKey)?'flex':'none';
+  }
   showPage('result');
 }
 
