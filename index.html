@@ -779,9 +779,9 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <div>
-          <p style="font-size:14px">Groq: <strong id="set-usage">0</strong>분 사용</p>
+          <p style="font-size:14px">Groq 사용량: <strong id="set-usage" style="font-size:12px;font-weight:normal;color:var(--text2)">0분 사용 (한도 충분)</strong></p>
           <p style="font-size:12px;color:var(--text2);margin-top:2px">
-            롤링 방식 — 첫 요청 후 1시간이면 자동 복구
+            1시간 롤링 방식 — 앱 시작 시 자동 체크
           </p>
         </div>
         <button class="btn btn-sm btn-ghost" onclick="resetQuota()">초기화</button>
@@ -854,8 +854,10 @@ async function dbSet(k,v){const db=await openDB();return new Promise(r=>{const t
 async function loadState(){
   const saved=await dbGet('state');
   if(saved) Object.assign(state,saved);
-  const today=new Date().toISOString().slice(0,10);
-  if(state.quota.date!==today) state.quota={date:today,usedSec:0};
+  // Groq is a 1-hour rolling window: reset if windowStart is >1h ago
+  const now=Date.now();
+  const windowStart=state.quota.windowStart||0;
+  if(now-windowStart>3600000) state.quota={windowStart:0,usedSec:0};
   applyStateToUI();
   renderHistory();
 }
@@ -904,7 +906,13 @@ function toast(msg){
 //  QUOTA UI
 // ═════════════════════════════════════════════════════════════════
 function updateQuotaUI(){
-  const remainSec=Math.max(0,GROQ_HOURLY_LIMIT-state.quota.usedSec);
+  // Check rolling 1h window: if elapsed >1h since windowStart, quota is fully reset
+  const now=Date.now();
+  const ws=state.quota.windowStart||0;
+  const elapsedSec=ws?(now-ws)/1000:0;
+  const effectiveUsed=ws&&elapsedSec<3600?state.quota.usedSec:0;
+
+  const remainSec=Math.max(0,GROQ_HOURLY_LIMIT-effectiveUsed);
   const remainMin=Math.round(remainSec/60);
   const pct=remainSec/GROQ_HOURLY_LIMIT;
   const circ=138.23;
@@ -913,27 +921,37 @@ function updateQuotaUI(){
   ring.style.stroke=pct>.2?'var(--green)':pct>.05?'var(--amber)':'var(--red)';
   document.getElementById('quota-text').textContent=remainMin+'분';
   const u=document.getElementById('set-usage');
-  if(u) u.textContent=Math.round(state.quota.usedSec/60);
+  if(u){
+    if(ws&&elapsedSec<3600){
+      const resetInMin=Math.ceil((3600-elapsedSec)/60);
+      u.textContent=`${Math.round(effectiveUsed/60)}분 사용 (${resetInMin}분 후 초기화)`;
+    }else{
+      u.textContent='0분 사용 (한도 충분)';
+    }
+  }
 }
 
 function resetQuota(){
-  state.quota={date:new Date().toISOString().slice(0,10),usedSec:0};
+  state.quota={windowStart:0,usedSec:0};
   saveState();updateQuotaUI();toast('사용량 초기화됨');
 }
 
 async function hardReload(){
   try{
-    // Unregister all service workers
+    // 1. Unregister all service workers
     if('serviceWorker' in navigator){
       const regs=await navigator.serviceWorker.getRegistrations();
       for(const reg of regs) await reg.unregister();
     }
-    // Clear all caches
+    // 2. Clear all SW caches
     if('caches' in window){
       const keys=await caches.keys();
       for(const k of keys) await caches.delete(k);
     }
-    toast('캐시 삭제 완료, 재시작합니다...');
+    // 3. Reset Groq quota in IndexedDB (keep API keys & history)
+    state.quota={windowStart:0,usedSec:0};
+    await saveState();
+    toast('캐시 및 사용량 초기화 완료, 재시작합니다...');
     setTimeout(()=>location.reload(true),800);
   }catch(e){
     location.reload(true);
@@ -1187,6 +1205,7 @@ async function startTranscription(){
 
       if(ch.api==='groq'){
         result=await transcribeGroq(chunkBlob,lang);
+        if(!state.quota.windowStart) state.quota.windowStart=Date.now();
         state.quota.usedSec+=ch.chunkDur;
         await saveState();updateQuotaUI();
       }else if(ch.api==='assemblyai'){
