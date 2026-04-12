@@ -900,7 +900,7 @@ async function startTranscription(){
       }else{
         text=await transcribeOpenAI(chunkBlob,lang);
       }
-      ch.text=text;ch.status='done';
+      ch.text=cleanHallucinations(text);ch.status='done';
     }catch(e){
       console.error(`Chunk ${i} error:`,e);
 
@@ -954,7 +954,7 @@ async function tryFallback(ch,error,lang,chunks,file){
       let text;
       if(fb==='assemblyai') text=await transcribeAssemblyAI(chunkBlob,lang);
       else text=await transcribeOpenAI(chunkBlob,lang);
-      ch.text=text;ch.status='done';
+      ch.text=cleanHallucinations(text);ch.status='done';
 
       // Switch remaining pending chunks too
       chunks.filter(c=>c.status==='pending'&&c.api===ch.api).forEach(c=>c.api=fb);
@@ -1091,6 +1091,91 @@ async function transcribeOpenAI(blob,lang){
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form});
   if(!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
   return(await res.json()).text||'';
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  HALLUCINATION FILTER (JS port of Mac app logic)
+// ═════════════════════════════════════════════════════════════════
+
+// Regex: Arabic, Hebrew, Thai, Devanagari etc. that shouldn't appear in KO/EN audio
+const RX_GARBAGE_SCRIPTS = /[\u0600-\u06FF\u0590-\u05FF\u0900-\u097F\u0E00-\u0E7F\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+// Looks like random English tokens injected mid-Korean (all-caps or gibberish)
+const RX_INJECTED_EN = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g; // Proper-noun pairs e.g. "Aqua Bleumer"
+// Repeated short phrase detector
+function _detectRepeat(text, minRepeats=3){
+  const words = text.split(/\s+/);
+  for(let len=2; len<=6; len++){
+    for(let i=0; i<=words.length-len*minRepeats; i++){
+      const phrase = words.slice(i,i+len).join(' ');
+      if(!phrase.trim()) continue;
+      let count=0, pos=0;
+      const t = text;
+      while((pos=t.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
+      if(count>=minRepeats && phrase.length*count > text.length*0.4) return true;
+    }
+  }
+  return false;
+}
+function _cleanRepeat(text){
+  const words = text.split(/\s+/);
+  for(let len=2; len<=6; len++){
+    for(let i=0; i<=words.length-len*3; i++){
+      const phrase = words.slice(i,i+len).join(' ');
+      if(!phrase.trim()) continue;
+      let count=0, pos=0;
+      while((pos=text.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
+      if(count>=3){
+        // Keep first occurrence, remove the rest
+        const first = text.indexOf(phrase);
+        const after = text.slice(first+phrase.length);
+        const cleaned = after.replace(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*','g'),'');
+        return text.slice(0,first+phrase.length)+' '+cleaned.trim();
+      }
+    }
+  }
+  return text;
+}
+
+function cleanHallucinations(text){
+  if(!text) return text;
+
+  // 1. Remove lines/sentences with Arabic/RTL garbage scripts
+  let cleaned = text.split(/\n/).map(line => {
+    if(RX_GARBAGE_SCRIPTS.test(line)){
+      // Remove the garbage characters and surrounding junk tokens
+      // If >20% of line is garbage, remove the whole segment around it
+      const garCount = (line.match(RX_GARBAGE_SCRIPTS)||[]).length;
+      if(garCount/line.length > 0.05){
+        // Remove the garbage word and adjacent suspicious tokens
+        return line.replace(/\S*[\u0600-\u06FF\u0590-\u05FF\u0900-\u097F\u0E00-\u0E7F\uFB50-\uFDFF\uFE70-\uFEFF]+\S*/g,'').trim();
+      }
+    }
+    return line;
+  }).filter(l=>l.length>0).join('\n');
+
+  // 2. Remove suspicious injected proper-noun pairs mid-Korean text
+  // Pattern: Korean chars, then random "Word Word" English, then Korean chars again
+  cleaned = cleaned.replace(/([\uAC00-\uD7A3])\s+([A-Z][a-z]+ [A-Z][a-z]+)\s+([\uAC00-\uD7A3])/g, '$1 $3');
+
+  // 3. Remove fragments like "3asting 1" "gef lazio" — short garbled tokens between Korean
+  cleaned = cleaned.replace(/([\uAC00-\uD7A3])\s+([a-zA-Z0-9]{1,5}\s+[a-zA-Z]{3,10})\s+([\uAC00-\uD7A3])/g, (m,a,mid,b)=>{
+    // Only remove if the middle part has no Korean at all
+    if(!/[\uAC00-\uD7A3]/.test(mid)) return `${a} ${b}`;
+    return m;
+  });
+
+  // 4. Repeated phrase cleanup
+  const sentences = cleaned.split(/(?<=[.!?。])\s+|(?<=\n)/);
+  const deduped = sentences.map(s=>{
+    if(_detectRepeat(s)) return _cleanRepeat(s);
+    return s;
+  });
+  cleaned = deduped.join(' ').replace(/\s{2,}/g,' ').trim();
+
+  // 5. Paragraph-level repeat check
+  if(_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
+
+  return cleaned;
 }
 
 // ═════════════════════════════════════════════════════════════════
