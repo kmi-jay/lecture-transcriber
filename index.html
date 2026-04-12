@@ -467,13 +467,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
 
   <div class="field">
-    <div class="field-label">처리 방법</div>
+    <div class="field-label">전사 방법 (음성→텍스트)</div>
     <select id="pre-api-choice">
-      <option value="auto">자동 (Groq → AssemblyAI → 선택지)</option>
+      <option value="auto">자동 (Groq → AssemblyAI → Gemini → 선택지)</option>
+      <option value="free-auto">무료만 (Groq → AssemblyAI → Gemini)</option>
       <option value="groq-only">Groq만 (한도 내에서만, 무료)</option>
       <option value="assemblyai-only">AssemblyAI만 (무료 크레딧)</option>
+      <option value="gemini-only">Gemini만 (무료)</option>
       <option value="openai-only">OpenAI만 (유료)</option>
     </select>
+    <p style="font-size:11px;color:var(--text3);margin-top:4px">Groq·AssemblyAI·OpenAI = 전용 음성인식 | Gemini = AI 멀티모달 전사 | Claude = 음성 미지원</p>
   </div>
 
   <div class="field">
@@ -499,8 +502,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border2)">
       <input type="checkbox" id="pre-diarization" style="width:18px;height:18px;accent-color:var(--accent)">
       <div>
-        <div style="font-size:14px;font-weight:500">화자 구분</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">AssemblyAI로 화자를 자동 구분합니다 (AssemblyAI 키 필요)</div>
+        <div style="font-size:14px;font-weight:500">화자 구분 (Speaker Diarization)</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">AssemblyAI 전용 — 여러 화자를 자동 식별합니다. 체크 시 전사 방법이 AssemblyAI로 전환됩니다.</div>
       </div>
     </label>
   </div>
@@ -509,6 +512,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="field-label">AI 후처리 (노트·요약·정제)</div>
     <select id="pre-llm-choice">
       <option value="auto">자동 (Groq → Gemini → Claude)</option>
+      <option value="free-only">무료만 (Groq → Gemini)</option>
       <option value="groq-first">Groq 우선 → Gemini → Claude</option>
       <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
       <option value="claude-first">Claude 우선 → Groq → Gemini</option>
@@ -872,10 +876,24 @@ function applyStateToUI(){
 // ═════════════════════════════════════════════════════════════════
 //  NAVIGATION
 // ═════════════════════════════════════════════════════════════════
-function showPage(name){
+let _pageHistory=[];
+function showPage(name, skipPush){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
+  if(!skipPush){
+    _pageHistory.push(name);
+    history.pushState({page:name},'',' ');
+  }
 }
+window.addEventListener('popstate', e=>{
+  if(_pageHistory.length>1){
+    _pageHistory.pop(); // remove current
+    const prev=_pageHistory[_pageHistory.length-1]||'home';
+    showPage(prev, true);
+  }else{
+    showPage('home', true);
+  }
+});
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
@@ -1094,16 +1112,21 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 //  TRANSCRIPTION ENGINE
 // ═════════════════════════════════════════════════════════════════
 async function startTranscription(){
-  const choice=document.getElementById('pre-api-choice').value;
+  let choice=document.getElementById('pre-api-choice').value;
   const lang=document.getElementById('pre-language').value;
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
 
+  // Force AssemblyAI when diarization is enabled
+  const diarizeEnabled=document.getElementById('pre-diarization')?.checked;
+  if(diarizeEnabled&&state.assemblyaiKey) choice='assemblyai-only';
+
   // Validate keys
   if(choice==='groq-only'&&!state.groqKey){toast('설정에서 Groq API 키를 입력하세요');return}
   if(choice==='assemblyai-only'&&!state.assemblyaiKey){toast('설정에서 AssemblyAI API 키를 입력하세요');return}
+  if(choice==='gemini-only'&&!state.geminiKey){toast('설정에서 Gemini API 키를 입력하세요');return}
   if(choice==='openai-only'&&!state.openaiKey){toast('설정에서 OpenAI API 키를 입력하세요');return}
-  if(choice==='auto'&&!state.groqKey&&!state.assemblyaiKey&&!state.openaiKey){
+  if((choice==='auto'||choice==='free-auto')&&!state.groqKey&&!state.assemblyaiKey&&!state.geminiKey&&!state.openaiKey){
     toast('설정에서 최소 1개 API 키를 입력하세요');return;
   }
 
@@ -1125,15 +1148,23 @@ async function startTranscription(){
     let api;
     if(choice==='openai-only') api='openai';
     else if(choice==='assemblyai-only') api='assemblyai';
+    else if(choice==='gemini-only') api=state.geminiKey?'gemini':'skip';
     else if(choice==='groq-only') api=remainGroq>=chunkDur?'groq':'skip';
-    else{
-      // auto: Groq first, then AssemblyAI, then prompt for OpenAI
+    else if(choice==='free-auto'){
+      // Free only: Groq → AssemblyAI → Gemini
       if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
       else if(state.assemblyaiKey){api='assemblyai'}
+      else if(state.geminiKey){api='gemini'}
+      else{api='skip'}
+    }else{
+      // auto: Groq → AssemblyAI → Gemini → OpenAI
+      if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
+      else if(state.assemblyaiKey){api='assemblyai'}
+      else if(state.geminiKey){api='gemini'}
       else if(state.openaiKey){api='openai'}
       else{api='skip'}
     }
-    if(api==='groq'&&choice!=='auto') remainGroq-=chunkDur;
+    if(api==='groq'&&choice!=='auto'&&choice!=='free-auto') remainGroq-=chunkDur;
 
     chunks.push({index:i,startSec,endSec,chunkDur,api,status:api==='skip'?'skipped':'pending',text:''});
   }
@@ -1160,6 +1191,8 @@ async function startTranscription(){
         await saveState();updateQuotaUI();
       }else if(ch.api==='assemblyai'){
         result=await transcribeAssemblyAI(chunkBlob,lang);
+      }else if(ch.api==='gemini'){
+        result=await transcribeGemini(chunkBlob,lang);
       }else{
         result=await transcribeOpenAI(chunkBlob,lang);
       }
@@ -1230,13 +1263,15 @@ async function startTranscription(){
 }
 
 async function tryFallback(ch,error,lang,chunks,file){
-  // If Groq failed, try AssemblyAI → OpenAI
+  // Fallback chain: Groq → AssemblyAI → Gemini → OpenAI
   const fallbackAPIs=[];
-  if(ch.api==='groq'){
-    if(state.assemblyaiKey) fallbackAPIs.push('assemblyai');
-    if(state.openaiKey) fallbackAPIs.push('openai');
-  }else if(ch.api==='assemblyai'){
-    if(state.openaiKey) fallbackAPIs.push('openai');
+  const allAPIs=['groq','assemblyai','gemini','openai'];
+  const keyMap={groq:'groqKey',assemblyai:'assemblyaiKey',gemini:'geminiKey',openai:'openaiKey'};
+  const idx=allAPIs.indexOf(ch.api);
+  for(let i=0;i<allAPIs.length;i++){
+    if(i===idx) continue;
+    const fb=allAPIs[i];
+    if(state[keyMap[fb]]) fallbackAPIs.push(fb);
   }
 
   for(const fb of fallbackAPIs){
@@ -1250,7 +1285,9 @@ async function tryFallback(ch,error,lang,chunks,file){
       ch.api=fb;
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let result;
-      if(fb==='assemblyai') result=await transcribeAssemblyAI(chunkBlob,lang);
+      if(fb==='groq') result=await transcribeGroq(chunkBlob,lang);
+      else if(fb==='assemblyai') result=await transcribeAssemblyAI(chunkBlob,lang);
+      else if(fb==='gemini') result=await transcribeGemini(chunkBlob,lang);
       else result=await transcribeOpenAI(chunkBlob,lang);
       ch.text=cleanHallucinations(result.text);
       ch.segments=result.segments||[];
@@ -1407,6 +1444,40 @@ async function transcribeOpenAI(blob,lang){
   const data=await res.json();
   const segments=(data.segments||[]).map(s=>({start:s.start,end:s.end,text:s.text}));
   return{text:data.text||'',segments};
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  API: Gemini (audio transcription via multimodal)
+// ═════════════════════════════════════════════════════════════════
+async function transcribeGemini(blob,lang){
+  const base64=await blobToBase64(blob);
+  const langName={ko:'한국어',en:'English',ja:'日本語',zh:'中文',es:'Español',fr:'Français',de:'Deutsch',it:'Italiano',hi:'Hindi',ar:'العربية',ru:'Русский',auto:'(자동 감지)'}[lang]||lang;
+  const model='gemini-2.0-flash';
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      contents:[{parts:[
+        {inline_data:{mime_type:'audio/wav',data:base64}},
+        {text:`이 오디오를 ${langName}로 전사해 주세요. 타임스탬프 없이 텍스트만 출력하세요. 다른 설명이나 주석 없이 순수한 전사 텍스트만 출력하세요.`}
+      ]}],
+      generationConfig:{temperature:0.1,maxOutputTokens:8000}
+    })
+  });
+  if(!res.ok) throw new Error(`Gemini 전사 ${res.status}: ${await res.text()}`);
+  const data=await res.json();
+  const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+  return{text,segments:[]};
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result.split(',')[1]);
+    reader.onerror=reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -2459,6 +2530,7 @@ function _pickLLMProvider(){
   // Priority orders
   const orders={
     'auto':['groq','gemini','claude'],
+    'free-only':['groq','gemini'],
     'groq-first':['groq','gemini','claude'],
     'gemini-first':['gemini','groq','claude'],
     'claude-first':['claude','groq','gemini'],
