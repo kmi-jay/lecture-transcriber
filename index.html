@@ -278,6 +278,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .notes-rendered p{font-size:14px;line-height:1.8;margin-bottom:8px;color:var(--text)}
 .notes-rendered ul{margin:6px 0 12px 16px;font-size:13px;line-height:1.7;color:var(--text2)}
 .notes-rendered li{margin-bottom:4px}
+.notes-rendered li.exam-point{cursor:pointer;padding:4px 8px;border-radius:4px;transition:background .15s;list-style:none;margin-left:-16px;padding-left:22px;position:relative}
+.notes-rendered li.exam-point::before{content:"▶";position:absolute;left:6px;font-size:9px;color:var(--accent);opacity:0;transition:opacity .15s;top:50%;transform:translateY(-50%)}
+.notes-rendered li.exam-point:hover{background:var(--surface2)}
+.notes-rendered li.exam-point:hover::before{opacity:1}
+.notes-rendered table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+.notes-rendered td{padding:6px 10px;border:1px solid var(--border);line-height:1.5}
 .notes-rendered strong{color:var(--text);font-weight:600}
 
 /* ──── Toast ──── */
@@ -496,10 +502,23 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <!-- Tab: 전문 -->
   <div id="tab-full" class="tab-content" style="display:block">
     <div class="result-text" id="res-full"></div>
+    <button id="btn-refine-text" class="btn btn-ghost" onclick="refineTranscript()"
+      style="margin-top:10px;display:none">🔧 텍스트 정제 (오인식·용어 자동 교정)</button>
   </div>
 
   <!-- Tab: 강의노트 -->
   <div id="tab-notes" class="tab-content" style="display:none">
+    <!-- Template selector -->
+    <div id="notes-template-row" style="display:none;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text3);white-space:nowrap">노트 템플릿:</span>
+      <select id="notes-template" style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:12px;cursor:pointer;flex:1;min-width:180px">
+        <option value="standard">📋 표준 강의노트 (추천)</option>
+        <option value="exam">🎯 시험 집중 노트</option>
+        <option value="concept">🧠 개념 정리 (마인드맵형)</option>
+        <option value="qa_format">❓ Q&A 예상 문제</option>
+        <option value="compare">⚖️ 비교·대조 분석</option>
+      </select>
+    </div>
     <div class="result-text" id="res-notes" style="min-height:150px">
       <span style="color:var(--text3)">전사 내용을 기반으로 체계적인 강의 노트를 생성합니다.</span>
     </div>
@@ -631,20 +650,35 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
+  <!-- Claude Key -->
+  <div class="api-card" style="border-color:var(--accent2,#e9456030)">
+    <h3><span style="color:var(--accent)">●</span> Claude API Key <span class="badge badge-paid">유료·최고품질</span></h3>
+    <div class="field" style="margin-bottom:0">
+      <input type="password" id="set-claude-key" placeholder="sk-ant-...">
+    </div>
+    <div class="hint">
+      <strong style="color:var(--accent)">유료 — 한국어 교정·강의노트 최고 품질</strong><br>
+      Groq/Gemini보다 정확도가 월등히 높음. ~$0.003/1K 토큰 (1시간 강의 ≈ $0.10~$0.30)<br>
+      <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> → API Keys
+    </div>
+  </div>
+
   <!-- LLM Summary Settings -->
   <div class="settings-section" style="margin-top:20px">
-    <div class="card-label">LLM 요약 설정</div>
+    <div class="card-label">LLM 후보정·노트·요약 설정</div>
     <div class="card">
       <div class="field" style="margin-bottom:0">
-        <div class="field-label">요약에 사용할 LLM</div>
+        <div class="field-label">강의노트·요약에 사용할 LLM</div>
         <select id="set-llm-provider">
-          <option value="auto">자동 (Groq → Gemini 순서)</option>
-          <option value="groq">Groq (Llama 3.3 70B) — 무료, 빠름</option>
+          <option value="auto">자동 (Groq → Gemini 순서, 무료)</option>
+          <option value="groq">Groq (llama-3.3-70b) — 무료, 빠름</option>
           <option value="gemini">Gemini 1.5 Flash — 무료, 한국어 강점</option>
+          <option value="claude">Claude Sonnet — 유료($), 최고 품질 ⭐</option>
         </select>
       </div>
       <p style="font-size:12px;color:var(--text3);margin-top:8px">
-        두 가지 모두 무료. 자동 선택 시 Groq 키가 있으면 Groq 우선, 없으면 Gemini 사용.
+        <strong>Groq/Gemini</strong>: 완전 무료 API. 일반적인 강의에 충분.<br>
+        <strong>Claude</strong>: 유료이지만 한국어 오인식 교정·구조화 노트 품질이 월등히 높음.
       </p>
     </div>
   </div>
@@ -742,10 +776,11 @@ async function loadState(){
 async function saveState(){await dbSet('state',state)}
 
 function applyStateToUI(){
-  document.getElementById('set-groq-key').value=state.groqKey;
+  document.getElementById('set-groq-key').value=state.groqKey||'';
   document.getElementById('set-assemblyai-key').value=state.assemblyaiKey||'';
-  document.getElementById('set-openai-key').value=state.openaiKey;
+  document.getElementById('set-openai-key').value=state.openaiKey||'';
   document.getElementById('set-gemini-key').value=state.geminiKey||'';
+  document.getElementById('set-claude-key').value=state.claudeKey||'';
   document.getElementById('set-llm-provider').value=state.llmProvider||'auto';
   document.getElementById('set-chunk-min').value=state.chunkMin;
   updateQuotaUI();
@@ -793,6 +828,7 @@ function saveSettings(){
   state.assemblyaiKey=document.getElementById('set-assemblyai-key').value.trim();
   state.openaiKey=document.getElementById('set-openai-key').value.trim();
   state.geminiKey=document.getElementById('set-gemini-key').value.trim();
+  state.claudeKey=document.getElementById('set-claude-key').value.trim();
   state.llmProvider=document.getElementById('set-llm-provider').value;
   state.chunkMin=parseInt(document.getElementById('set-chunk-min').value);
   saveState();toast('설정 저장됨');showPage('home');
@@ -1044,7 +1080,7 @@ async function startTranscription(){
   await saveState();renderHistory();
 
   // Prepare tabs
-  const hasLLM=!!(state.groqKey||state.geminiKey);
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
   const wantLLM=document.getElementById('pre-llm-summary')?.checked;
 
   const summaryEl=document.getElementById('res-summary');
@@ -1054,8 +1090,14 @@ async function startTranscription(){
 
   const notesEl=document.getElementById('res-notes');
   const notesBtn=document.getElementById('btn-generate-notes');
+  const notesTemplateRow=document.getElementById('notes-template-row');
   notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 강의 노트를 생성합니다.</span>';
   notesBtn.style.display=hasLLM?'flex':'none';
+  if(notesTemplateRow) notesTemplateRow.style.display=hasLLM?'flex':'none';
+
+  // Show refine button in 전문 tab if LLM is available
+  const refineBtn=document.getElementById('btn-refine-text');
+  if(refineBtn) refineBtn.style.display=hasLLM?'flex':'none';
 
   // Reset Q&A
   qaHistory=[];
@@ -1567,69 +1609,167 @@ async function generateNotes(){
   await generateNotesFromText(text,lang);
 }
 
-async function generateNotesFromText(transcriptText,lang){
-  const provider=_pickLLMProvider();
-  if(!provider){toast('설정에서 Groq 또는 Gemini API 키를 입력하세요');return}
-  const notesEl=document.getElementById('res-notes');
-  const notesBtn=document.getElementById('btn-generate-notes');
-  notesBtn.disabled=true;
-  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':'OpenAI';
-  notesEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 강의노트 생성 중... (30초~1분 소요)</span>`;
-
-  const systemPrompt=`당신은 최고 수준의 학습 컨설턴트입니다. 강의 전사 텍스트를 분석하여 학생이 복습에 바로 사용할 수 있는 체계적인 강의 노트를 작성합니다.
+// Template system prompts
+const NOTE_TEMPLATES={
+  standard:`당신은 최고 수준의 학습 컨설턴트입니다. 강의 전사 텍스트를 분석하여 학생이 복습에 바로 사용할 수 있는 체계적인 강의 노트를 작성합니다.
 
 반드시 아래 형식을 정확히 따르세요:
 
 # [강의 주제 - 전사 내용에서 자동 추출]
-
-날짜: [전사에 언급된 날짜 또는 "미확인"]
-
+날짜: [전사에 언급된 날짜 또는 오늘 날짜]
 키워드: [핵심 용어 5~8개, 쉼표 구분]
 
 ## 주요 학습 내용
-
 1. [주제명]: [2~3문장 요약. 핵심 개념과 왜 중요한지 설명]
 2. [주제명]: [2~3문장 요약]
-(전사 내용의 주제 수에 맞게 번호를 계속 이어감)
+(전사 내용의 주제 수에 맞게 번호를 이어감)
 
 ## 지식 설명
-
 ### 1. [주제명]
 **주요 요점:**
 - [핵심 포인트]
 - [핵심 포인트]
-
-**설명:** [3~5문장으로 상세 설명. 강의에서 사용된 예시나 비유를 포함. 전문 용어는 영어를 괄호 안에 병기]
+**설명:** [3~5문장으로 상세 설명. 예시·비유 포함. 전문 용어는 한국어(English) 병기]
 
 ### 2. [주제명]
 (동일 패턴 반복)
 
 ## 시험 대비 포인트
-- [시험에 나올 수 있는 핵심 사항 3~5개]
+- [시험에 나올 수 있는 핵심 사항 3~5개, 자격증 시험 관점에서 중요한 포인트]
 
-규칙:
-- 모든 전문 용어는 한국어(English) 형식으로 병기
-- 강의자가 강조한 부분은 **굵게** 표시
-- 실제 예시나 사례가 있으면 반드시 포함
-- 학생의 이해를 돕는 보충 설명 추가
-- 불필요한 잡담, 반복은 제거하고 핵심만 추출`;
+규칙: 강의자가 강조한 부분은 **굵게** 표시. 불필요한 잡담·반복은 제거하고 핵심만 추출.`,
 
+  exam:`당신은 자격증·시험 전문 학습 코치입니다. 강의 전사를 분석하여 시험 합격에 최적화된 노트를 작성합니다.
+
+# [강의 주제]
+날짜: [날짜]
+키워드: [핵심 용어 5~8개]
+
+## 핵심 암기 포인트
+- **[개념명]**: [한 문장 정의]
+- **[개념명]**: [한 문장 정의]
+(중요 개념 모두 나열)
+
+## 자주 출제되는 주제
+### 1. [주제명] ⭐
+- 출제 포인트: [왜 시험에 나오는가]
+- 핵심 내용: [2~3문장]
+- 함정 포인트: [자주 틀리는 부분]
+
+## 예상 시험 문제
+1. Q: [예상 문제] → A: [핵심 답변]
+2. Q: [예상 문제] → A: [핵심 답변]
+(3~5개)
+
+## 시험 대비 포인트
+- [반드시 알아야 할 사항 5~7개, 별표(⭐)로 중요도 표시]`,
+
+  concept:`당신은 개념 정리 전문 교육자입니다. 강의 내용을 마인드맵 형태의 구조화된 개념도로 정리합니다.
+
+# [강의 주제]
+날짜: [날짜]
+키워드: [핵심 용어 5~8개]
+
+## 중심 개념
+**[강의의 핵심 주제]**: [2~3문장으로 핵심 정의]
+
+## 주요 개념 구조
+### 개념 1: [개념명]
+- 정의: [명확한 정의]
+- 특징: [핵심 특징 3가지]
+- 연관 개념: [관련된 다른 개념들]
+- 예시: [구체적인 예]
+
+### 개념 2: [개념명]
+(동일 패턴)
+
+## 개념 간 관계
+- [개념A] → [개념B]: [관계 설명]
+- [개념A] vs [개념B]: [차이점]
+
+## 시험 대비 포인트
+- [개념 이해 관련 핵심 사항 3~5개]`,
+
+  qa_format:`당신은 소크라테스식 학습법 전문가입니다. 강의 내용을 Q&A 형식으로 변환하여 능동적 학습을 돕습니다.
+
+# [강의 주제]
+날짜: [날짜]
+키워드: [핵심 용어 5~8개]
+
+## 핵심 Q&A
+Q1. [강의의 핵심 질문]
+A. [명확하고 완전한 답변 2~4문장]
+
+Q2. [두 번째 핵심 질문]
+A. [답변]
+
+(강의 내용에서 중요한 질문 7~10개 도출)
+
+## 심화 Q&A
+Q. [더 깊이 있는 질문]
+A. [상세한 답변, 예시 포함]
+
+## 시험 대비 포인트
+- [Q&A에서 가장 중요한 개념 3~5가지]`,
+
+  compare:`당신은 분석적 사고 전문 교육자입니다. 강의 내용의 개념들을 비교·대조 분석으로 정리합니다.
+
+# [강의 주제]
+날짜: [날짜]
+키워드: [핵심 용어 5~8개]
+
+## 주요 개념 요약
+[강의의 핵심 내용 3~5문장]
+
+## 비교·대조 분석
+### [개념A] vs [개념B]
+| 구분 | [개념A] | [개념B] |
+|------|---------|---------|
+| 정의 | ... | ... |
+| 특징 | ... | ... |
+| 장점 | ... | ... |
+| 단점 | ... | ... |
+| 적용 | ... | ... |
+
+### [개념C] vs [개념D]
+(필요한 경우 추가)
+
+## 핵심 차이점 요약
+- [가장 중요한 차이점 3~5개]
+
+## 시험 대비 포인트
+- [비교 개념에서 자주 출제되는 포인트 3~5개]`
+};
+
+async function generateNotesFromText(transcriptText,lang){
+  const provider=_pickLLMProvider();
+  if(!provider){toast('설정에서 API 키를 입력하세요 (Groq·Gemini 무료 / Claude 유료)');showPage('settings');return}
+  const notesEl=document.getElementById('res-notes');
+  const notesBtn=document.getElementById('btn-generate-notes');
+  notesBtn.disabled=true;
+  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI';
+  const template=document.getElementById('notes-template')?.value||'standard';
+  const templateNames={standard:'표준',exam:'시험 집중',concept:'개념 정리',qa_format:'Q&A',compare:'비교·대조'};
+  notesEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 강의노트 생성 중 (${templateNames[template]||'표준'} 템플릿)... 30초~1분 소요</span>`;
+
+  const systemPrompt=NOTE_TEMPLATES[template]||NOTE_TEMPLATES.standard;
   const userPrompt=`다음 강의 전사 텍스트를 분석하여 위 형식대로 강의 노트를 작성해 주세요:\n\n${transcriptText.slice(0,15000)}`;
 
   try{
     let result;
     if(provider==='groq') result=await callGroqChat(systemPrompt,userPrompt);
     else if(provider==='gemini') result=await callGemini(systemPrompt,userPrompt);
+    else if(provider==='claude') result=await callClaudeChat(systemPrompt,userPrompt,4000);
     else result=await callOpenAIChat(systemPrompt,userPrompt);
 
-    // Render markdown-like content as styled HTML
+    // Render markdown as styled HTML with clickable exam points
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
     if(state.history.length>0) state.history[0].notes=result;
     await saveState();
-    toast(`강의노트 생성 완료 (${label})`);
+    toast(`강의노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
   }catch(e){
     if(e instanceof LLMError){
-      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 선택지를 확인하세요.</span>`;
+      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 설정을 확인하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
     }else{
       notesEl.innerHTML=`<span style="color:var(--red)">생성 실패: ${e.message}</span>`;
@@ -1648,40 +1788,150 @@ async function _runNotesWithProvider(provider,text,lang){
   state.llmProvider=origPref;
 }
 
-// Simple markdown → HTML renderer for notes
+// Markdown → HTML renderer for notes with clickable exam points
 function renderNotesMarkdown(md){
   if(!md) return '';
-  let html=md
-    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
-    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
-    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+  let inExamSection=false;
+  const lines=md.split('\n');
+  const out=[];
+  let liBuffer=[];
+
+  function flushLi(){
+    if(liBuffer.length){
+      out.push('<ul>'+liBuffer.join('')+'</ul>');
+      liBuffer=[];
+    }
+  }
+
+  for(let i=0;i<lines.length;i++){
+    const raw=lines[i];
+    const trimmed=raw.trim();
+
+    if(trimmed.startsWith('### ')){
+      flushLi();
+      inExamSection=false;
+      out.push('<h3>'+inlineMd(trimmed.slice(4))+'</h3>');
+    } else if(trimmed.startsWith('## ')){
+      flushLi();
+      const title=trimmed.slice(3);
+      inExamSection=title.includes('시험 대비')||title.includes('시험대비')||title.includes('핵심 암기');
+      out.push('<h2>'+inlineMd(title)+'</h2>');
+      if(inExamSection){
+        out.push('<p class="exam-hint" style="font-size:11px;color:var(--text3);margin-top:-4px;margin-bottom:6px">💡 항목을 클릭하면 Q&A로 자동 질문됩니다</p>');
+      }
+    } else if(trimmed.startsWith('# ')){
+      flushLi();
+      inExamSection=false;
+      out.push('<h1>'+inlineMd(trimmed.slice(2))+'</h1>');
+    } else if(/^[\-\*] /.test(trimmed)){
+      const content=trimmed.replace(/^[\-\*] /,'');
+      if(inExamSection){
+        liBuffer.push(`<li class="exam-point" onclick="examPointClick(this)" title="클릭하여 Q&A 질문">${inlineMd(content)} <span style="opacity:0;font-size:10px;color:var(--accent)">▶ 질문</span></li>`);
+      } else {
+        liBuffer.push('<li>'+inlineMd(content)+'</li>');
+      }
+    } else if(/^\d+\.\s/.test(trimmed)){
+      flushLi();
+      const m=trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if(m) out.push(`<p><strong>${m[1]}.</strong> ${inlineMd(m[2])}</p>`);
+      else out.push('<p>'+inlineMd(trimmed)+'</p>');
+    } else if(/^키워드:\s*/i.test(trimmed)){
+      flushLi();
+      const kw=trimmed.replace(/^키워드:\s*/i,'');
+      const tags=kw.split(/[,，、]/).map(t=>t.trim()).filter(Boolean);
+      out.push('<div class="notes-tags">'+tags.map(t=>`<span class="notes-tag">${escHtml(t)}</span>`).join('')+'</div>');
+    } else if(/^날짜:\s*/i.test(trimmed)){
+      flushLi();
+      const d=trimmed.replace(/^날짜:\s*/i,'');
+      out.push(`<div class="notes-meta">📅 날짜: ${escHtml(d)}</div>`);
+    } else if(trimmed===''){
+      flushLi();
+    } else if(/^\|/.test(trimmed)){
+      // Table row — pass through as-is wrapped in a simple table
+      if(trimmed.startsWith('|---')) { out.push(''); continue; }
+      flushLi();
+      const cells=trimmed.split('|').filter((_,j,a)=>j>0&&j<a.length-1).map(c=>`<td>${inlineMd(c.trim())}</td>`).join('');
+      out.push(`<tr>${cells}</tr>`);
+    } else {
+      flushLi();
+      out.push('<p>'+inlineMd(trimmed)+'</p>');
+    }
+  }
+  flushLi();
+  // Wrap table rows
+  let final=out.join('\n');
+  final=final.replace(/(<tr>.*<\/tr>\n?)+/g,(m)=>`<table style="width:100%;border-collapse:collapse;font-size:13px;margin:8px 0">${m}</table>`);
+  return final;
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function inlineMd(s){
+  return escHtml(s)
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm,'<p><strong>$1.</strong> $2</p>');
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code style="background:var(--bg2);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>');
+}
 
-  // Wrap consecutive <li> in <ul>
-  html=html.replace(/((?:<li>.*<\/li>\n?)+)/g,'<ul>$1</ul>');
+// Click on exam point → switch to Q&A and auto-ask
+function examPointClick(li){
+  const text=li.textContent.replace('▶ 질문','').trim();
+  switchTab('qa',document.querySelector('#result-tabs button:nth-child(4)'));
+  const inp=document.getElementById('qa-input');
+  inp.value=text+' — 자세히 설명해줘';
+  askQuestion();
+}
 
-  // Wrap plain lines in <p> (not already tagged)
-  html=html.split('\n').map(line=>{
-    const trimmed=line.trim();
-    if(!trimmed) return '';
-    if(trimmed.startsWith('<')) return line;
-    return `<p>${line}</p>`;
-  }).join('\n');
+// ─── Transcript refinement ───────────────────────────────────────────────
+async function refineTranscript(){
+  const provider=_pickLLMProvider();
+  if(!provider){toast('설정에서 API 키를 입력하세요');showPage('settings');return}
+  const fullEl=document.getElementById('res-full');
+  const rawText=fullEl.textContent;
+  if(!rawText||rawText.length<50){toast('전사 결과가 없습니다');return}
+  const btn=document.getElementById('btn-refine-text');
+  btn.disabled=true;
+  btn.textContent='🔧 정제 중...';
+  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI';
+  toast(`${label}로 텍스트 정제 중...`);
 
-  // Extract keywords line into tags
-  html=html.replace(/<p>키워드:\s*(.+?)<\/p>/i,(m,kw)=>{
-    const tags=kw.split(/[,，、]/).map(t=>t.trim()).filter(Boolean);
-    return '<div class="notes-tags">'+tags.map(t=>`<span class="notes-tag">${t}</span>`).join('')+'</div>';
-  });
+  const systemPrompt=`당신은 한국어 강의 전사본을 교정하는 편집자입니다.
+아래 전사본은 음성인식(Whisper)으로 자동 생성되었으며 다음 오류가 있을 수 있습니다:
+- 발음이 비슷한 단어 혼동 (예: 관리직↔관리적)
+- 전문 용어·약어·숫자 오인식
+- 자연스럽지 않은 띄어쓰기
+- 무의미하게 반복되는 구절(환각)
+- 외국어 문자가 한국어 문장에 섞인 경우
 
-  // Extract date line into meta block
-  html=html.replace(/<p>날짜:\s*(.+?)<\/p>/i,(m,d)=>{
-    return `<div class="notes-meta">날짜: ${d}</div>`;
-  });
+작업:
+1) 원문의 의미를 유지하면서 명백한 오인식만 교정하세요.
+2) [HH:MM:SS] 타임스탬프는 반드시 그대로 유지하세요.
+3) 내용을 요약하거나 축약하지 마세요 — 오직 오류만 교정하세요.
+4) 확신이 없는 단어는 원문대로 두세요.
+5) 교정된 본문만 출력하세요 — 설명 없이.`;
 
-  return html;
+  try{
+    let refined;
+    if(provider==='groq') refined=await callGroqChat(systemPrompt,rawText.slice(0,12000));
+    else if(provider==='gemini') refined=await callGemini(systemPrompt,rawText.slice(0,12000));
+    else if(provider==='claude') refined=await callClaudeChat(systemPrompt,rawText.slice(0,12000),8000);
+    else refined=await callOpenAIChat(systemPrompt,rawText.slice(0,12000));
+
+    // Replace content with diff-like display
+    fullEl.innerHTML=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border-radius:6px">✅ ${label} 정제 완료 — 오인식·용어 자동 교정됨</div>`+
+      `<div style="white-space:pre-wrap;font-family:var(--font-mono,monospace);font-size:13px;line-height:1.7">${escHtml(refined)}</div>`;
+    if(state.history.length>0) state.history[0].refined=refined;
+    await saveState();
+    toast(`텍스트 정제 완료 (${label})`);
+  }catch(e){
+    if(e instanceof LLMError){
+      showLLMErrorModal(e,(p)=>{ state.llmProvider=p; refineTranscript(); });
+    }else{
+      toast('정제 실패: '+e.message);
+    }
+  }finally{
+    btn.disabled=false;
+    btn.textContent='🔧 텍스트 정제 (오인식·용어 자동 교정)';
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1748,14 +1998,22 @@ ${contextText}`;
       if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
       answer=(await res.json()).choices?.[0]?.message?.content||'(답변 생성 실패)';
     }else if(provider==='gemini'){
-      // Gemini: flatten messages into single prompt
-      const combined=messages.map(m=>m.role==='system'?m.content:`${m.role==='user'?'질문':'답변'}: ${m.content}`).join('\n\n');
+      const gemContents=recentQA.slice(0,-1).map(m=>({
+        role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]
+      }));
+      gemContents.push({role:'user',parts:[{text:q}]});
       const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{text:combined}]}],generationConfig:{temperature:0.4,maxOutputTokens:1000}})
+        body:JSON.stringify({
+          system_instruction:{parts:[{text:systemPrompt}]},
+          contents:gemContents,
+          generationConfig:{temperature:0.4,maxOutputTokens:1000}
+        })
       });
       if(!res.ok) throw new LLMError('gemini',res.status,await res.text(),null);
       answer=(await res.json()).candidates?.[0]?.content?.parts?.[0]?.text||'(답변 생성 실패)';
+    }else if(provider==='claude'){
+      answer=await callClaudeChat(systemPrompt,q,1500);
     }else{
       const res=await fetch('https://api.openai.com/v1/chat/completions',{
         method:'POST',
@@ -1784,13 +2042,41 @@ ${contextText}`;
 // Helper: pick best LLM provider based on settings
 function _pickLLMProvider(){
   const pref=state.llmProvider||'auto';
+  if(pref==='claude'&&state.claudeKey) return 'claude';
   if(pref==='groq'&&state.groqKey) return 'groq';
   if(pref==='gemini'&&state.geminiKey) return 'gemini';
   if(pref==='auto'){
     if(state.groqKey) return 'groq';
     if(state.geminiKey) return 'gemini';
+    if(state.claudeKey) return 'claude';
   }
   return null;
+}
+
+// Call Claude API (Anthropic) for text completion
+async function callClaudeChat(systemPrompt, userPrompt, maxTokens=3000){
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key':state.claudeKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:maxTokens,
+      system:systemPrompt,
+      messages:[{role:'user',content:userPrompt}]
+    })
+  });
+  if(!res.ok){
+    const body=await res.text();
+    const retryAfter=parseInt(res.headers.get('retry-after')||'0');
+    throw new LLMError('claude',res.status,body,retryAfter||null);
+  }
+  const data=await res.json();
+  return data.content[0].text;
 }
 
 // ═════════════════════════════════════════════════════════════════
