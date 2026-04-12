@@ -786,6 +786,20 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
 
   <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">설정 저장</button>
+
+  <!-- App Cache Reset -->
+  <div class="settings-section" style="margin-top:16px">
+    <div class="card-label">앱 문제 해결</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <p style="font-size:14px;font-weight:500">캐시 초기화 및 재시작</p>
+          <p style="font-size:12px;color:var(--text2);margin-top:2px">버튼이 안 눌리거나 앱이 이상하게 동작할 때</p>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="hardReload()" style="color:var(--amber);border-color:var(--amber)">초기화</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal (for API switch confirmation) -->
@@ -887,6 +901,25 @@ function updateQuotaUI(){
 function resetQuota(){
   state.quota={date:new Date().toISOString().slice(0,10),usedSec:0};
   saveState();updateQuotaUI();toast('사용량 초기화됨');
+}
+
+async function hardReload(){
+  try{
+    // Unregister all service workers
+    if('serviceWorker' in navigator){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      for(const reg of regs) await reg.unregister();
+    }
+    // Clear all caches
+    if('caches' in window){
+      const keys=await caches.keys();
+      for(const k of keys) await caches.delete(k);
+    }
+    toast('캐시 삭제 완료, 재시작합니다...');
+    setTimeout(()=>location.reload(true),800);
+  }catch(e){
+    location.reload(true);
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════

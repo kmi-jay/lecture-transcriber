@@ -1,5 +1,5 @@
-// Lispen Service Worker v2
-const CACHE = 'lispen-v2';
+// Lispen Service Worker v3
+const CACHE = 'lispen-v3';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -17,14 +17,15 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for navigation, cache-first for assets
-  if(e.request.mode === 'navigate'){
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('./index.html'))
-    );
-  } else {
-    e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request))
-    );
-  }
+  // Network-first for everything (ensures updates are always reflected)
+  e.respondWith(
+    fetch(e.request).then(res => {
+      // Cache the fresh response
+      if(res.ok){
+        const clone=res.clone();
+        caches.open(CACHE).then(c=>c.put(e.request,clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request))
+  );
 });
