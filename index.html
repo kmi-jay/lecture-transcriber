@@ -1500,7 +1500,7 @@ function mergeChunks(chunks){
         merged+=segmentText;
       }else{
         const prevEnd=sorted[i-1].text.trim().slice(-100);
-        const firstSeg=segmentText.substring(segmentText.indexOf(''] ')+2);
+        const firstSeg=segmentText.substring(segmentText.indexOf('] ')+2);
         let skip=false;
         if(prevEnd.includes(firstSeg.slice(0,30))) skip=true;
         if(!skip){
