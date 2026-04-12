@@ -256,6 +256,30 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .history-item .hi-meta{font-size:12px;color:var(--text2);margin-top:2px}
 .history-item .hi-arrow{color:var(--text3);font-size:16px}
 
+/* ──── Q&A Chat ──── */
+.qa-system-msg{text-align:center;color:var(--text3);font-size:13px;
+  padding:20px 10px;line-height:1.6}
+.qa-bubble{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:8px;
+  font-size:14px;line-height:1.7;max-width:90%;word-break:break-word;white-space:pre-wrap}
+.qa-user{background:var(--accent);color:white;margin-left:auto;border-radius:var(--radius-sm) var(--radius-sm) 4px var(--radius-sm)}
+.qa-ai{background:var(--surface2);color:var(--text);border-radius:var(--radius-sm) var(--radius-sm) var(--radius-sm) 4px}
+.qa-ai.loading{color:var(--text2);font-style:italic}
+
+/* ──── Notes rendered content ──── */
+.notes-rendered h1{font-size:20px;font-weight:700;margin:0 0 12px;line-height:1.3}
+.notes-rendered .notes-meta{font-size:12px;color:var(--text2);margin-bottom:16px;
+  padding:10px 14px;background:var(--bg);border-radius:var(--radius-xs);line-height:1.6}
+.notes-rendered .notes-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.notes-rendered .notes-tag{padding:4px 12px;background:var(--surface2);
+  border-radius:20px;font-size:12px;color:var(--text2);border:1px solid var(--border)}
+.notes-rendered h2{font-size:16px;font-weight:600;color:var(--accent2);
+  margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.notes-rendered h3{font-size:14px;font-weight:600;margin:12px 0 6px}
+.notes-rendered p{font-size:14px;line-height:1.8;margin-bottom:8px;color:var(--text)}
+.notes-rendered ul{margin:6px 0 12px 16px;font-size:13px;line-height:1.7;color:var(--text2)}
+.notes-rendered li{margin-bottom:4px}
+.notes-rendered strong{color:var(--text);font-weight:600}
+
 /* ──── Toast ──── */
 .toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);
   background:var(--surface2);border:1px solid var(--border2);color:var(--text);
@@ -462,20 +486,54 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
-  <div class="result-tabs">
+  <div class="result-tabs" id="result-tabs">
     <button class="active" onclick="switchTab('full',this)">전문</button>
+    <button onclick="switchTab('notes',this)">강의노트</button>
     <button onclick="switchTab('summary',this)">요약</button>
+    <button onclick="switchTab('qa',this)">Q&A</button>
   </div>
 
+  <!-- Tab: 전문 -->
   <div id="tab-full" class="tab-content" style="display:block">
     <div class="result-text" id="res-full"></div>
   </div>
+
+  <!-- Tab: 강의노트 -->
+  <div id="tab-notes" class="tab-content" style="display:none">
+    <div class="result-text" id="res-notes" style="min-height:150px">
+      <span style="color:var(--text3)">전사 내용을 기반으로 체계적인 강의 노트를 생성합니다.</span>
+    </div>
+    <button id="btn-generate-notes" class="btn btn-ghost" onclick="generateNotes()"
+      style="margin-top:10px;display:none">📝 강의노트 생성 (무료)</button>
+  </div>
+
+  <!-- Tab: 요약 -->
   <div id="tab-summary" class="tab-content" style="display:none">
     <div class="result-text" id="res-summary" style="min-height:120px">
-      <span style="color:var(--text3)">요약 탭에서 전사 완료 후 Groq로 한국어 요약을 생성할 수 있습니다.</span>
+      <span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>
     </div>
     <button id="btn-generate-summary" class="btn btn-ghost" onclick="generateSummary()"
-      style="margin-top:10px;display:none">✨ 요약 생성 (Groq 무료)</button>
+      style="margin-top:10px;display:none">✨ 요약 생성 (무료)</button>
+  </div>
+
+  <!-- Tab: Q&A -->
+  <div id="tab-qa" class="tab-content" style="display:none">
+    <div id="qa-messages" style="max-height:45vh;overflow-y:auto;margin-bottom:12px;
+      scrollbar-width:thin;scrollbar-color:var(--surface3) transparent">
+      <div class="qa-system-msg">
+        강의 내용에 대해 질문하세요. 전사 텍스트를 기반으로 답변합니다.
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="qa-input" placeholder="질문을 입력하세요..."
+        style="flex:1;padding:13px 14px;background:var(--bg2);border:1px solid var(--border2);
+        border-radius:var(--radius-sm);color:var(--text);font-family:var(--font);font-size:14px;outline:none"
+        onkeydown="if(event.key==='Enter')askQuestion()">
+      <button class="btn btn-primary" onclick="askQuestion()"
+        style="width:52px;padding:0;border-radius:var(--radius-sm);flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+      </button>
+    </div>
   </div>
 
   <div style="display:flex;gap:10px;margin-top:14px">
@@ -985,17 +1043,29 @@ async function startTranscription(){
   if(state.history.length>10) state.history.pop();
   await saveState();renderHistory();
 
-  // Prepare summary tab
-  const wantSummary=document.getElementById('pre-llm-summary')?.checked;
+  // Prepare tabs
+  const hasLLM=!!(state.groqKey||state.geminiKey);
+  const wantLLM=document.getElementById('pre-llm-summary')?.checked;
+
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
-  summaryEl.innerHTML='<span style="color:var(--text3)">요약이 생성되지 않았습니다.</span>';
-  summaryBtn.style.display=(state.groqKey||state.geminiKey)?'flex':'none';
+  summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';
+  summaryBtn.style.display=hasLLM?'flex':'none';
+
+  const notesEl=document.getElementById('res-notes');
+  const notesBtn=document.getElementById('btn-generate-notes');
+  notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 강의 노트를 생성합니다.</span>';
+  notesBtn.style.display=hasLLM?'flex':'none';
+
+  // Reset Q&A
+  qaHistory=[];
+  document.getElementById('qa-messages').innerHTML='<div class="qa-system-msg">강의 내용에 대해 질문하세요. 전사 텍스트를 기반으로 답변합니다.</div>';
 
   showPage('result');
 
-  // Auto-run summary if checkbox was ticked
-  if(wantSummary&&state.groqKey){
+  // Auto-run if checkbox was ticked
+  if(wantLLM&&hasLLM){
+    await generateNotesFromText(fullText,lang);
     await generateSummaryFromText(fullText,lang);
   }
 }
@@ -1489,6 +1559,241 @@ async function _runSummary(provider,transcriptText,lang){
 }
 
 // ═════════════════════════════════════════════════════════════════
+//  LECTURE NOTES (Plaud-style structured output)
+// ═════════════════════════════════════════════════════════════════
+async function generateNotes(){
+  const text=document.getElementById('res-full').textContent;
+  const lang=document.getElementById('pre-language')?.value||'ko';
+  await generateNotesFromText(text,lang);
+}
+
+async function generateNotesFromText(transcriptText,lang){
+  const provider=_pickLLMProvider();
+  if(!provider){toast('설정에서 Groq 또는 Gemini API 키를 입력하세요');return}
+  const notesEl=document.getElementById('res-notes');
+  const notesBtn=document.getElementById('btn-generate-notes');
+  notesBtn.disabled=true;
+  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':'OpenAI';
+  notesEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 강의노트 생성 중... (30초~1분 소요)</span>`;
+
+  const systemPrompt=`당신은 최고 수준의 학습 컨설턴트입니다. 강의 전사 텍스트를 분석하여 학생이 복습에 바로 사용할 수 있는 체계적인 강의 노트를 작성합니다.
+
+반드시 아래 형식을 정확히 따르세요:
+
+# [강의 주제 - 전사 내용에서 자동 추출]
+
+날짜: [전사에 언급된 날짜 또는 "미확인"]
+
+키워드: [핵심 용어 5~8개, 쉼표 구분]
+
+## 주요 학습 내용
+
+1. [주제명]: [2~3문장 요약. 핵심 개념과 왜 중요한지 설명]
+2. [주제명]: [2~3문장 요약]
+(전사 내용의 주제 수에 맞게 번호를 계속 이어감)
+
+## 지식 설명
+
+### 1. [주제명]
+**주요 요점:**
+- [핵심 포인트]
+- [핵심 포인트]
+
+**설명:** [3~5문장으로 상세 설명. 강의에서 사용된 예시나 비유를 포함. 전문 용어는 영어를 괄호 안에 병기]
+
+### 2. [주제명]
+(동일 패턴 반복)
+
+## 시험 대비 포인트
+- [시험에 나올 수 있는 핵심 사항 3~5개]
+
+규칙:
+- 모든 전문 용어는 한국어(English) 형식으로 병기
+- 강의자가 강조한 부분은 **굵게** 표시
+- 실제 예시나 사례가 있으면 반드시 포함
+- 학생의 이해를 돕는 보충 설명 추가
+- 불필요한 잡담, 반복은 제거하고 핵심만 추출`;
+
+  const userPrompt=`다음 강의 전사 텍스트를 분석하여 위 형식대로 강의 노트를 작성해 주세요:\n\n${transcriptText.slice(0,15000)}`;
+
+  try{
+    let result;
+    if(provider==='groq') result=await callGroqChat(systemPrompt,userPrompt);
+    else if(provider==='gemini') result=await callGemini(systemPrompt,userPrompt);
+    else result=await callOpenAIChat(systemPrompt,userPrompt);
+
+    // Render markdown-like content as styled HTML
+    notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
+    if(state.history.length>0) state.history[0].notes=result;
+    await saveState();
+    toast(`강의노트 생성 완료 (${label})`);
+  }catch(e){
+    if(e instanceof LLMError){
+      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 선택지를 확인하세요.</span>`;
+      showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
+    }else{
+      notesEl.innerHTML=`<span style="color:var(--red)">생성 실패: ${e.message}</span>`;
+    }
+  }finally{notesBtn.disabled=false}
+}
+
+async function _runNotesWithProvider(provider,text,lang){
+  // Re-run with specific provider (used by error modal callback)
+  const notesEl=document.getElementById('res-notes');
+  notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 재시도 중...</span>`;
+  // Delegate to generateNotesFromText but override provider
+  const origPref=state.llmProvider;
+  state.llmProvider=provider;
+  await generateNotesFromText(text,lang);
+  state.llmProvider=origPref;
+}
+
+// Simple markdown → HTML renderer for notes
+function renderNotesMarkdown(md){
+  if(!md) return '';
+  let html=md
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^# (.+)$/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm,'<p><strong>$1.</strong> $2</p>');
+
+  // Wrap consecutive <li> in <ul>
+  html=html.replace(/((?:<li>.*<\/li>\n?)+)/g,'<ul>$1</ul>');
+
+  // Wrap plain lines in <p> (not already tagged)
+  html=html.split('\n').map(line=>{
+    const trimmed=line.trim();
+    if(!trimmed) return '';
+    if(trimmed.startsWith('<')) return line;
+    return `<p>${line}</p>`;
+  }).join('\n');
+
+  // Extract keywords line into tags
+  html=html.replace(/<p>키워드:\s*(.+?)<\/p>/i,(m,kw)=>{
+    const tags=kw.split(/[,，、]/).map(t=>t.trim()).filter(Boolean);
+    return '<div class="notes-tags">'+tags.map(t=>`<span class="notes-tag">${t}</span>`).join('')+'</div>';
+  });
+
+  // Extract date line into meta block
+  html=html.replace(/<p>날짜:\s*(.+?)<\/p>/i,(m,d)=>{
+    return `<div class="notes-meta">날짜: ${d}</div>`;
+  });
+
+  return html;
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  Q&A CHAT (context-based Q&A on transcript)
+// ═════════════════════════════════════════════════════════════════
+let qaHistory=[]; // {role:'user'|'assistant', content:string}
+
+async function askQuestion(){
+  const input=document.getElementById('qa-input');
+  const q=input.value.trim();
+  if(!q) return;
+  input.value='';
+
+  const provider=_pickLLMProvider();
+  if(!provider){toast('설정에서 Groq 또는 Gemini API 키를 입력하세요');return}
+
+  const msgBox=document.getElementById('qa-messages');
+
+  // Add user bubble
+  const userBub=document.createElement('div');
+  userBub.className='qa-bubble qa-user';
+  userBub.textContent=q;
+  msgBox.appendChild(userBub);
+
+  // Add loading bubble
+  const aiBub=document.createElement('div');
+  aiBub.className='qa-bubble qa-ai loading';
+  aiBub.textContent='생각하는 중...';
+  msgBox.appendChild(aiBub);
+  msgBox.scrollTop=msgBox.scrollHeight;
+
+  // Build context
+  const transcript=document.getElementById('res-full').textContent;
+  const notes=document.getElementById('res-notes')?.textContent||'';
+  const contextText=transcript.slice(0,10000)+(notes?'\n\n[강의노트]\n'+notes.slice(0,3000):'');
+
+  qaHistory.push({role:'user',content:q});
+
+  const systemPrompt=`당신은 강의 내용 전문가입니다. 아래 전사 텍스트를 기반으로 학생의 질문에 정확하고 이해하기 쉽게 답변합니다.
+
+규칙:
+- 전사 텍스트에 있는 내용만으로 답변 (없는 내용은 "전사 내용에서 확인되지 않습니다"로 안내)
+- 전문 용어는 한국어(English) 병기
+- 간결하되 충분한 설명
+- 시험 관련 질문이면 핵심을 강조
+- 관련 내용이 전사의 다른 부분에도 있으면 함께 언급
+
+[전사 텍스트 및 노트]
+${contextText}`;
+
+  const messages=[{role:'system',content:systemPrompt}];
+  // Include last 6 messages for context continuity
+  const recentQA=qaHistory.slice(-6);
+  recentQA.forEach(m=>messages.push(m));
+
+  try{
+    let answer;
+    if(provider==='groq'){
+      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
+        body:JSON.stringify({model:'llama-3.3-70b-versatile',messages,temperature:0.4,max_tokens:1000})
+      });
+      if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
+      answer=(await res.json()).choices?.[0]?.message?.content||'(답변 생성 실패)';
+    }else if(provider==='gemini'){
+      // Gemini: flatten messages into single prompt
+      const combined=messages.map(m=>m.role==='system'?m.content:`${m.role==='user'?'질문':'답변'}: ${m.content}`).join('\n\n');
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${state.geminiKey}`,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{parts:[{text:combined}]}],generationConfig:{temperature:0.4,maxOutputTokens:1000}})
+      });
+      if(!res.ok) throw new LLMError('gemini',res.status,await res.text(),null);
+      answer=(await res.json()).candidates?.[0]?.content?.parts?.[0]?.text||'(답변 생성 실패)';
+    }else{
+      const res=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
+        body:JSON.stringify({model:'gpt-4o-mini',messages,temperature:0.4,max_tokens:1000})
+      });
+      if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
+      answer=(await res.json()).choices?.[0]?.message?.content||'(답변 생성 실패)';
+    }
+
+    qaHistory.push({role:'assistant',content:answer});
+    aiBub.className='qa-bubble qa-ai';
+    aiBub.textContent=answer;
+  }catch(e){
+    aiBub.className='qa-bubble qa-ai';
+    if(e instanceof LLMError){
+      aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ ${e.friendlyMessage}</span>`;
+    }else{
+      aiBub.textContent='오류: '+e.message;
+    }
+    qaHistory.pop(); // remove failed user message from history
+  }
+  msgBox.scrollTop=msgBox.scrollHeight;
+}
+
+// Helper: pick best LLM provider based on settings
+function _pickLLMProvider(){
+  const pref=state.llmProvider||'auto';
+  if(pref==='groq'&&state.groqKey) return 'groq';
+  if(pref==='gemini'&&state.geminiKey) return 'gemini';
+  if(pref==='auto'){
+    if(state.groqKey) return 'groq';
+    if(state.geminiKey) return 'gemini';
+  }
+  return null;
+}
+
+// ═════════════════════════════════════════════════════════════════
 //  UI HELPERS
 // ═════════════════════════════════════════════════════════════════
 function renderChunks(chunks){
@@ -1515,10 +1820,12 @@ function updateProgress(cur,total,text){
 }
 
 function switchTab(name,btn){
-  document.querySelectorAll('.result-tabs button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#result-tabs button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('tab-full').style.display=name==='full'?'block':'none';
-  document.getElementById('tab-summary').style.display=name==='summary'?'block':'none';
+  ['full','notes','summary','qa'].forEach(t=>{
+    const el=document.getElementById('tab-'+t);
+    if(el) el.style.display=t===name?'block':'none';
+  });
 }
 
 function copyResult(){
@@ -1548,18 +1855,26 @@ function renderHistory(){
 }
 function showHistoryItem(i){
   const h=state.history[i];if(!h)return;
+  const hasLLM=!!(state.groqKey||state.geminiKey);
   document.getElementById('res-info').textContent=`${h.name} · ${Math.round(h.duration/60)}분`;
   document.getElementById('res-full').textContent=h.text;
+
+  // Summary
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
-  if(h.summary){
-    summaryEl.style.whiteSpace='pre-wrap';
-    summaryEl.textContent=h.summary;
-    summaryBtn.style.display='flex';
-  }else{
-    summaryEl.innerHTML='<span style="color:var(--text3)">요약이 생성되지 않았습니다.</span>';
-    summaryBtn.style.display=(state.groqKey||state.geminiKey)?'flex':'none';
-  }
+  if(h.summary){summaryEl.style.whiteSpace='pre-wrap';summaryEl.textContent=h.summary;summaryBtn.style.display='flex'}
+  else{summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';summaryBtn.style.display=hasLLM?'flex':'none'}
+
+  // Notes
+  const notesEl=document.getElementById('res-notes');
+  const notesBtn=document.getElementById('btn-generate-notes');
+  if(h.notes){notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(h.notes)+'</div>';notesBtn.style.display='flex'}
+  else{notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 강의 노트를 생성합니다.</span>';notesBtn.style.display=hasLLM?'flex':'none'}
+
+  // Reset Q&A
+  qaHistory=[];
+  document.getElementById('qa-messages').innerHTML='<div class="qa-system-msg">강의 내용에 대해 질문하세요. 전사 텍스트를 기반으로 답변합니다.</div>';
+
   showPage('result');
 }
 
