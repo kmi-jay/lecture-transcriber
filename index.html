@@ -1811,11 +1811,11 @@ async function callOpenAIChat(systemPrompt,userPrompt){
 function buildSummaryPrompts(transcriptText,lang){
   const isKorean=lang==='ko'||lang==='auto';
   const systemPrompt=isKorean
-    ?'당신은 전문 강의 요약가입니다. 한국어 강의 전사 텍스트를 간결하고 체계적으로 요약합니다.'
-    :'You are a professional lecture summarizer. Summarize lecture transcripts into concise Korean summaries with key terms in English.';
+    ?'당신은 전문 요약가입니다. 전사 텍스트를 간결하고 체계적인 마크다운 형식으로 요약합니다. 반드시 ##, -, ** 등 마크다운 문법을 사용하세요.'
+    :'You are a professional summarizer. Summarize transcripts into concise, well-structured Korean summaries using proper Markdown syntax (##, -, **bold**).';
   const userPrompt=isKorean
-    ?`다음은 강의 전사 텍스트입니다. 아래 형식으로 요약해 주세요:\n\n**핵심 주제**: (1~2문장)\n\n**주요 내용**:\n- (핵심 포인트 5~8개, 각 1~2문장)\n\n**키워드**: (중요 용어/개념 쉼표 구분)\n\n---\n전사 텍스트:\n${transcriptText.slice(0,12000)}`
-    :`Summarize the following ${lang.toUpperCase()} lecture transcript in Korean:\n\n**핵심 주제**: (1~2 sentences in Korean)\n\n**주요 내용**:\n- (5~8 key points in Korean, with important English terms in parentheses)\n\n**키워드**: (key English terms, comma separated)\n\n---\nTranscript:\n${transcriptText.slice(0,12000)}`;
+    ?`다음 전사 텍스트를 아래 마크다운 형식으로 요약하세요. 반드시 이 형식을 지키세요:\n\n## 핵심 주제\n(1~2문장으로 전체 핵심 설명)\n\n## 주요 내용\n- **포인트 1**: 설명 (1~2문장)\n- **포인트 2**: 설명\n- (5~8개)\n\n## 핵심 키워드\n키워드: 용어1, 용어2, 용어3\n\n---\n전사 텍스트:\n${transcriptText.slice(0,12000)}`
+    :`Summarize the following transcript in Korean using this exact Markdown format:\n\n## 핵심 주제\n(1~2 sentences)\n\n## 주요 내용\n- **Point 1**: explanation\n- **Point 2**: explanation\n- (5~8 points)\n\n## 핵심 키워드\n키워드: term1, term2, term3\n\n---\nTranscript:\n${transcriptText.slice(0,12000)}`;
   return{systemPrompt,userPrompt};
 }
 
@@ -1843,8 +1843,8 @@ async function _runSummary(provider,transcriptText,lang){
     else if(provider==='gemini') summary=await callGemini(systemPrompt,userPrompt);
     else summary=await callOpenAIChat(systemPrompt,userPrompt);
 
-    summaryEl.style.whiteSpace='pre-wrap';
-    summaryEl.textContent=summary;
+    summaryEl.style.whiteSpace='normal';
+    summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
     if(state.history.length>0) state.history[0].summary=summary;
     await saveState();
     toast(`요약 완료 (${label})`);
@@ -2263,6 +2263,13 @@ function renderNotesMarkdown(md){
       flushLi();
       const p=trimmed.replace(/^인터뷰이:\s*/i,'');
       out.push(`<div class="notes-meta">🎤 인터뷰이: ${escHtml(p)}</div>`);
+    } else if(/^---+$/.test(trimmed)){
+      flushLi();
+      out.push('<hr style="border:none;border-top:1px solid var(--border2);margin:12px 0">');
+    } else if(/^>\s*/.test(trimmed)){
+      flushLi();
+      const quote=trimmed.replace(/^>\s*/,'');
+      out.push('<blockquote style="border-left:3px solid var(--accent);margin:8px 0;padding:4px 12px;color:var(--text2);font-size:13px">'+inlineMd(quote)+'</blockquote>');
     } else if(trimmed===''){
       flushLi();
     } else if(/^\|/.test(trimmed)){
@@ -2286,8 +2293,8 @@ function renderNotesMarkdown(md){
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function inlineMd(s){
   return escHtml(s)
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\*\*\s*(.+?)\s*\*\*/g,'<strong>$1</strong>')  // **bold** with optional inner spaces
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,'<em>$1</em>') // *italic* (not **)
     .replace(/`(.+?)`/g,'<code style="background:var(--bg2);padding:1px 5px;border-radius:3px;font-size:12px">$1</code>');
 }
 
@@ -2514,12 +2521,21 @@ function renderQAMarkdown(text){
       flushLi(); out.push('<h3>'+_iq(t.slice(3))+'</h3>');
     } else if(t.startsWith('# ')){
       flushLi(); out.push('<h3>'+_iq(t.slice(2))+'</h3>');
+    } else if(/^[\-\*] \[[ x]\] /.test(t)){
+      liType='ul';
+      const checked=/^[\-\*] \[x\] /i.test(t);
+      const content=t.replace(/^[\-\*] \[[ x]\] /i,'');
+      const icon=checked?'☑':'☐';
+      liBuffer.push(`<li style="list-style:none">${icon} ${_iq(content)}</li>`);
     } else if(/^[\-\*] /.test(t)){
       liType='ul';
       liBuffer.push('<li>'+_iq(t.slice(2))+'</li>');
     } else if(/^\d+[\.\)] /.test(t)){
       liType='ol';
       liBuffer.push('<li>'+_iq(t.replace(/^\d+[\.\)] /,''))+'</li>');
+    } else if(/^---+$/.test(t)){
+      flushLi();
+      out.push('<hr style="border:none;border-top:1px solid var(--border2);margin:8px 0">');
     } else if(t===''){
       flushLi(); // blank line
     } else {
@@ -2533,8 +2549,8 @@ function renderQAMarkdown(text){
 // Inline markdown: bold, italic, code
 function _iq(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\*\*\s*(.+?)\s*\*\*/g,'<strong>$1</strong>')
+    .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,'<em>$1</em>')
     .replace(/`(.+?)`/g,'<code>$1</code>');
 }
 
@@ -2692,7 +2708,7 @@ function showHistoryItem(i){
   // Summary
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
-  if(h.summary){summaryEl.style.whiteSpace='pre-wrap';summaryEl.textContent=h.summary;summaryBtn.style.display='flex'}
+  if(h.summary){summaryEl.style.whiteSpace='normal';summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(h.summary)+'</div>';summaryBtn.style.display='flex'}
   else{summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';summaryBtn.style.display=hasLLM?'flex':'none'}
 
   // Notes
