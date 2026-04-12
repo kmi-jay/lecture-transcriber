@@ -1,7 +1,7 @@
 {
-  "name": "강의전사",
-  "short_name": "강의전사",
-  "description": "강의 녹음을 텍스트로 전사하는 모바일 앱",
+  "name": "Lispen",
+  "short_name": "Lispen",
+  "description": "강의·회의·인터뷰 녹음을 전사하고 AI 노트를 생성하는 앱",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1a1a2e",
