@@ -494,6 +494,31 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </select>
   </div>
 
+  <div class="field" id="diarization-row" style="display:none">
+    <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px;
+      background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border2)">
+      <input type="checkbox" id="pre-diarization" style="width:18px;height:18px;accent-color:var(--accent)">
+      <div>
+        <div style="font-size:14px;font-weight:500">화자 구분</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">AssemblyAI로 화자를 자동 구분합니다 (AssemblyAI 키 필요)</div>
+      </div>
+    </label>
+  </div>
+
+  <div class="field" id="precheck-llm-row" style="display:none">
+    <div class="field-label">AI 후처리 (노트·요약·정제)</div>
+    <select id="pre-llm-choice">
+      <option value="auto">자동 (Groq → Gemini → Claude)</option>
+      <option value="groq-first">Groq 우선 → Gemini → Claude</option>
+      <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
+      <option value="claude-first">Claude 우선 → Groq → Gemini</option>
+      <option value="groq-only">Groq만 (Llama, 무료)</option>
+      <option value="gemini-only">Gemini만 (무료)</option>
+      <option value="claude-only">Claude만 (유료)</option>
+    </select>
+    <p style="font-size:12px;color:var(--text3);margin-top:4px">노트 생성, 요약, 텍스트 정제에 사용할 AI를 선택합니다</p>
+  </div>
+
   <div id="llm-toggle-row" class="field" style="display:none">
     <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px 14px;
       background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border2)">
@@ -967,9 +992,19 @@ function showPrecheck(){
   }
 
   // Show LLM summary toggle if any LLM key is available
-  const hasLLM=!!(state.groqKey||state.geminiKey);
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
   const llmRow=document.getElementById('llm-toggle-row');
   llmRow.style.display=hasLLM?'block':'none';
+
+  // Show diarization checkbox only if AssemblyAI key is available
+  const diarizationRow=document.getElementById('diarization-row');
+  diarizationRow.style.display=state.assemblyaiKey?'block':'none';
+
+  // Show LLM provider choice if any LLM key is available
+  const llmChoiceRow=document.getElementById('precheck-llm-row');
+  llmChoiceRow.style.display=hasLLM?'block':'none';
+  const llmChoice=document.getElementById('pre-llm-choice');
+  if(llmChoice) llmChoice.value=state.llmProvider||'auto';
 
   sel.onchange=updateCostEstimate;
   updateCostEstimate();
@@ -1028,6 +1063,7 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 async function startTranscription(){
   const choice=document.getElementById('pre-api-choice').value;
   const lang=document.getElementById('pre-language').value;
+  state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
 
   // Validate keys
@@ -1083,18 +1119,20 @@ async function startTranscription(){
 
     try{
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
-      let text;
+      let result;
 
       if(ch.api==='groq'){
-        text=await transcribeGroq(chunkBlob,lang);
+        result=await transcribeGroq(chunkBlob,lang);
         state.quota.usedSec+=ch.chunkDur;
         await saveState();updateQuotaUI();
       }else if(ch.api==='assemblyai'){
-        text=await transcribeAssemblyAI(chunkBlob,lang);
+        result=await transcribeAssemblyAI(chunkBlob,lang);
       }else{
-        text=await transcribeOpenAI(chunkBlob,lang);
+        result=await transcribeOpenAI(chunkBlob,lang);
       }
-      ch.text=cleanHallucinations(text);ch.status='done';
+      ch.text=cleanHallucinations(result.text);
+      ch.segments=result.segments||[];
+      ch.status='done';
     }catch(e){
       console.error(`Chunk ${i} error:`,e);
 
@@ -1178,10 +1216,12 @@ async function tryFallback(ch,error,lang,chunks,file){
       toast(`${ch.api.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
       ch.api=fb;
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
-      let text;
-      if(fb==='assemblyai') text=await transcribeAssemblyAI(chunkBlob,lang);
-      else text=await transcribeOpenAI(chunkBlob,lang);
-      ch.text=cleanHallucinations(text);ch.status='done';
+      let result;
+      if(fb==='assemblyai') result=await transcribeAssemblyAI(chunkBlob,lang);
+      else result=await transcribeOpenAI(chunkBlob,lang);
+      ch.text=cleanHallucinations(result.text);
+      ch.segments=result.segments||[];
+      ch.status='done';
 
       // Switch remaining pending chunks too
       chunks.filter(c=>c.status==='pending'&&c.api===ch.api).forEach(c=>c.api=fb);
@@ -1256,7 +1296,9 @@ async function transcribeGroq(blob,lang){
   const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form});
   if(!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
-  return(await res.json()).text||'';
+  const data=await res.json();
+  const segments=(data.segments||[]).map(s=>({start:s.start,end:s.end,text:s.text}));
+  return{text:data.text||'',segments};
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1282,6 +1324,10 @@ async function transcribeAssemblyAI(blob,lang){
   // If language is auto or not mapped, let AssemblyAI detect (language_detection: true)
   if(!body.language_code) body.language_detection=true;
 
+  // Check if diarization is enabled
+  const diarize=document.getElementById('pre-diarization')?.checked;
+  if(diarize) body.speaker_labels=true;
+
   const submitRes=await fetch('https://api.assemblyai.com/v2/transcript',{
     method:'POST',headers:{...headers,'Content-Type':'application/json'},
     body:JSON.stringify(body)});
@@ -1296,7 +1342,15 @@ async function transcribeAssemblyAI(blob,lang){
     const pollRes=await fetch(`https://api.assemblyai.com/v2/transcript/${id}`,{headers});
     if(!pollRes.ok) throw new Error(`AssemblyAI poll ${pollRes.status}`);
     const result=await pollRes.json();
-    if(result.status==='completed') return result.text||'';
+    if(result.status==='completed'){
+      const segments=[];
+      if(result.utterances&&result.utterances.length>0){
+        for(const u of result.utterances){
+          segments.push({start:u.start/1000,end:u.end/1000,text:u.text,speaker:u.speaker});
+        }
+      }
+      return{text:result.text||'',segments};
+    }
     if(result.status==='error') throw new Error(`AssemblyAI: ${result.error}`);
     attempts++;
   }
@@ -1317,7 +1371,9 @@ async function transcribeOpenAI(blob,lang){
   const res=await fetch('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form});
   if(!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
-  return(await res.json()).text||'';
+  const data=await res.json();
+  const segments=(data.segments||[]).map(s=>({start:s.start,end:s.end,text:s.text}));
+  return{text:data.text||'',segments};
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1413,14 +1469,59 @@ function mergeChunks(chunks){
   if(!sorted.length) return '(전사 결과 없음)';
   let merged='';
   for(let i=0;i<sorted.length;i++){
-    const ch=sorted[i],ts=fmtTime(ch.startSec),text=ch.text.trim();
-    if(i===0){merged+=`[${ts}] ${text}`}
-    else{
-      const sentences=text.split(/(?<=[.!?。])\s+/);
-      const prevEnd=sorted[i-1].text.trim().slice(-100);
-      let si=0;
-      if(sentences.length>1&&prevEnd.includes(sentences[0].slice(0,30))) si=1;
-      merged+=`\n\n[${ts}] ${sentences.slice(si).join(' ')}`;
+    const ch=sorted[i],text=ch.text.trim();
+
+    // Use segment-level timestamps if available
+    if(ch.segments&&ch.segments.length>0){
+      let segmentText='';
+      let lastParaTime=null;
+      let lastSpeaker=null;
+      const PARA_BREAK_SEC=30; // Add paragraph break every ~30 seconds
+
+      for(let j=0;j<ch.segments.length;j++){
+        const seg=ch.segments[j];
+        const absStart=ch.startSec+seg.start;
+        const ts=fmtTime(absStart);
+        const speakerChanged=seg.speaker&&seg.speaker!==lastSpeaker;
+
+        // Add timestamp at segment start, every ~30 seconds, or when speaker changes
+        if(j===0||!lastParaTime||absStart-lastParaTime>=PARA_BREAK_SEC||speakerChanged){
+          if(segmentText&&j>0) segmentText+='\n\n';
+          const speakerTag=seg.speaker?`[화자 ${seg.speaker}] `:'';
+          segmentText+=`[${ts}] ${speakerTag}${seg.text}`;
+          lastParaTime=absStart;
+          if(seg.speaker) lastSpeaker=seg.speaker;
+        }else{
+          segmentText+=` ${seg.text}`;
+        }
+      }
+
+      if(i===0){
+        merged+=segmentText;
+      }else{
+        const prevEnd=sorted[i-1].text.trim().slice(-100);
+        const firstSeg=segmentText.substring(segmentText.indexOf(''] ')+2);
+        let skip=false;
+        if(prevEnd.includes(firstSeg.slice(0,30))) skip=true;
+        if(!skip){
+          merged+=`\n\n${segmentText}`;
+        }else{
+          // Skip first segment if it's a repeat, keep rest
+          const restSegs=segmentText.split('\n\n').slice(1);
+          if(restSegs.length>0) merged+=`\n\n${restSegs.join('\n\n')}`;
+        }
+      }
+    }else{
+      // Fallback to chunk-level timestamps if no segments
+      const ts=fmtTime(ch.startSec);
+      if(i===0){merged+=`[${ts}] ${text}`}
+      else{
+        const sentences=text.split(/(?<=[.!?。])\s+/);
+        const prevEnd=sorted[i-1].text.trim().slice(-100);
+        let si=0;
+        if(sentences.length>1&&prevEnd.includes(sentences[0].slice(0,30))) si=1;
+        merged+=`\n\n[${ts}] ${sentences.slice(si).join(' ')}`;
+      }
     }
   }
   return merged;
@@ -1596,16 +1697,9 @@ function buildSummaryPrompts(transcriptText,lang){
 
 // ── Main summary entry point ──
 async function generateSummaryFromText(transcriptText,lang){
-  const pref=state.llmProvider||'auto';
-  let provider=null;
-  if(pref==='groq'&&state.groqKey) provider='groq';
-  else if(pref==='gemini'&&state.geminiKey) provider='gemini';
-  else if(pref==='auto'){
-    if(state.groqKey) provider='groq';
-    else if(state.geminiKey) provider='gemini';
-  }
+  const provider=_pickLLMProvider();
   if(!provider){
-    toast('설정에서 Groq 또는 Gemini API 키를 입력하세요');return;
+    toast('설정에서 Groq, Gemini 또는 Claude API 키를 입력하세요');return;
   }
   await _runSummary(provider,transcriptText,lang);
 }
@@ -1614,7 +1708,7 @@ async function _runSummary(provider,transcriptText,lang){
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
   summaryBtn.disabled=true;
-  const label=provider==='groq'?'Groq (Llama)':provider==='gemini'?'Gemini':'OpenAI (유료)';
+  const label=provider==='groq'?'Groq (Llama)':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI (유료)';
   summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...</span>`;
 
   const{systemPrompt,userPrompt}=buildSummaryPrompts(transcriptText,lang);
@@ -2320,16 +2414,26 @@ function _iq(s){
     .replace(/`(.+?)`/g,'<code>$1</code>');
 }
 
-// Helper: pick best LLM provider based on settings
+// Helper: pick best LLM provider based on settings with priority ordering
 function _pickLLMProvider(){
   const pref=state.llmProvider||'auto';
-  if(pref==='claude'&&state.claudeKey) return 'claude';
-  if(pref==='groq'&&state.groqKey) return 'groq';
-  if(pref==='gemini'&&state.geminiKey) return 'gemini';
-  if(pref==='auto'){
-    if(state.groqKey) return 'groq';
-    if(state.geminiKey) return 'gemini';
-    if(state.claudeKey) return 'claude';
+
+  // Exact match (single provider only)
+  if(pref==='groq-only'&&state.groqKey) return 'groq';
+  if(pref==='gemini-only'&&state.geminiKey) return 'gemini';
+  if(pref==='claude-only'&&state.claudeKey) return 'claude';
+
+  // Priority orders
+  const orders={
+    'auto':['groq','gemini','claude'],
+    'groq-first':['groq','gemini','claude'],
+    'gemini-first':['gemini','groq','claude'],
+    'claude-first':['claude','groq','gemini'],
+  };
+  const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey'};
+  const order=orders[pref]||orders['auto'];
+  for(const p of order){
+    if(state[keyMap[p]]) return p;
   }
   return null;
 }
