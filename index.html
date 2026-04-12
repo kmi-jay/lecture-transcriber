@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lispen">
+<meta name="application-name" content="Lispen">
 <meta name="theme-color" content="#0a0a0f">
 <title>Lispen</title>
 <link rel="manifest" href="manifest.json">
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -374,6 +377,32 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
   <input type="file" id="file-input" accept="audio/*" style="display:none"
     onchange="handleFile(this.files[0])">
+
+  <!-- PWA Install Banner -->
+  <div id="install-banner" style="display:none;margin-top:14px">
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:16px 18px;
+      border-color:var(--accent);background:linear-gradient(135deg,#6c5ce712,transparent)">
+      <div style="font-size:28px;flex-shrink:0">📲</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;margin-bottom:2px">홈 화면에 추가</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.4">앱처럼 설치하면 오프라인에서도 사용 가능</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="triggerInstall()" style="flex-shrink:0">설치</button>
+    </div>
+  </div>
+
+  <!-- iOS Install Tip (Safari only) -->
+  <div id="ios-install-tip" style="display:none;margin-top:14px">
+    <div class="card" style="padding:14px 16px;border-color:var(--border2)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">📲 홈 화면에 추가하기 (iOS)</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">
+        Safari 하단 <span style="background:var(--surface2);padding:1px 7px;border-radius:4px">공유 🔗</span> 버튼 →
+        <span style="background:var(--surface2);padding:1px 7px;border-radius:4px">홈 화면에 추가</span> 탭
+      </div>
+      <button onclick="document.getElementById('ios-install-tip').style.display='none'"
+        style="margin-top:10px;font-size:11px;color:var(--text3);background:none;border:none;cursor:pointer">닫기</button>
+    </div>
+  </div>
 
   <!-- History -->
   <div id="history-section" style="display:none;margin-top:20px">
@@ -2375,6 +2404,46 @@ function fmtNow(){
   const d=new Date();
   return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
 }
+
+// ═════════════════════════════════════════════════════════════════
+//  PWA INSTALL
+// ═════════════════════════════════════════════════════════════════
+let _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+  // Show install banner only if not already installed
+  if(!window.matchMedia('(display-mode: standalone)').matches){
+    document.getElementById('install-banner').style.display = 'block';
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').style.display = 'none';
+  toast('✅ Lispen이 홈 화면에 추가됐어요!');
+  _installPrompt = null;
+});
+
+async function triggerInstall(){
+  if(_installPrompt){
+    _installPrompt.prompt();
+    const { outcome } = await _installPrompt.userChoice;
+    if(outcome === 'accepted') _installPrompt = null;
+  }
+}
+
+// iOS Safari: no beforeinstallprompt — show manual tip instead
+function _checkIOSInstall(){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  if(isIOS && isSafari && !isStandalone){
+    document.getElementById('ios-install-tip').style.display = 'block';
+  }
+}
+_checkIOSInstall();
 
 // ═════════════════════════════════════════════════════════════════
 //  INIT
