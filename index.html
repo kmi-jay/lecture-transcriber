@@ -2,898 +2,1198 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1a2e">
+<meta name="theme-color" content="#0a0a0f">
 <title>강의전사</title>
 <link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-:root {
-  --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
-  --accent: #e94560; --accent2: #533483; --text: #eee; --text2: #aaa;
-  --ok: #4ecca3; --warn: #f0a500; --err: #e94560;
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--surface:#1a1a26;--surface2:#222233;--surface3:#2a2a3d;
+  --border:#ffffff0a;--border2:#ffffff12;
+  --text:#f0f0f5;--text2:#8888a0;--text3:#55556a;
+  --accent:#6c5ce7;--accent2:#a29bfe;--accent-glow:#6c5ce740;
+  --green:#00d2a0;--green-dim:#00d2a020;--green-glow:#00d2a040;
+  --amber:#ffb347;--amber-dim:#ffb34720;
+  --red:#ff6b6b;--red-dim:#ff6b6b20;
+  --blue:#74b9ff;--blue-dim:#74b9ff20;
+  --radius:16px;--radius-sm:10px;--radius-xs:6px;
+  --shadow:0 8px 32px rgba(0,0,0,0.4);
+  --shadow-up:0 -4px 20px rgba(0,0,0,0.3);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','SF Mono',monospace;
 }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg); color: var(--text); min-height: 100vh; padding: 0; }
+html{font-size:16px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);
+  min-height:100vh;min-height:100dvh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased}
 
-/* Header */
-.header { background: var(--surface); padding: 16px 20px; display: flex;
-  align-items: center; justify-content: space-between; border-bottom: 1px solid #333; }
-.header h1 { font-size: 18px; font-weight: 600; }
-.header .settings-btn { background: none; border: none; color: var(--text2);
-  font-size: 22px; cursor: pointer; padding: 4px 8px; }
+/* Ambient gradient background */
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse at 30% 20%,#6c5ce708 0%,transparent 50%),
+             radial-gradient(ellipse at 70% 80%,#00d2a005 0%,transparent 50%);
+  pointer-events:none;z-index:0}
 
-/* Pages */
-.page { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
-.page.active { display: block; }
+/* ──── Layout Shell ──── */
+.app{position:relative;z-index:1;max-width:480px;margin:0 auto;
+  min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 
-/* Buttons */
-.btn { display: block; width: 100%; padding: 16px; border: none; border-radius: 12px;
-  font-size: 16px; font-weight: 600; cursor: pointer; margin: 8px 0;
-  transition: all 0.2s; }
-.btn-primary { background: var(--accent); color: white; }
-.btn-primary:hover { opacity: 0.9; }
-.btn-secondary { background: var(--surface2); color: var(--text); }
-.btn-secondary:hover { background: #1a4a80; }
-.btn-small { width: auto; display: inline-block; padding: 10px 20px; font-size: 14px; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* ──── Top Bar ──── */
+.topbar{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(180deg,var(--bg) 60%,transparent);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.topbar .logo{display:flex;align-items:center;gap:10px}
+.topbar .logo-icon{width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),#a29bfe);
+  display:flex;align-items:center;justify-content:center;font-size:16px}
+.topbar .logo-text{font-size:17px;font-weight:600;letter-spacing:-0.3px}
+.topbar .nav-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--surface);color:var(--text2);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .2s}
+.topbar .nav-btn:hover{background:var(--surface2);color:var(--text)}
 
-/* Cards */
-.card { background: var(--surface); border-radius: 12px; padding: 20px;
-  margin: 12px 0; border: 1px solid #333; }
-.card h3 { font-size: 15px; color: var(--text2); margin-bottom: 12px; }
+/* ──── Pages ──── */
+.page{display:none;flex:1;padding:0 20px 100px;animation:fadeUp .35s ease}
+.page.active{display:flex;flex-direction:column}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
-/* Input */
-.input-group { margin: 12px 0; }
-.input-group label { display: block; font-size: 13px; color: var(--text2);
-  margin-bottom: 6px; }
-.input-group input, .input-group select {
-  width: 100%; padding: 12px; background: var(--bg); border: 1px solid #444;
-  border-radius: 8px; color: var(--text); font-size: 15px; }
+/* ──── Cards ──── */
+.card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;margin-bottom:14px;
+  transition:all .2s}
+.card:hover{border-color:var(--border2)}
+.card-label{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--text3);font-weight:600;margin-bottom:10px}
+.card-glow{box-shadow:0 0 0 1px var(--accent-glow),var(--shadow)}
 
-/* Recording */
-.rec-btn { width: 80px; height: 80px; border-radius: 50%; border: 4px solid var(--accent);
-  background: transparent; color: var(--accent); font-size: 28px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; margin: 20px auto;
-  transition: all 0.3s; }
-.rec-btn.recording { background: var(--accent); color: white; animation: pulse 1.5s infinite; }
-@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+/* ──── Buttons ──── */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:16px;border:none;border-radius:var(--radius-sm);
+  font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden}
+.btn:active{transform:scale(0.98)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 
-/* Progress */
-.progress-bar { width: 100%; height: 8px; background: var(--bg); border-radius: 4px;
-  overflow: hidden; margin: 8px 0; }
-.progress-fill { height: 100%; background: var(--ok); transition: width 0.3s;
-  border-radius: 4px; }
-.chunk-list { margin-top: 12px; }
-.chunk-item { display: flex; align-items: center; padding: 8px 0;
-  border-bottom: 1px solid #2a2a3e; font-size: 14px; }
-.chunk-item .status { width: 24px; text-align: center; margin-right: 10px; }
-.chunk-item .api-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px;
-  margin-left: auto; }
-.tag-groq { background: #1b5e20; color: #81c784; }
-.tag-openai { background: #4a148c; color: #ce93d8; }
-.tag-pending { background: #333; color: #888; }
+.btn-primary{background:linear-gradient(135deg,var(--accent),#7c6cf0);
+  color:white;box-shadow:0 4px 20px var(--accent-glow)}
+.btn-primary:hover:not(:disabled){box-shadow:0 6px 28px #6c5ce760}
 
-/* Result */
-.result-text { background: var(--bg); border-radius: 8px; padding: 16px;
-  font-size: 14px; line-height: 1.7; max-height: 60vh; overflow-y: auto;
-  white-space: pre-wrap; word-break: break-word; margin: 12px 0; }
+.btn-ghost{background:var(--surface);border:1px solid var(--border2);
+  color:var(--text);padding:14px}
+.btn-ghost:hover{background:var(--surface2)}
 
-/* Quota bar */
-.quota-bar { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
-.quota-bar .bar { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; }
-.quota-bar .bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.btn-sm{width:auto;padding:10px 20px;font-size:13px;border-radius:var(--radius-xs)}
 
-/* Warning box */
-.warn-box { background: #3e2723; border: 1px solid var(--warn); border-radius: 10px;
-  padding: 16px; margin: 12px 0; }
-.warn-box h4 { color: var(--warn); margin-bottom: 8px; }
-.warn-box p { font-size: 14px; color: var(--text2); line-height: 1.5; }
+/* ──── Inputs ──── */
+.field{margin-bottom:14px}
+.field-label{font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500}
+.field input,.field select{width:100%;padding:13px 14px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-sm);
+  color:var(--text);font-family:var(--font);font-size:14px;
+  transition:border-color .2s;outline:none}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--text3)}
+.field select{appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238888a0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+.field select option{background:var(--surface);color:var(--text)}
 
-/* Tabs */
-.tab-bar { display: flex; gap: 0; margin: 16px 0 0; border-radius: 8px; overflow: hidden; }
-.tab-bar button { flex: 1; padding: 10px; border: none; background: var(--surface);
-  color: var(--text2); font-size: 13px; cursor: pointer; }
-.tab-bar button.active { background: var(--surface2); color: var(--text); font-weight: 600; }
-.tab-content { display: none; }
-.tab-content.active { display: block; }
+/* ──── Quota Widget ──── */
+.quota{display:flex;align-items:center;gap:14px}
+.quota-ring{width:52px;height:52px;position:relative;flex-shrink:0}
+.quota-ring svg{transform:rotate(-90deg)}
+.quota-ring .track{fill:none;stroke:var(--surface3);stroke-width:4}
+.quota-ring .fill{fill:none;stroke:var(--green);stroke-width:4;
+  stroke-linecap:round;transition:stroke-dashoffset .6s ease,stroke .3s}
+.quota-info{flex:1}
+.quota-info .value{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.quota-info .label{font-size:12px;color:var(--text2);margin-top:2px}
 
-/* Timer */
-.timer { font-size: 48px; font-weight: 300; text-align: center; margin: 12px 0;
-  font-variant-numeric: tabular-nums; color: var(--ok); }
+/* ──── Action Cards (Home) ──── */
+.action-card{display:flex;align-items:center;gap:16px;padding:18px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  cursor:pointer;margin-bottom:10px;transition:all .25s}
+.action-card:hover{border-color:var(--accent);background:var(--surface2)}
+.action-card:active{transform:scale(0.98)}
+.action-icon{width:48px;height:48px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.action-card h3{font-size:15px;font-weight:600;margin-bottom:2px}
+.action-card p{font-size:12px;color:var(--text2);line-height:1.4}
 
-/* Toast */
-.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
-  background: var(--surface2); color: var(--text); padding: 12px 24px;
-  border-radius: 20px; font-size: 14px; z-index: 100; opacity: 0;
-  transition: opacity 0.3s; pointer-events: none; }
-.toast.show { opacity: 1; }
+/* ──── Recording Page ──── */
+.rec-display{text-align:center;padding:40px 0 20px}
+.rec-timer{font-family:var(--mono);font-size:56px;font-weight:300;
+  letter-spacing:2px;color:var(--green);margin:16px 0;
+  font-variant-numeric:tabular-nums}
+.rec-wave{display:flex;align-items:center;justify-content:center;gap:3px;
+  height:40px;margin:20px 0}
+.rec-wave span{width:3px;background:var(--green);border-radius:2px;
+  animation:wave 1.2s ease-in-out infinite}
+.rec-wave span:nth-child(1){animation-delay:0s;height:12px}
+.rec-wave span:nth-child(2){animation-delay:.1s;height:20px}
+.rec-wave span:nth-child(3){animation-delay:.2s;height:32px}
+.rec-wave span:nth-child(4){animation-delay:.3s;height:24px}
+.rec-wave span:nth-child(5){animation-delay:.4s;height:36px}
+.rec-wave span:nth-child(6){animation-delay:.3s;height:28px}
+.rec-wave span:nth-child(7){animation-delay:.2s;height:16px}
+.rec-wave span:nth-child(8){animation-delay:.1s;height:22px}
+.rec-wave span:nth-child(9){animation-delay:0s;height:14px}
+@keyframes wave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.rec-stop{width:72px;height:72px;border-radius:50%;border:3px solid var(--red);
+  background:transparent;color:var(--red);font-size:24px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;margin:24px auto;
+  transition:all .2s}
+.rec-stop:hover{background:var(--red-dim)}
+.rec-stop .stop-icon{width:20px;height:20px;border-radius:4px;background:var(--red)}
 
-/* Responsive */
-@media (max-width: 400px) { .header h1 { font-size: 16px; } }
+/* ──── Pre-check ──── */
+.file-badge{display:flex;align-items:center;gap:12px;
+  padding:14px 16px;background:var(--bg2);border-radius:var(--radius-sm);margin-bottom:14px}
+.file-badge .icon{width:40px;height:40px;border-radius:10px;
+  background:var(--accent-glow);display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0}
+.file-badge .info{flex:1;min-width:0}
+.file-badge .name{font-size:14px;font-weight:500;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.file-badge .meta{font-size:12px;color:var(--text2);margin-top:2px}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-item{background:var(--bg2);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.stat-item .val{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat-item .lbl{font-size:11px;color:var(--text2);margin-top:4px}
+
+.alert{padding:14px 16px;border-radius:var(--radius-sm);margin-bottom:14px;
+  display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.6}
+.alert-warn{background:var(--amber-dim);border:1px solid #ffb34730;color:var(--amber)}
+.alert-info{background:var(--blue-dim);border:1px solid #74b9ff30;color:var(--blue)}
+
+.cost-pill{display:inline-flex;align-items:center;gap:6px;
+  padding:8px 14px;border-radius:20px;font-size:13px;font-weight:500;
+  background:var(--surface2);margin-top:8px}
+
+/* ──── Processing ──── */
+.proc-header{text-align:center;padding:20px 0}
+.proc-header h2{font-size:18px;font-weight:600;margin-bottom:4px}
+.proc-header p{font-size:13px;color:var(--text2)}
+.progress-track{width:100%;height:4px;background:var(--surface3);
+  border-radius:2px;overflow:hidden;margin:16px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  border-radius:2px;transition:width .4s ease;position:relative}
+.progress-bar::after{content:'';position:absolute;top:0;right:0;bottom:0;
+  width:60px;background:linear-gradient(90deg,transparent,#ffffff30);
+  animation:shimmer 1.5s infinite}
+@keyframes shimmer{from{transform:translateX(-60px)}to{transform:translateX(60px)}}
+.chunk-list{display:flex;flex-direction:column;gap:6px}
+.chunk-row{display:flex;align-items:center;gap:10px;
+  padding:10px 14px;background:var(--surface);border-radius:var(--radius-sm);
+  font-size:13px;border:1px solid var(--border)}
+.chunk-row .ci{font-weight:500;min-width:60px}
+.chunk-row .ct{flex:1;color:var(--text2);font-size:12px}
+.chunk-row .cs{width:20px;text-align:center}
+.chunk-row .ca{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:500}
+.ca-groq{background:var(--green-dim);color:var(--green)}
+.ca-assemblyai{background:var(--blue-dim);color:var(--blue)}
+.ca-openai{background:#9b59b620;color:#d4a5ff}
+.ca-pending{background:var(--surface2);color:var(--text3)}
+.ca-skip{background:var(--surface2);color:var(--text3)}
+
+/* ──── Result ──── */
+.result-tabs{display:flex;gap:4px;padding:4px;background:var(--surface);
+  border-radius:var(--radius-sm);margin-bottom:14px}
+.result-tabs button{flex:1;padding:10px;border:none;border-radius:var(--radius-xs);
+  background:transparent;color:var(--text2);font-family:var(--font);
+  font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+.result-tabs button.active{background:var(--accent);color:white}
+.result-text{background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:18px;
+  font-size:14px;line-height:1.8;max-height:55vh;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-word;
+  scrollbar-width:thin;scrollbar-color:var(--surface3) transparent}
+.result-text::-webkit-scrollbar{width:4px}
+.result-text::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px}
+
+/* ──── Settings ──── */
+.settings-section{margin-bottom:24px}
+.settings-section h2{font-size:16px;font-weight:600;margin-bottom:14px;
+  display:flex;align-items:center;gap:8px}
+.api-order{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.api-step{display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--bg2);border-radius:var(--radius-sm);font-size:13px}
+.api-step .num{width:24px;height:24px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.api-step .detail{flex:1;line-height:1.5}
+.api-step .detail strong{font-weight:600;color:var(--text)}
+.api-step .detail span{color:var(--text2)}
+
+.api-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px;margin-bottom:10px}
+.api-card h3{font-size:14px;font-weight:600;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px}
+.api-card .hint{font-size:12px;color:var(--text2);line-height:1.6;margin-top:10px}
+.api-card .hint a{color:var(--accent2);text-decoration:none}
+.api-card .hint a:hover{text-decoration:underline}
+
+.badge{display:inline-flex;padding:3px 8px;border-radius:4px;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.badge-free{background:var(--green-dim);color:var(--green)}
+.badge-credit{background:var(--blue-dim);color:var(--blue)}
+.badge-paid{background:var(--red-dim);color:var(--red)}
+
+/* ──── History ──── */
+.history-item{display:flex;align-items:center;gap:12px;
+  padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer}
+.history-item:last-child{border-bottom:none}
+.history-item .hi-icon{width:36px;height:36px;border-radius:10px;
+  background:var(--surface2);display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0}
+.history-item .hi-info{flex:1;min-width:0}
+.history-item .hi-name{font-size:14px;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item .hi-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.history-item .hi-arrow{color:var(--text3);font-size:16px}
+
+/* ──── Toast ──── */
+.toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+  padding:12px 24px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;
+  z-index:200;opacity:0;pointer-events:none;transition:all .3s ease;
+  box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ──── Modal ──── */
+.modal-overlay{position:fixed;inset:0;background:#00000080;z-index:100;
+  display:none;align-items:flex-end;justify-content:center;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{width:100%;max-width:480px;background:var(--surface);
+  border-radius:var(--radius) var(--radius) 0 0;padding:24px 20px 40px;
+  animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.modal h3{font-size:17px;font-weight:600;margin-bottom:16px}
+.modal-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+
+/* ──── Responsive ──── */
+@media(max-width:380px){
+  .topbar{padding:12px 16px}
+  .page{padding:0 16px 80px}
+  .rec-timer{font-size:44px}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
+<div class="app">
 
-<!-- Header -->
-<div class="header">
-  <h1>📝 강의전사</h1>
-  <button class="settings-btn" onclick="showPage('settings')">⚙️</button>
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">📝</div>
+    <span class="logo-text">강의전사</span>
+  </div>
+  <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
 </div>
 
-<!-- Page: Home -->
+<!-- ═══════ PAGE: Home ═══════ -->
 <div id="page-home" class="page active">
-  <div class="card">
-    <h3>Groq 무료 사용량</h3>
-    <div class="quota-bar">
-      <span id="quota-text" style="font-size:13px; min-width:80px;">0 / 120분</span>
-      <div class="bar"><div class="bar-fill" id="quota-fill" style="width:0%; background:var(--ok);"></div></div>
+  <!-- Quota Card -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="quota">
+      <div class="quota-ring">
+        <svg width="52" height="52" viewBox="0 0 52 52">
+          <circle class="track" cx="26" cy="26" r="22"/>
+          <circle class="fill" id="quota-ring-fill" cx="26" cy="26" r="22"
+            stroke-dasharray="138.23" stroke-dashoffset="0"/>
+        </svg>
+      </div>
+      <div class="quota-info">
+        <div class="value" id="quota-text">120분</div>
+        <div class="label">Groq 잔여 (시간당 갱신)</div>
+      </div>
     </div>
   </div>
 
-  <button class="btn btn-primary" onclick="startRecording()" id="btn-record">
-    🎙️ 녹음 시작
-  </button>
-  <button class="btn btn-secondary" onclick="pickFile()">
-    📁 파일 선택
-  </button>
+  <!-- Actions -->
+  <div class="action-card" onclick="startRecording()">
+    <div class="action-icon" style="background:var(--red-dim)">🎙️</div>
+    <div>
+      <h3>녹음 시작</h3>
+      <p>마이크로 강의를 직접 녹음합니다</p>
+    </div>
+  </div>
+
+  <div class="action-card" onclick="pickFile()">
+    <div class="action-icon" style="background:var(--accent-glow)">📂</div>
+    <div>
+      <h3>파일 선택</h3>
+      <p>녹음된 오디오 파일을 불러옵니다</p>
+    </div>
+  </div>
   <input type="file" id="file-input" accept="audio/*" style="display:none"
     onchange="handleFile(this.files[0])">
 
-  <div id="history-section" class="card" style="margin-top:20px; display:none;">
-    <h3>최근 전사</h3>
-    <div id="history-list"></div>
+  <!-- History -->
+  <div id="history-section" style="display:none;margin-top:20px">
+    <div class="card-label">최근 전사</div>
+    <div class="card" style="padding:4px 16px">
+      <div id="history-list"></div>
+    </div>
   </div>
 </div>
 
-<!-- Page: Recording -->
+<!-- ═══════ PAGE: Recording ═══════ -->
 <div id="page-record" class="page">
-  <div style="text-align:center; padding: 20px 0;">
-    <p style="color:var(--text2); font-size:14px;">녹음 중</p>
-    <div class="timer" id="rec-timer">00:00:00</div>
-    <button class="rec-btn recording" id="rec-stop-btn" onclick="stopRecording()">⏹</button>
-    <p style="color:var(--text2); font-size:13px; margin-top:12px;">탭하여 녹음 중지</p>
+  <div class="rec-display">
+    <div class="card-label">녹음 중</div>
+    <div class="rec-timer" id="rec-timer">00:00:00</div>
+    <div class="rec-wave">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <button class="rec-stop" onclick="stopRecording()">
+      <div class="stop-icon"></div>
+    </button>
+    <p style="color:var(--text3);font-size:13px;margin-top:8px">탭하여 녹음 중지</p>
   </div>
 </div>
 
-<!-- Page: Pre-check (한도 확인 + 선택지) -->
+<!-- ═══════ PAGE: Pre-check ═══════ -->
 <div id="page-precheck" class="page">
-  <div class="card">
-    <h3>파일 정보</h3>
-    <p id="pre-filename" style="font-size:15px;"></p>
-    <p id="pre-duration" style="font-size:14px; color:var(--text2); margin-top:4px;"></p>
-    <p id="pre-chunks" style="font-size:14px; color:var(--text2); margin-top:4px;"></p>
+  <div class="card-label">전사 준비</div>
+
+  <div class="file-badge">
+    <div class="icon">🎵</div>
+    <div class="info">
+      <div class="name" id="pre-filename"></div>
+      <div class="meta" id="pre-filemeta"></div>
+    </div>
   </div>
 
-  <div id="pre-warn" class="warn-box" style="display:none;">
-    <h4>⚠️ Groq 한도 부족</h4>
-    <p id="pre-warn-text"></p>
+  <div class="stat-grid">
+    <div class="stat-item">
+      <div class="val" id="pre-dur-val">0</div>
+      <div class="lbl">분</div>
+    </div>
+    <div class="stat-item">
+      <div class="val" id="pre-chunk-val">0</div>
+      <div class="lbl">청크</div>
+    </div>
+    <div class="stat-item">
+      <div class="val" id="pre-size-val">0</div>
+      <div class="lbl">MB</div>
+    </div>
   </div>
 
-  <div class="input-group">
-    <label>처리 방법</label>
+  <div id="pre-warn" class="alert alert-warn" style="display:none">
+    <span>⚠️</span>
+    <span id="pre-warn-text"></span>
+  </div>
+
+  <div id="pre-cost-alert" class="alert alert-info" style="display:none">
+    <span>💰</span>
+    <span id="pre-cost-text"></span>
+  </div>
+
+  <div class="field">
+    <div class="field-label">처리 방법</div>
     <select id="pre-api-choice">
-      <option value="groq-only">Groq 무료 (한도 내에서만)</option>
-      <option value="groq-then-openai">Groq 우선 → 한도 소진 시 OpenAI 전환</option>
-      <option value="openai-only">OpenAI만 사용</option>
+      <option value="auto">자동 (Groq → AssemblyAI → 선택지)</option>
+      <option value="groq-only">Groq만 (한도 내에서만, 무료)</option>
+      <option value="assemblyai-only">AssemblyAI만 (무료 크레딧)</option>
+      <option value="openai-only">OpenAI만 (유료)</option>
     </select>
   </div>
 
-  <div class="input-group">
-    <label>전사 언어</label>
+  <div class="field">
+    <div class="field-label">전사 언어</div>
     <select id="pre-language">
-      <option value="ko">한국어 / ko</option>
-      <option value="en">영어 / en</option>
-      <option value="ja">일본어 / ja</option>
-      <option value="zh">중국어 / zh</option>
-      <option value="es">스페인어 / es</option>
-      <option value="fr">프랑스어 / fr</option>
-      <option value="de">독일어 / de</option>
-      <option value="it">이탈리아어 / it</option>
-      <option value="hi">힌디어 / hi</option>
-      <option value="ar">아랍어 / ar</option>
-      <option value="ru">러시아어 / ru</option>
-      <option value="auto">자동감지 / auto</option>
+      <option value="ko">한국어</option>
+      <option value="en">영어</option>
+      <option value="ja">일본어</option>
+      <option value="zh">중국어</option>
+      <option value="es">스페인어</option>
+      <option value="fr">프랑스어</option>
+      <option value="de">독일어</option>
+      <option value="it">이탈리아어</option>
+      <option value="hi">힌디어</option>
+      <option value="ar">아랍어</option>
+      <option value="ru">러시아어</option>
+      <option value="auto">자동감지</option>
     </select>
   </div>
 
-  <div id="pre-cost" class="card" style="display:none;">
-    <h3>예상 비용</h3>
-    <p id="pre-cost-text" style="font-size:14px;"></p>
+  <div style="display:flex;gap:10px;margin-top:8px">
+    <button class="btn btn-ghost" onclick="showPage('home')" style="flex:1">취소</button>
+    <button class="btn btn-primary" onclick="startTranscription()" style="flex:2">전사 시작</button>
   </div>
-
-  <button class="btn btn-primary" onclick="startTranscription()">전사 시작</button>
-  <button class="btn btn-secondary" onclick="showPage('home')">취소</button>
 </div>
 
-<!-- Page: Processing -->
+<!-- ═══════ PAGE: Processing ═══════ -->
 <div id="page-process" class="page">
-  <div class="card">
-    <h3 id="proc-status">전사 준비 중...</h3>
-    <div class="progress-bar"><div class="progress-fill" id="proc-progress"></div></div>
-    <p id="proc-detail" style="font-size:13px; color:var(--text2); margin-top:8px;"></p>
+  <div class="proc-header">
+    <h2 id="proc-status">전사 준비 중...</h2>
+    <p id="proc-detail"></p>
   </div>
+  <div class="progress-track"><div class="progress-bar" id="proc-progress" style="width:0%"></div></div>
   <div class="chunk-list" id="chunk-list"></div>
 </div>
 
-<!-- Page: Result -->
+<!-- ═══════ PAGE: Result ═══════ -->
 <div id="page-result" class="page">
-  <div class="card" style="padding:12px 16px;">
-    <p id="res-info" style="font-size:13px; color:var(--text2);"></p>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="flex:1;min-width:0">
+      <p id="res-info" style="font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
+    </div>
   </div>
-  <div class="tab-bar">
-    <button class="active" onclick="switchTab('full')">전문</button>
-    <button onclick="switchTab('summary')">요약</button>
+
+  <div class="result-tabs">
+    <button class="active" onclick="switchTab('full',this)">전문</button>
+    <button onclick="switchTab('summary',this)">요약</button>
   </div>
-  <div id="tab-full" class="tab-content active">
+
+  <div id="tab-full" class="tab-content" style="display:block">
     <div class="result-text" id="res-full"></div>
   </div>
-  <div id="tab-summary" class="tab-content">
+  <div id="tab-summary" class="tab-content" style="display:none">
     <div class="result-text" id="res-summary">요약은 LLM 후보정 사용 시 생성됩니다.</div>
   </div>
-  <button class="btn btn-primary" onclick="copyResult()">📋 결과 복사</button>
-  <button class="btn btn-secondary" onclick="downloadResult()">💾 텍스트 파일 저장</button>
-  <button class="btn btn-secondary" onclick="showPage('home')">홈으로</button>
+
+  <div style="display:flex;gap:10px;margin-top:14px">
+    <button class="btn btn-ghost" onclick="copyResult()" style="flex:1">📋 복사</button>
+    <button class="btn btn-ghost" onclick="downloadResult()" style="flex:1">💾 저장</button>
+  </div>
+  <button class="btn btn-ghost" onclick="showPage('home')" style="margin-top:8px">← 홈으로</button>
 </div>
 
-<!-- Page: Settings -->
+<!-- ═══════ PAGE: Settings ═══════ -->
 <div id="page-settings" class="page">
-  <h2 style="margin-bottom:16px;">설정</h2>
-  <div class="card">
-    <h3>API 키</h3>
-    <div class="input-group">
-      <label>Groq API Key</label>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <button class="nav-btn" onclick="showPage('home')" style="width:36px;height:36px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <h2 style="font-size:18px;font-weight:600">설정</h2>
+  </div>
+
+  <!-- API Usage Order -->
+  <div class="settings-section">
+    <div class="card-label">API 사용 순서</div>
+    <div class="api-order">
+      <div class="api-step">
+        <div class="num" style="background:var(--green-dim);color:var(--green)">1</div>
+        <div class="detail">
+          <strong>Groq</strong> <span class="badge badge-free">무료</span><br>
+          <span>시간당 120분 / 하루 2,000건 (롤링 리셋)</span>
+        </div>
+      </div>
+      <div class="api-step">
+        <div class="num" style="background:var(--blue-dim);color:var(--blue)">2</div>
+        <div class="detail">
+          <strong>AssemblyAI</strong> <span class="badge badge-credit">크레딧</span><br>
+          <span>가입 시 $50 무료 크레딧 (약 333시간분)</span>
+        </div>
+      </div>
+      <div class="api-step">
+        <div class="num" style="background:var(--red-dim);color:var(--red)">3</div>
+        <div class="detail">
+          <strong>OpenAI</strong> <span class="badge badge-paid">유료</span><br>
+          <span>$0.006/분 ≈ ₩9/분 (선택 시에만 사용)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Groq Key -->
+  <div class="api-card">
+    <h3><span style="color:var(--green)">●</span> Groq API Key</h3>
+    <div class="field" style="margin-bottom:0">
       <input type="password" id="set-groq-key" placeholder="gsk_...">
     </div>
-    <div class="input-group">
-      <label>OpenAI API Key</label>
+    <div class="hint">
+      <strong>영구 무료</strong> — 카드 등록 불필요<br>
+      <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> → 구글 가입 → Create API Key
+    </div>
+  </div>
+
+  <!-- AssemblyAI Key -->
+  <div class="api-card">
+    <h3><span style="color:var(--blue)">●</span> AssemblyAI API Key</h3>
+    <div class="field" style="margin-bottom:0">
+      <input type="password" id="set-assemblyai-key" placeholder="가입 시 대시보드에서 확인">
+    </div>
+    <div class="hint">
+      <strong>가입 시 $50 무료 크레딧</strong> — 카드 미등록 시 자동과금 없음<br>
+      <a href="https://www.assemblyai.com/app" target="_blank">assemblyai.com/app</a> → 가입 → 대시보드에서 API Key 복사<br>
+      크레딧 소진 후 카드 미등록이면 단순 중단됨
+    </div>
+  </div>
+
+  <!-- OpenAI Key -->
+  <div class="api-card" style="border-color:#ff6b6b30">
+    <h3><span style="color:var(--red)">●</span> OpenAI API Key <span class="badge badge-paid">유료</span></h3>
+    <div class="field" style="margin-bottom:0">
       <input type="password" id="set-openai-key" placeholder="sk-...">
     </div>
-  </div>
-  <div class="card">
-    <h3>청크 설정</h3>
-    <div class="input-group">
-      <label>청크 길이 (분)</label>
-      <select id="set-chunk-min">
-        <option value="5">5분</option>
-        <option value="10" selected>10분</option>
-        <option value="15">15분</option>
-      </select>
+    <div class="hint">
+      <strong style="color:var(--red)">이 서비스만 유료</strong> — 174분 강의 ≈ ₩1,500<br>
+      <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> → Create new secret key<br>
+      반드시 <a href="https://platform.openai.com/settings/organization/limits" target="_blank">월간 한도</a>를 설정하세요 (예: $5)
     </div>
   </div>
-  <div class="card">
-    <h3>사용량 초기화</h3>
-    <p style="font-size:13px; color:var(--text2); margin-bottom:8px;">
-      오늘 Groq 사용량: <span id="set-usage">0</span>분
-    </p>
-    <button class="btn btn-small btn-secondary" onclick="resetQuota()">사용량 초기화</button>
+
+  <!-- Chunk Settings -->
+  <div class="settings-section" style="margin-top:20px">
+    <div class="card-label">청크 설정</div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0">
+        <div class="field-label">청크 길이</div>
+        <select id="set-chunk-min">
+          <option value="5">5분</option>
+          <option value="10" selected>10분 (권장)</option>
+          <option value="15">15분</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--text3);margin-top:8px">
+        긴 강의는 청크 단위로 분할됩니다. 10분이 품질과 효율의 균형점.
+      </p>
+    </div>
   </div>
-  <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:16px;">저장</button>
-  <button class="btn btn-secondary" onclick="showPage('home')">뒤로</button>
+
+  <!-- Quota Info -->
+  <div class="settings-section">
+    <div class="card-label">사용량</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <p style="font-size:14px">Groq: <strong id="set-usage">0</strong>분 사용</p>
+          <p style="font-size:12px;color:var(--text2);margin-top:2px">
+            롤링 방식 — 첫 요청 후 1시간이면 자동 복구
+          </p>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="resetQuota()">초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" onclick="saveSettings()" style="margin-top:8px">설정 저장</button>
+</div>
+
+<!-- Modal (for API switch confirmation) -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">API 전환</h3>
+    <p id="modal-body" style="font-size:14px;color:var(--text2);line-height:1.6"></p>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
 </div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+</div><!-- /app -->
+
 <script>
-// ═══════════════════════════════════════════════════════════════
-// State
-// ═══════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
+//  STATE
+// ═════════════════════════════════════════════════════════════════
 let state = {
-  groqKey: '', openaiKey: '',
-  chunkMin: 10,
-  // Quota tracking: { date: 'YYYY-MM-DD', usedSec: 0 }
-  quota: { date: '', usedSec: 0 },
-  history: []
+  groqKey:'', assemblyaiKey:'', openaiKey:'',
+  chunkMin:10,
+  quota:{ date:'', usedSec:0 },
+  history:[]
 };
 
-let currentAudio = null;   // { file: File, duration: number (sec) }
+let currentAudio = null;
 let mediaRecorder = null;
 let recordChunks = [];
 let recStartTime = null;
 let recTimerInterval = null;
+let transcriptionAborted = false;
 
-const GROQ_HOURLY_LIMIT = 7200; // seconds
+const GROQ_HOURLY_LIMIT = 7200;
 const OVERLAP_SEC = 30;
 
-// ═══════════════════════════════════════════════════════════════
-// Persistence (IndexedDB simple wrapper)
-// ═══════════════════════════════════════════════════════════════
-const DB_NAME = 'lecture_transcriber';
-const STORE = 'config';
+// ═════════════════════════════════════════════════════════════════
+//  PERSISTENCE (IndexedDB)
+// ═════════════════════════════════════════════════════════════════
+const DB_NAME='lecture_transcriber', STORE='config';
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function dbGet(k){const db=await openDB();return new Promise(r=>{const tx=db.transaction(STORE,'readonly');const rq=tx.objectStore(STORE).get(k);rq.onsuccess=()=>r(rq.result);rq.onerror=()=>r(null)})}
+async function dbSet(k,v){const db=await openDB();return new Promise(r=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,k);tx.oncomplete=()=>r()})}
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function dbGet(key) {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const req = tx.objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
-}
-
-async function dbSet(key, val) {
-  const db = await openDB();
-  return new Promise((resolve) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(val, key);
-    tx.oncomplete = () => resolve();
-  });
-}
-
-async function loadState() {
-  const saved = await dbGet('state');
-  if (saved) Object.assign(state, saved);
-  // Reset quota if new day
-  const today = new Date().toISOString().slice(0, 10);
-  if (state.quota.date !== today) {
-    state.quota = { date: today, usedSec: 0 };
-  }
+async function loadState(){
+  const saved=await dbGet('state');
+  if(saved) Object.assign(state,saved);
+  const today=new Date().toISOString().slice(0,10);
+  if(state.quota.date!==today) state.quota={date:today,usedSec:0};
   applyStateToUI();
+  renderHistory();
 }
 
-async function saveState() {
-  await dbSet('state', state);
-}
+async function saveState(){await dbSet('state',state)}
 
-function applyStateToUI() {
-  document.getElementById('set-groq-key').value = state.groqKey;
-  document.getElementById('set-openai-key').value = state.openaiKey;
-  document.getElementById('set-chunk-min').value = state.chunkMin;
+function applyStateToUI(){
+  document.getElementById('set-groq-key').value=state.groqKey;
+  document.getElementById('set-assemblyai-key').value=state.assemblyaiKey||'';
+  document.getElementById('set-openai-key').value=state.openaiKey;
+  document.getElementById('set-chunk-min').value=state.chunkMin;
   updateQuotaUI();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Navigation
-// ═══════════════════════════════════════════════════════════════
-function showPage(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
+// ═════════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═════════════════════════════════════════════════════════════════
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+}
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-function toast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+// ═════════════════════════════════════════════════════════════════
+//  QUOTA UI
+// ═════════════════════════════════════════════════════════════════
+function updateQuotaUI(){
+  const remainSec=Math.max(0,GROQ_HOURLY_LIMIT-state.quota.usedSec);
+  const remainMin=Math.round(remainSec/60);
+  const pct=remainSec/GROQ_HOURLY_LIMIT;
+  const circ=138.23;
+  const ring=document.getElementById('quota-ring-fill');
+  ring.style.strokeDashoffset=circ*(1-pct);
+  ring.style.stroke=pct>.2?'var(--green)':pct>.05?'var(--amber)':'var(--red)';
+  document.getElementById('quota-text').textContent=remainMin+'분';
+  const u=document.getElementById('set-usage');
+  if(u) u.textContent=Math.round(state.quota.usedSec/60);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Quota UI
-// ═══════════════════════════════════════════════════════════════
-function updateQuotaUI() {
-  const usedMin = Math.round(state.quota.usedSec / 60);
-  const totalMin = Math.round(GROQ_HOURLY_LIMIT / 60);
-  const pct = Math.min(100, (state.quota.usedSec / GROQ_HOURLY_LIMIT) * 100);
-  document.getElementById('quota-text').textContent = `${usedMin} / ${totalMin}분`;
-  const fill = document.getElementById('quota-fill');
-  fill.style.width = pct + '%';
-  fill.style.background = pct > 80 ? 'var(--warn)' : pct > 95 ? 'var(--err)' : 'var(--ok)';
-  const setUsage = document.getElementById('set-usage');
-  if (setUsage) setUsage.textContent = usedMin;
+function resetQuota(){
+  state.quota={date:new Date().toISOString().slice(0,10),usedSec:0};
+  saveState();updateQuotaUI();toast('사용량 초기화됨');
 }
 
-function resetQuota() {
-  state.quota = { date: new Date().toISOString().slice(0, 10), usedSec: 0 };
-  saveState();
-  updateQuotaUI();
-  toast('사용량 초기화됨');
+// ═════════════════════════════════════════════════════════════════
+//  SETTINGS
+// ═════════════════════════════════════════════════════════════════
+function saveSettings(){
+  state.groqKey=document.getElementById('set-groq-key').value.trim();
+  state.assemblyaiKey=document.getElementById('set-assemblyai-key').value.trim();
+  state.openaiKey=document.getElementById('set-openai-key').value.trim();
+  state.chunkMin=parseInt(document.getElementById('set-chunk-min').value);
+  saveState();toast('설정 저장됨');showPage('home');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Settings
-// ═══════════════════════════════════════════════════════════════
-function saveSettings() {
-  state.groqKey = document.getElementById('set-groq-key').value.trim();
-  state.openaiKey = document.getElementById('set-openai-key').value.trim();
-  state.chunkMin = parseInt(document.getElementById('set-chunk-min').value);
-  saveState();
-  toast('설정 저장됨');
-  showPage('home');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Recording
-// ═══════════════════════════════════════════════════════════════
-async function startRecording() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recordChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: getBestMime() });
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordChunks.push(e.data); };
-    mediaRecorder.onstop = onRecordingStop;
+// ═════════════════════════════════════════════════════════════════
+//  RECORDING
+// ═════════════════════════════════════════════════════════════════
+async function startRecording(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recordChunks=[];
+    mediaRecorder=new MediaRecorder(stream,{mimeType:getBestMime()});
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordChunks.push(e.data)};
+    mediaRecorder.onstop=onRecordingStop;
     mediaRecorder.start(1000);
-    recStartTime = Date.now();
-    recTimerInterval = setInterval(updateRecTimer, 500);
+    recStartTime=Date.now();
+    recTimerInterval=setInterval(updateRecTimer,500);
     showPage('record');
-  } catch (e) {
-    toast('마이크 접근 실패: ' + e.message);
-  }
+  }catch(e){toast('마이크 접근 실패: '+e.message)}
 }
-
-function getBestMime() {
-  const types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'];
-  return types.find(t => MediaRecorder.isTypeSupported(t)) || '';
+function getBestMime(){
+  return['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg'].find(t=>MediaRecorder.isTypeSupported(t))||'';
 }
-
-function updateRecTimer() {
-  const elapsed = Math.floor((Date.now() - recStartTime) / 1000);
-  const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
-  const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
-  const s = String(elapsed % 60).padStart(2, '0');
-  document.getElementById('rec-timer').textContent = `${h}:${m}:${s}`;
+function updateRecTimer(){
+  const el=Math.floor((Date.now()-recStartTime)/1000);
+  const h=String(Math.floor(el/3600)).padStart(2,'0');
+  const m=String(Math.floor((el%3600)/60)).padStart(2,'0');
+  const s=String(el%60).padStart(2,'0');
+  document.getElementById('rec-timer').textContent=`${h}:${m}:${s}`;
 }
-
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+function stopRecording(){
+  if(mediaRecorder&&mediaRecorder.state!=='inactive'){
+    mediaRecorder.stop();mediaRecorder.stream.getTracks().forEach(t=>t.stop());
   }
   clearInterval(recTimerInterval);
 }
-
-async function onRecordingStop() {
-  const blob = new Blob(recordChunks, { type: mediaRecorder.mimeType });
-  const ext = mediaRecorder.mimeType.includes('mp4') ? 'm4a' : 'webm';
-  const file = new File([blob], `녹음_${fmtNow()}.${ext}`, { type: mediaRecorder.mimeType });
+async function onRecordingStop(){
+  const blob=new Blob(recordChunks,{type:mediaRecorder.mimeType});
+  const ext=mediaRecorder.mimeType.includes('mp4')?'m4a':'webm';
+  const file=new File([blob],`녹음_${fmtNow()}.${ext}`,{type:mediaRecorder.mimeType});
   await prepareAudio(file);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// File Selection
-// ═══════════════════════════════════════════════════════════════
-function pickFile() { document.getElementById('file-input').click(); }
-
-async function handleFile(file) {
-  if (!file) return;
-  await prepareAudio(file);
-}
-
-async function prepareAudio(file) {
+// ═════════════════════════════════════════════════════════════════
+//  FILE SELECTION
+// ═════════════════════════════════════════════════════════════════
+function pickFile(){document.getElementById('file-input').click()}
+async function handleFile(file){if(!file)return;await prepareAudio(file)}
+async function prepareAudio(file){
   toast('파일 분석 중...');
-  const duration = await getAudioDuration(file);
-  currentAudio = { file, duration };
+  const duration=await getAudioDuration(file);
+  currentAudio={file,duration};
   showPrecheck();
 }
-
-function getAudioDuration(file) {
-  return new Promise((resolve) => {
-    const audio = new Audio();
-    audio.src = URL.createObjectURL(file);
-    audio.addEventListener('loadedmetadata', () => {
-      resolve(audio.duration);
-      URL.revokeObjectURL(audio.src);
-    });
-    audio.addEventListener('error', () => {
-      // Fallback: estimate from file size (assume 128kbps)
-      resolve((file.size * 8) / (128 * 1000));
-    });
+function getAudioDuration(file){
+  return new Promise(resolve=>{
+    const audio=new Audio();audio.src=URL.createObjectURL(file);
+    audio.addEventListener('loadedmetadata',()=>{resolve(audio.duration);URL.revokeObjectURL(audio.src)});
+    audio.addEventListener('error',()=>{resolve((file.size*8)/(128*1000))});
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Pre-check page
-// ═══════════════════════════════════════════════════════════════
-function showPrecheck() {
-  const { file, duration } = currentAudio;
-  const durMin = (duration / 60).toFixed(1);
-  const chunkSec = state.chunkMin * 60;
-  const nChunks = Math.ceil(duration / chunkSec);
-  const remainSec = GROQ_HOURLY_LIMIT - state.quota.usedSec;
-  const remainMin = Math.round(remainSec / 60);
+// ═════════════════════════════════════════════════════════════════
+//  PRE-CHECK
+// ═════════════════════════════════════════════════════════════════
+function showPrecheck(){
+  const{file,duration}=currentAudio;
+  const durMin=(duration/60).toFixed(1);
+  const chunkSec=state.chunkMin*60;
+  const nChunks=Math.ceil(duration/chunkSec);
+  const remainSec=GROQ_HOURLY_LIMIT-state.quota.usedSec;
+  const remainMin=Math.round(remainSec/60);
+  const sizeMB=(file.size/1024/1024).toFixed(1);
 
-  document.getElementById('pre-filename').textContent = file.name;
-  document.getElementById('pre-duration').textContent = `길이: ${durMin}분 | 크기: ${(file.size/1024/1024).toFixed(1)}MB`;
-  document.getElementById('pre-chunks').textContent = `청크: ${nChunks}개 (${state.chunkMin}분 단위)`;
+  document.getElementById('pre-filename').textContent=file.name;
+  document.getElementById('pre-filemeta').textContent=`${sizeMB} MB`;
+  document.getElementById('pre-dur-val').textContent=Math.round(duration/60);
+  document.getElementById('pre-chunk-val').textContent=nChunks;
+  document.getElementById('pre-size-val').textContent=sizeMB;
 
-  // Warning if quota insufficient
-  const warnBox = document.getElementById('pre-warn');
-  const sel = document.getElementById('pre-api-choice');
-  if (duration > remainSec) {
-    warnBox.style.display = 'block';
-    document.getElementById('pre-warn-text').textContent =
-      `이 파일(${durMin}분)은 Groq 남은 한도(${remainMin}분)를 초과합니다. ` +
-      `Groq로 약 ${remainMin}분 처리 후 나머지는 OpenAI로 전환하거나, OpenAI만 사용하세요.`;
-    sel.value = 'groq-then-openai';
-  } else {
-    warnBox.style.display = 'none';
-    sel.value = 'groq-only';
+  const warnEl=document.getElementById('pre-warn');
+  const sel=document.getElementById('pre-api-choice');
+  if(duration>remainSec){
+    warnEl.style.display='flex';
+    document.getElementById('pre-warn-text').textContent=
+      `이 파일(${durMin}분)은 Groq 잔여 한도(${remainMin}분)를 초과합니다. 자동 모드 사용 시 AssemblyAI/OpenAI로 전환됩니다.`;
+    sel.value='auto';
+  }else{
+    warnEl.style.display='none';
+    sel.value='auto';
   }
 
-  // Cost estimate listener
-  sel.onchange = updateCostEstimate;
+  sel.onchange=updateCostEstimate;
   updateCostEstimate();
-
   showPage('precheck');
 }
 
-function updateCostEstimate() {
-  const choice = document.getElementById('pre-api-choice').value;
-  const dur = currentAudio.duration;
-  const remainSec = GROQ_HOURLY_LIMIT - state.quota.usedSec;
-  const costDiv = document.getElementById('pre-cost');
-  const costText = document.getElementById('pre-cost-text');
-  const RATE = 0.006; // $/min
-  const KRW = 1400;   // approx
+function updateCostEstimate(){
+  const choice=document.getElementById('pre-api-choice').value;
+  const dur=currentAudio.duration;
+  const remainSec=GROQ_HOURLY_LIMIT-state.quota.usedSec;
+  const costDiv=document.getElementById('pre-cost-alert');
+  const costText=document.getElementById('pre-cost-text');
+  const RATE=0.006,KRW=1400;
 
-  if (choice === 'groq-only') {
-    costDiv.style.display = 'none';
-  } else if (choice === 'openai-only') {
-    const cost = (dur / 60) * RATE;
-    costDiv.style.display = 'block';
-    costText.textContent = `OpenAI: $${cost.toFixed(3)} (≈ ₩${Math.round(cost * KRW)})`;
-  } else {
-    // groq-then-openai
-    const openaiSec = Math.max(0, dur - remainSec);
-    const cost = (openaiSec / 60) * RATE;
-    costDiv.style.display = cost > 0 ? 'block' : 'none';
-    costText.textContent = cost > 0
-      ? `Groq: ${Math.round(Math.min(dur, remainSec)/60)}분 무료 + OpenAI: ${Math.round(openaiSec/60)}분 = $${cost.toFixed(3)} (≈ ₩${Math.round(cost * KRW)})`
-      : '';
+  if(choice==='groq-only'||choice==='assemblyai-only'){
+    costDiv.style.display='none';
+  }else if(choice==='openai-only'){
+    const cost=(dur/60)*RATE;
+    costDiv.style.display='flex';
+    costText.textContent=`예상 비용: $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
+  }else{
+    // auto: Groq free → AssemblyAI free → OpenAI only if both exhausted
+    const openaiSec=Math.max(0,dur-remainSec);
+    if(openaiSec>0&&!state.assemblyaiKey){
+      const cost=(openaiSec/60)*RATE;
+      costDiv.style.display='flex';
+      costText.textContent=`Groq ${remainSec>0?Math.round(remainSec/60)+'분 무료 + ':''}AssemblyAI 키 미등록 시 OpenAI 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
+    }else{
+      costDiv.style.display='none';
+    }
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Transcription Engine
-// ═══════════════════════════════════════════════════════════════
-async function startTranscription() {
-  const choice = document.getElementById('pre-api-choice').value;
-  const lang = document.getElementById('pre-language').value;
+// ═════════════════════════════════════════════════════════════════
+//  MODAL HELPER
+// ═════════════════════════════════════════════════════════════════
+function showModal(title,body,actions){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=body;
+  const cont=document.getElementById('modal-actions');
+  cont.innerHTML='';
+  actions.forEach(a=>{
+    const btn=document.createElement('button');
+    btn.className='btn '+(a.primary?'btn-primary':'btn-ghost');
+    btn.textContent=a.label;
+    btn.onclick=()=>{closeModal();a.fn()};
+    cont.appendChild(btn);
+  });
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open')}
+
+// ═════════════════════════════════════════════════════════════════
+//  TRANSCRIPTION ENGINE
+// ═════════════════════════════════════════════════════════════════
+async function startTranscription(){
+  const choice=document.getElementById('pre-api-choice').value;
+  const lang=document.getElementById('pre-language').value;
+  transcriptionAborted=false;
 
   // Validate keys
-  if ((choice === 'groq-only' || choice === 'groq-then-openai') && !state.groqKey) {
-    toast('설정에서 Groq API 키를 입력하세요');
-    return;
-  }
-  if ((choice === 'openai-only' || choice === 'groq-then-openai') && !state.openaiKey) {
-    if (choice === 'openai-only') { toast('설정에서 OpenAI API 키를 입력하세요'); return; }
-    if (choice === 'groq-then-openai') { toast('설정에서 OpenAI API 키를 입력하세요 (전환용)'); return; }
+  if(choice==='groq-only'&&!state.groqKey){toast('설정에서 Groq API 키를 입력하세요');return}
+  if(choice==='assemblyai-only'&&!state.assemblyaiKey){toast('설정에서 AssemblyAI API 키를 입력하세요');return}
+  if(choice==='openai-only'&&!state.openaiKey){toast('설정에서 OpenAI API 키를 입력하세요');return}
+  if(choice==='auto'&&!state.groqKey&&!state.assemblyaiKey&&!state.openaiKey){
+    toast('설정에서 최소 1개 API 키를 입력하세요');return;
   }
 
   showPage('process');
 
-  const { file, duration } = currentAudio;
-  const chunkSec = state.chunkMin * 60;
-  const nChunks = Math.ceil(duration / chunkSec);
+  const{file,duration}=currentAudio;
+  const chunkSec=state.chunkMin*60;
+  const nChunks=Math.ceil(duration/chunkSec);
 
   // Build chunk plan
-  const chunks = [];
-  let remainGroq = GROQ_HOURLY_LIMIT - state.quota.usedSec;
+  const chunks=[];
+  let remainGroq=GROQ_HOURLY_LIMIT-state.quota.usedSec;
 
-  for (let i = 0; i < nChunks; i++) {
-    const startSec = Math.max(0, i * chunkSec - (i > 0 ? OVERLAP_SEC : 0));
-    const endSec = Math.min(duration, (i + 1) * chunkSec);
-    const chunkDur = endSec - startSec;
+  for(let i=0;i<nChunks;i++){
+    const startSec=Math.max(0,i*chunkSec-(i>0?OVERLAP_SEC:0));
+    const endSec=Math.min(duration,(i+1)*chunkSec);
+    const chunkDur=endSec-startSec;
 
     let api;
-    if (choice === 'openai-only') {
-      api = 'openai';
-    } else if (choice === 'groq-only') {
-      api = remainGroq >= chunkDur ? 'groq' : 'skip';
-    } else {
-      // groq-then-openai
-      if (remainGroq >= chunkDur) {
-        api = 'groq';
-      } else {
-        api = 'openai';
-      }
+    if(choice==='openai-only') api='openai';
+    else if(choice==='assemblyai-only') api='assemblyai';
+    else if(choice==='groq-only') api=remainGroq>=chunkDur?'groq':'skip';
+    else{
+      // auto: Groq first, then AssemblyAI, then prompt for OpenAI
+      if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
+      else if(state.assemblyaiKey){api='assemblyai'}
+      else if(state.openaiKey){api='openai'}
+      else{api='skip'}
     }
+    if(api==='groq'&&choice!=='auto') remainGroq-=chunkDur;
 
-    if (api === 'groq') remainGroq -= chunkDur;
-
-    chunks.push({
-      index: i, startSec, endSec, chunkDur,
-      api, status: api === 'skip' ? 'skipped' : 'pending', text: ''
-    });
+    chunks.push({index:i,startSec,endSec,chunkDur,api,status:api==='skip'?'skipped':'pending',text:''});
   }
 
   renderChunks(chunks);
 
-  // Process each chunk
-  const results = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const ch = chunks[i];
-    if (ch.status === 'skipped') continue;
+  // Process
+  for(let i=0;i<chunks.length;i++){
+    if(transcriptionAborted) break;
+    const ch=chunks[i];
+    if(ch.status==='skipped') continue;
 
-    ch.status = 'processing';
+    ch.status='processing';
     renderChunks(chunks);
-    updateProgress(i, chunks.length, `청크 ${i+1}/${nChunks} 처리 중 (${ch.api.toUpperCase()})`);
+    updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — ${ch.api.toUpperCase()}`);
 
-    try {
-      // Extract chunk audio
-      const chunkBlob = await extractChunk(file, ch.startSec, ch.endSec);
-
-      // Transcribe
+    try{
+      const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let text;
-      if (ch.api === 'groq') {
-        text = await transcribeGroq(chunkBlob, lang);
-        state.quota.usedSec += ch.chunkDur;
-        await saveState();
-        updateQuotaUI();
-      } else {
-        text = await transcribeOpenAI(chunkBlob, lang);
-      }
 
-      ch.text = text;
-      ch.status = 'done';
-    } catch (e) {
-      console.error(`Chunk ${i} error:`, e);
-      // If Groq fails (rate limit), try OpenAI fallback
-      if (ch.api === 'groq' && choice === 'groq-then-openai' && state.openaiKey) {
-        try {
-          toast(`Groq 한도 도달 — OpenAI로 전환`);
-          ch.api = 'openai';
-          const chunkBlob = await extractChunk(file, ch.startSec, ch.endSec);
-          ch.text = await transcribeOpenAI(chunkBlob, lang);
-          ch.status = 'done';
-          // Mark remaining chunks as openai
-          chunks.filter(c => c.status === 'pending' && c.api === 'groq')
-            .forEach(c => c.api = 'openai');
-        } catch (e2) {
-          ch.status = 'error';
-          ch.text = `[오류: ${e2.message}]`;
+      if(ch.api==='groq'){
+        text=await transcribeGroq(chunkBlob,lang);
+        state.quota.usedSec+=ch.chunkDur;
+        await saveState();updateQuotaUI();
+      }else if(ch.api==='assemblyai'){
+        text=await transcribeAssemblyAI(chunkBlob,lang);
+      }else{
+        text=await transcribeOpenAI(chunkBlob,lang);
+      }
+      ch.text=text;ch.status='done';
+    }catch(e){
+      console.error(`Chunk ${i} error:`,e);
+
+      // Fallback logic for auto mode
+      if(choice==='auto'){
+        const switched=await tryFallback(ch,e,lang,chunks,file);
+        if(!switched){
+          ch.status='error';ch.text=`[오류: ${e.message}]`;
         }
-      } else {
-        ch.status = 'error';
-        ch.text = `[오류: ${e.message}]`;
+      }else{
+        ch.status='error';ch.text=`[오류: ${e.message}]`;
       }
     }
     renderChunks(chunks);
   }
 
-  // Merge results
-  updateProgress(nChunks, nChunks, '결과 병합 중...');
-  const fullText = mergeChunks(chunks);
+  // Merge
+  updateProgress(nChunks,nChunks,'결과 병합 중...');
+  const fullText=mergeChunks(chunks);
+  const langName=document.getElementById('pre-language').selectedOptions[0].text;
+  document.getElementById('res-info').textContent=`${file.name} · ${(duration/60).toFixed(1)}분 · ${langName}`;
+  document.getElementById('res-full').textContent=fullText;
 
-  // Show result
-  const langName = document.getElementById('pre-language').selectedOptions[0].text;
-  document.getElementById('res-info').textContent =
-    `${file.name} | ${(duration/60).toFixed(1)}분 | ${langName}`;
-  document.getElementById('res-full').textContent = fullText;
-
-  // Save to history
-  const entry = {
-    name: file.name, date: fmtNow(), duration: Math.round(duration),
-    lang, text: fullText
-  };
-  state.history.unshift(entry);
-  if (state.history.length > 10) state.history.pop();
-  await saveState();
-
+  // Save history
+  state.history.unshift({name:file.name,date:fmtNow(),duration:Math.round(duration),lang,text:fullText});
+  if(state.history.length>10) state.history.pop();
+  await saveState();renderHistory();
   showPage('result');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Audio chunk extraction (Web Audio API)
-// ═══════════════════════════════════════════════════════════════
-async function extractChunk(file, startSec, endSec) {
-  const arrayBuf = await file.arrayBuffer();
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const decoded = await audioCtx.decodeAudioData(arrayBuf);
-
-  const sampleRate = 16000; // Whisper optimal
-  const startSample = Math.floor(startSec * decoded.sampleRate);
-  const endSample = Math.min(Math.floor(endSec * decoded.sampleRate), decoded.length);
-  const length = endSample - startSample;
-
-  // Downmix to mono + resample to 16kHz
-  const offlineCtx = new OfflineAudioContext(1, Math.ceil(length * sampleRate / decoded.sampleRate), sampleRate);
-  const source = offlineCtx.createBufferSource();
-
-  // Create a buffer with just the chunk
-  const chunkBuf = audioCtx.createBuffer(decoded.numberOfChannels, length, decoded.sampleRate);
-  for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
-    const src = decoded.getChannelData(ch);
-    const dst = chunkBuf.getChannelData(ch);
-    for (let i = 0; i < length; i++) dst[i] = src[startSample + i];
+async function tryFallback(ch,error,lang,chunks,file){
+  // If Groq failed, try AssemblyAI → OpenAI
+  const fallbackAPIs=[];
+  if(ch.api==='groq'){
+    if(state.assemblyaiKey) fallbackAPIs.push('assemblyai');
+    if(state.openaiKey) fallbackAPIs.push('openai');
+  }else if(ch.api==='assemblyai'){
+    if(state.openaiKey) fallbackAPIs.push('openai');
   }
 
-  source.buffer = chunkBuf;
-  source.connect(offlineCtx.destination);
-  source.start();
+  for(const fb of fallbackAPIs){
+    if(fb==='openai'){
+      // Ask user permission for paid API
+      const approved=await askUserForOpenAI(ch);
+      if(!approved) continue;
+    }
+    try{
+      toast(`${ch.api.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
+      ch.api=fb;
+      const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
+      let text;
+      if(fb==='assemblyai') text=await transcribeAssemblyAI(chunkBlob,lang);
+      else text=await transcribeOpenAI(chunkBlob,lang);
+      ch.text=text;ch.status='done';
 
-  const rendered = await offlineCtx.startRendering();
+      // Switch remaining pending chunks too
+      chunks.filter(c=>c.status==='pending'&&c.api===ch.api).forEach(c=>c.api=fb);
+      if(fb==='groq'){state.quota.usedSec+=ch.chunkDur;await saveState();updateQuotaUI()}
+      return true;
+    }catch(e2){console.error(`Fallback ${fb} failed:`,e2)}
+  }
+  return false;
+}
+
+function askUserForOpenAI(ch){
+  return new Promise(resolve=>{
+    const durMin=(ch.chunkDur/60).toFixed(1);
+    const cost=(ch.chunkDur/60*0.006).toFixed(3);
+    showModal('유료 API 전환',
+      `무료 API가 모두 실패했습니다.<br><br>남은 청크를 OpenAI로 처리할까요?<br>이 청크: ${durMin}분 ≈ $${cost} (≈ ₩${Math.round(ch.chunkDur/60*0.006*1400)})`,
+      [{label:'OpenAI로 계속',primary:true,fn:()=>resolve(true)},
+       {label:'건너뛰기',primary:false,fn:()=>resolve(false)}]);
+  });
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  AUDIO CHUNK EXTRACTION
+// ═════════════════════════════════════════════════════════════════
+async function extractChunk(file,startSec,endSec){
+  const arrayBuf=await file.arrayBuffer();
+  const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  const decoded=await audioCtx.decodeAudioData(arrayBuf);
+  const sampleRate=16000;
+  const startSample=Math.floor(startSec*decoded.sampleRate);
+  const endSample=Math.min(Math.floor(endSec*decoded.sampleRate),decoded.length);
+  const length=endSample-startSample;
+  const offlineCtx=new OfflineAudioContext(1,Math.ceil(length*sampleRate/decoded.sampleRate),sampleRate);
+  const source=offlineCtx.createBufferSource();
+  const chunkBuf=audioCtx.createBuffer(decoded.numberOfChannels,length,decoded.sampleRate);
+  for(let c=0;c<decoded.numberOfChannels;c++){
+    const src=decoded.getChannelData(c),dst=chunkBuf.getChannelData(c);
+    for(let i=0;i<length;i++) dst[i]=src[startSample+i];
+  }
+  source.buffer=chunkBuf;source.connect(offlineCtx.destination);source.start();
+  const rendered=await offlineCtx.startRendering();
   audioCtx.close();
-
-  // Encode as WAV
   return encodeWAV(rendered);
 }
 
-function encodeWAV(audioBuffer) {
-  const numCh = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
-  const data = audioBuffer.getChannelData(0);
-  const dataLength = data.length * (bitDepth / 8);
-  const buffer = new ArrayBuffer(44 + dataLength);
-  const view = new DataView(buffer);
-
-  // RIFF header
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, 1, true); // mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 1 * (bitDepth / 8), true);
-  view.setUint16(32, 1 * (bitDepth / 8), true);
-  view.setUint16(34, bitDepth, true);
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataLength, true);
-
-  let offset = 44;
-  for (let i = 0; i < data.length; i++) {
-    const s = Math.max(-1, Math.min(1, data[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-    offset += 2;
+function encodeWAV(buf){
+  const sr=buf.sampleRate,data=buf.getChannelData(0),dl=data.length*2;
+  const ab=new ArrayBuffer(44+dl),v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  ws(0,'RIFF');v.setUint32(4,36+dl,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);
+  v.setUint16(32,2,true);v.setUint16(34,16,true);
+  ws(36,'data');v.setUint32(40,dl,true);
+  let o=44;
+  for(let i=0;i<data.length;i++){
+    const s=Math.max(-1,Math.min(1,data[i]));
+    v.setInt16(o,s<0?s*0x8000:s*0x7FFF,true);o+=2;
   }
-
-  return new Blob([buffer], { type: 'audio/wav' });
+  return new Blob([ab],{type:'audio/wav'});
 }
 
-function writeString(view, offset, str) {
-  for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+// ═════════════════════════════════════════════════════════════════
+//  API: Groq
+// ═════════════════════════════════════════════════════════════════
+async function transcribeGroq(blob,lang){
+  const form=new FormData();
+  form.append('file',blob,'chunk.wav');
+  form.append('model','whisper-large-v3');
+  form.append('response_format','verbose_json');
+  if(lang&&lang!=='auto') form.append('language',lang);
+  const res=await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+    method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form});
+  if(!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+  return(await res.json()).text||'';
 }
 
-// ═══════════════════════════════════════════════════════════════
-// API Calls
-// ═══════════════════════════════════════════════════════════════
-async function transcribeGroq(audioBlob, lang) {
-  const form = new FormData();
-  form.append('file', audioBlob, 'chunk.wav');
-  form.append('model', 'whisper-large-v3');
-  form.append('response_format', 'verbose_json');
-  if (lang && lang !== 'auto') form.append('language', lang);
+// ═════════════════════════════════════════════════════════════════
+//  API: AssemblyAI (async: upload → submit → poll)
+// ═════════════════════════════════════════════════════════════════
+async function transcribeAssemblyAI(blob,lang){
+  const headers={'Authorization':state.assemblyaiKey};
 
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${state.groqKey}` },
-    body: form,
-  });
+  // Step 1: Upload
+  const uploadRes=await fetch('https://api.assemblyai.com/v2/upload',{
+    method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},
+    body:blob});
+  if(!uploadRes.ok) throw new Error(`AssemblyAI upload ${uploadRes.status}: ${await uploadRes.text()}`);
+  const{upload_url}=await uploadRes.json();
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Groq ${res.status}: ${err}`);
+  // Step 2: Submit transcription
+  const body={audio_url:upload_url};
+  if(lang&&lang!=='auto'){
+    // AssemblyAI uses language codes like 'ko','en', etc.
+    const langMap={ko:'ko',en:'en',ja:'ja',zh:'zh',es:'es',fr:'fr',de:'de',it:'it',hi:'hi',ar:'ar',ru:'ru'};
+    if(langMap[lang]) body.language_code=langMap[lang];
   }
+  // If language is auto or not mapped, let AssemblyAI detect (language_detection: true)
+  if(!body.language_code) body.language_detection=true;
 
-  const json = await res.json();
-  return json.text || '';
-}
+  const submitRes=await fetch('https://api.assemblyai.com/v2/transcript',{
+    method:'POST',headers:{...headers,'Content-Type':'application/json'},
+    body:JSON.stringify(body)});
+  if(!submitRes.ok) throw new Error(`AssemblyAI submit ${submitRes.status}: ${await submitRes.text()}`);
+  const{id}=await submitRes.json();
 
-async function transcribeOpenAI(audioBlob, lang) {
-  const form = new FormData();
-  form.append('file', audioBlob, 'chunk.wav');
-  form.append('model', 'whisper-1');
-  form.append('response_format', 'verbose_json');
-  if (lang && lang !== 'auto') form.append('language', lang);
-
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${state.openaiKey}` },
-    body: form,
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI ${res.status}: ${err}`);
+  // Step 3: Poll for completion
+  let attempts=0;
+  const maxAttempts=120; // 10 minutes max (5s intervals)
+  while(attempts<maxAttempts){
+    await sleep(5000);
+    const pollRes=await fetch(`https://api.assemblyai.com/v2/transcript/${id}`,{headers});
+    if(!pollRes.ok) throw new Error(`AssemblyAI poll ${pollRes.status}`);
+    const result=await pollRes.json();
+    if(result.status==='completed') return result.text||'';
+    if(result.status==='error') throw new Error(`AssemblyAI: ${result.error}`);
+    attempts++;
   }
-
-  const json = await res.json();
-  return json.text || '';
+  throw new Error('AssemblyAI: 시간 초과');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Merge chunks (handle overlap dedup)
-// ═══════════════════════════════════════════════════════════════
-function mergeChunks(chunks) {
-  const sorted = chunks.filter(c => c.status === 'done').sort((a, b) => a.startSec - b.startSec);
-  if (sorted.length === 0) return '(전사 결과 없음)';
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
-  let merged = '';
-  for (let i = 0; i < sorted.length; i++) {
-    const ch = sorted[i];
-    const ts = fmtTime(ch.startSec);
-    const text = ch.text.trim();
-    if (i === 0) {
-      merged += `[${ts}] ${text}`;
-    } else {
-      // Simple overlap handling: skip first sentence of overlapping chunk
-      // if it appears at end of previous chunk
-      const sentences = text.split(/(?<=[.!?。])\s+/);
-      const prevEnd = sorted[i-1].text.trim().slice(-100);
-      let startIdx = 0;
-      if (sentences.length > 1 && prevEnd.includes(sentences[0].slice(0, 30))) {
-        startIdx = 1; // skip duplicate first sentence
-      }
-      merged += `\n\n[${ts}] ${sentences.slice(startIdx).join(' ')}`;
+// ═════════════════════════════════════════════════════════════════
+//  API: OpenAI
+// ═════════════════════════════════════════════════════════════════
+async function transcribeOpenAI(blob,lang){
+  const form=new FormData();
+  form.append('file',blob,'chunk.wav');
+  form.append('model','whisper-1');
+  form.append('response_format','verbose_json');
+  if(lang&&lang!=='auto') form.append('language',lang);
+  const res=await fetch('https://api.openai.com/v1/audio/transcriptions',{
+    method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form});
+  if(!res.ok) throw new Error(`OpenAI ${res.status}: ${await res.text()}`);
+  return(await res.json()).text||'';
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  MERGE
+// ═════════════════════════════════════════════════════════════════
+function mergeChunks(chunks){
+  const sorted=chunks.filter(c=>c.status==='done').sort((a,b)=>a.startSec-b.startSec);
+  if(!sorted.length) return '(전사 결과 없음)';
+  let merged='';
+  for(let i=0;i<sorted.length;i++){
+    const ch=sorted[i],ts=fmtTime(ch.startSec),text=ch.text.trim();
+    if(i===0){merged+=`[${ts}] ${text}`}
+    else{
+      const sentences=text.split(/(?<=[.!?。])\s+/);
+      const prevEnd=sorted[i-1].text.trim().slice(-100);
+      let si=0;
+      if(sentences.length>1&&prevEnd.includes(sentences[0].slice(0,30))) si=1;
+      merged+=`\n\n[${ts}] ${sentences.slice(si).join(' ')}`;
     }
   }
   return merged;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// UI Helpers
-// ═══════════════════════════════════════════════════════════════
-function renderChunks(chunks) {
-  const list = document.getElementById('chunk-list');
-  list.innerHTML = chunks.map(ch => {
-    const icon = ch.status === 'done' ? '✅' :
-                 ch.status === 'processing' ? '⏳' :
-                 ch.status === 'error' ? '❌' :
-                 ch.status === 'skipped' ? '⏭️' : '⬜';
-    const tagCls = ch.api === 'groq' ? 'tag-groq' :
-                   ch.api === 'openai' ? 'tag-openai' : 'tag-pending';
-    const tagName = ch.api === 'skip' ? '건너뜀' : ch.api.toUpperCase();
-    return `<div class="chunk-item">
-      <span class="status">${icon}</span>
-      <span>청크 ${ch.index+1} (${fmtTime(ch.startSec)}~${fmtTime(ch.endSec)})</span>
-      <span class="api-tag ${tagCls}">${tagName}</span>
+// ═════════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ═════════════════════════════════════════════════════════════════
+function renderChunks(chunks){
+  document.getElementById('chunk-list').innerHTML=chunks.map(ch=>{
+    const icon=ch.status==='done'?'✓':ch.status==='processing'?'◌':
+      ch.status==='error'?'✕':ch.status==='skipped'?'—':'·';
+    const iconColor=ch.status==='done'?'var(--green)':ch.status==='processing'?'var(--accent2)':
+      ch.status==='error'?'var(--red)':'var(--text3)';
+    const tag=ch.api==='skip'?'건너뜀':ch.api.toUpperCase();
+    const tagCls='ca-'+(ch.api==='skip'?'skip':ch.api);
+    return`<div class="chunk-row">
+      <span class="cs" style="color:${iconColor};font-weight:600">${icon}</span>
+      <span class="ci">청크 ${ch.index+1}</span>
+      <span class="ct">${fmtTime(ch.startSec)}–${fmtTime(ch.endSec)}</span>
+      <span class="ca ${tagCls}">${tag}</span>
     </div>`;
   }).join('');
 }
 
-function updateProgress(current, total, text) {
-  const pct = Math.round((current / total) * 100);
-  document.getElementById('proc-progress').style.width = pct + '%';
-  document.getElementById('proc-status').textContent = text;
-  document.getElementById('proc-detail').textContent = `${current} / ${total} 청크 완료`;
+function updateProgress(cur,total,text){
+  document.getElementById('proc-progress').style.width=Math.round(cur/total*100)+'%';
+  document.getElementById('proc-status').textContent=text;
+  document.getElementById('proc-detail').textContent=`${cur} / ${total} 청크`;
 }
 
-function switchTab(name) {
-  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById('tab-' + name).classList.add('active');
+function switchTab(name,btn){
+  document.querySelectorAll('.result-tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-full').style.display=name==='full'?'block':'none';
+  document.getElementById('tab-summary').style.display=name==='summary'?'block':'none';
 }
 
-function copyResult() {
-  const text = document.getElementById('res-full').textContent;
-  navigator.clipboard.writeText(text).then(() => toast('클립보드에 복사됨'));
+function copyResult(){
+  navigator.clipboard.writeText(document.getElementById('res-full').textContent)
+    .then(()=>toast('클립보드에 복사됨'));
 }
-
-function downloadResult() {
-  const text = document.getElementById('res-full').textContent;
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `전사_${fmtNow()}.txt`;
-  a.click();
+function downloadResult(){
+  const text=document.getElementById('res-full').textContent;
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=`전사_${fmtNow()}.txt`;a.click();
   URL.revokeObjectURL(a.href);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Utils
-// ═══════════════════════════════════════════════════════════════
-function fmtTime(sec) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  return h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-               : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+function renderHistory(){
+  if(!state.history.length){document.getElementById('history-section').style.display='none';return}
+  document.getElementById('history-section').style.display='block';
+  document.getElementById('history-list').innerHTML=state.history.map((h,i)=>`
+    <div class="history-item" onclick="showHistoryItem(${i})">
+      <div class="hi-icon">📄</div>
+      <div class="hi-info">
+        <div class="hi-name">${h.name}</div>
+        <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
+      </div>
+      <div class="hi-arrow">›</div>
+    </div>`).join('');
+}
+function showHistoryItem(i){
+  const h=state.history[i];if(!h)return;
+  document.getElementById('res-info').textContent=`${h.name} · ${Math.round(h.duration/60)}분`;
+  document.getElementById('res-full').textContent=h.text;
+  showPage('result');
 }
 
-function fmtNow() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+// ═════════════════════════════════════════════════════════════════
+//  UTILS
+// ═════════════════════════════════════════════════════════════════
+function fmtTime(sec){
+  const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=Math.floor(sec%60);
+  return h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function fmtNow(){
+  const d=new Date();
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Init
-// ═══════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
+//  INIT
+// ═════════════════════════════════════════════════════════════════
 loadState();
 </script>
 </body>
