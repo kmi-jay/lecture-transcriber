@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.2</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.3</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1141,7 +1141,7 @@ function showPrecheck(){
   if(duration>remainSec){
     warnEl.style.display='flex';
     document.getElementById('pre-warn-text').textContent=
-      `이 파일(${durMin}분)은 Groq 잔여 한도(${remainMin}분)를 초과합니다. 자동 모드 사용 시 AssemblyAI/OpenAI로 전환됩니다.`;
+      `이 파일(${durMin}분)은 ${_provLabel('groq')} 잔여 한도(${remainMin}분)를 초과합니다. 자동 모드 사용 시 ${_provLabel('assemblyai')}/${_provLabel('openai')}로 전환됩니다.`;
     sel.value='auto';
   }else{
     warnEl.style.display='none';
@@ -1188,7 +1188,7 @@ function updateCostEstimate(){
     if(openaiSec>0&&!state.assemblyaiKey){
       const cost=(openaiSec/60)*RATE;
       costDiv.style.display='flex';
-      costText.textContent=`Groq ${remainSec>0?Math.round(remainSec/60)+'분 무료 + ':''}AssemblyAI 키 미등록 시 OpenAI 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
+      costText.textContent=`${_provLabel('groq')} ${remainSec>0?Math.round(remainSec/60)+'분 무료 + ':''}${_provLabel('assemblyai')} 키 미등록 시 ${_provLabel('openai')} 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
     }else{
       costDiv.style.display='none';
     }
@@ -1824,8 +1824,7 @@ class LLMError extends Error {
     else this.type='unknown';
   }
   get friendlyMessage(){
-    const pNames={groq:'Groq',gemini:'Gemini',claude:'Claude',openai:'OpenAI'};
-    const p=pNames[this.provider]||this.provider;
+    const p=_provLabel(this.provider);
     if(this.type==='rate_limit'){
       if(this.retryAfterSec&&this.retryAfterSec<600){
         const m=Math.ceil(this.retryAfterSec/60);
@@ -1848,12 +1847,10 @@ class LLMError extends Error {
 // ── Show LLM error modal with actionable options ──
 function showLLMErrorModal(err, retryFn){
   const failedProvider=err.provider;
-  const allProviders=[
-    {id:'groq',  label:'Groq (Llama)',  key:state.groqKey,    free:true},
-    {id:'gemini',label:'Gemini',        key:state.geminiKey,  free:true},
-    {id:'claude',label:'Claude',        key:state.claudeKey,  free:false},
-    {id:'openai',label:'OpenAI',        key:state.openaiKey,  free:false},
-  ];
+  const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
+  const allProviders=Object.keys(PROVIDERS).filter(id=>PROVIDERS[id].canPostProcess).map(id=>({
+    id, label:_provLabel(id), key:state[keyMap[id]], free:PROVIDERS[id].free
+  }));
 
   let bodyHTML=`<div style="margin-bottom:12px;line-height:1.7;white-space:pre-line">${err.friendlyMessage}</div>`;
 
@@ -1877,8 +1874,7 @@ function showLLMErrorModal(err, retryFn){
   // Paid alternatives — only for non-auth errors
   if(err.type!=='auth'){
     paidAlts.forEach(alt=>{
-      const cost=alt.id==='openai'?' — ~₩9/분':' — 유료';
-      actions.push({label:`${alt.label}로 전환${cost}`,primary:freeAlts.length===0,fn:()=>{retryFn(alt.id)}});
+      actions.push({label:`${alt.label}로 전환 (${_provCost(alt.id)})`,primary:freeAlts.length===0,fn:()=>{retryFn(alt.id)}});
     });
   }
 
@@ -1918,14 +1914,23 @@ function showLLMErrorModal(err, retryFn){
 }
 
 // ── API call functions with structured errors ──
-// ── LLM input/output limits per provider ──
-const LLM_LIMITS={
-  groq:  {inputChars:50000, maxTokens:4000},   // Llama 3.3 128k context
-  gemini:{inputChars:200000, maxTokens:8000},   // Gemini 2.0 Flash 1M context
-  claude:{inputChars:80000, maxTokens:6000},    // Claude Sonnet 200k context
-  openai:{inputChars:50000, maxTokens:4000}     // GPT-4o-mini 128k context
+// ── Provider registry — single source of truth for labels, costs, limits ──
+const PROVIDERS={
+  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:4000, canTranscribe:true,  canPostProcess:true},
+  gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:200000, maxTokens:8000, canTranscribe:true,  canPostProcess:true},
+  assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
+  claude:{label:'Claude',          costLabel:'~₩3~5/분', costPerMin:4,   free:false, inputChars:80000,  maxTokens:6000, canTranscribe:false, canPostProcess:true},
+  openai:{label:'OpenAI',          costLabel:'~₩1~2/분', costPerMin:1.5, free:false, inputChars:50000,  maxTokens:4000, canTranscribe:true,  canPostProcess:true},
 };
-function _getLLMLimits(provider){return LLM_LIMITS[provider]||LLM_LIMITS.groq}
+function _getLLMLimits(provider){const p=PROVIDERS[provider];return p?{inputChars:p.inputChars,maxTokens:p.maxTokens}:{inputChars:50000,maxTokens:4000}}
+function _provLabel(provider){return PROVIDERS[provider]?.label||provider}
+function _provCost(provider){return PROVIDERS[provider]?.costLabel||''}
+function _provLabelWithCost(provider){const p=PROVIDERS[provider];if(!p)return provider;return p.free?p.label:p.label+' ('+p.costLabel+')'}
+function _noLLMKeyMsg(){
+  const free=Object.entries(PROVIDERS).filter(([,v])=>v.free&&v.canPostProcess).map(([,v])=>v.label);
+  const paid=Object.entries(PROVIDERS).filter(([,v])=>!v.free&&v.canPostProcess).map(([,v])=>v.label);
+  return '설정에서 '+free.join('·')+'(무료) 또는 '+paid.join('·')+'(유료) API 키를 입력하세요';
+}
 
 async function callGroqChat(systemPrompt,userPrompt,maxTok){
   const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
@@ -2006,7 +2011,7 @@ function buildSummaryPrompts(transcriptText,lang,provider){
 async function generateSummaryFromText(transcriptText,lang){
   const provider=_pickLLMProvider();
   if(!provider){
-    toast('설정에서 Groq·Gemini(무료) 또는 Claude(유료) API 키를 입력하세요');return;
+    toast(_noLLMKeyMsg());return;
   }
   await _runSummary(provider,transcriptText,lang);
 }
@@ -2015,7 +2020,7 @@ async function _runSummary(provider,transcriptText,lang){
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
   summaryBtn.disabled=true;
-  const label=provider==='groq'?'Groq (Llama)':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI (유료)';
+  const label=_provLabelWithCost(provider);
   const limits=_getLLMLimits(provider);
   const isLong=transcriptText.length>limits.inputChars;
   summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':''}</span>`;
@@ -2350,11 +2355,11 @@ const NOTE_TEMPLATES={
 
 async function generateNotesFromText(transcriptText,lang){
   const provider=_pickLLMProvider();
-  if(!provider){toast('설정에서 Groq·Gemini(무료) 또는 Claude(유료) API 키를 입력하세요');showPage('settings');return}
+  if(!provider){toast(_noLLMKeyMsg());showPage('settings');return}
   const notesEl=document.getElementById('res-notes');
   const notesBtn=document.getElementById('btn-generate-notes');
   notesBtn.disabled=true;
-  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI';
+  const label=_provLabel(provider);
   const template=document.getElementById('notes-template')?.value||'standard';
   const templateNames={standard:'표준',exam:'시험 집중',meeting:'회의록',interview:'인터뷰',concept:'개념 정리',qa_format:'Q&A',compare:'비교·대조'};
   notesEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 노트 생성 중 (${templateNames[template]||'표준'} 템플릿)... 30초~1분 소요</span>`;
@@ -2552,14 +2557,14 @@ function examPointClick(li){
 // ─── Transcript refinement ───────────────────────────────────────────────
 async function refineTranscript(){
   const provider=_pickLLMProvider();
-  if(!provider){toast('설정에서 Groq·Gemini(무료) 또는 Claude(유료) API 키를 입력하세요');showPage('settings');return}
+  if(!provider){toast(_noLLMKeyMsg());showPage('settings');return}
   const fullEl=document.getElementById('res-full');
   const rawText=fullEl.textContent;
   if(!rawText||rawText.length<50){toast('전사 결과가 없습니다');return}
   const btn=document.getElementById('btn-refine-text');
   btn.disabled=true;
   btn.textContent='🔧 정제 중...';
-  const label=provider==='groq'?'Groq':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI';
+  const label=_provLabel(provider);
   toast(`${label}로 텍스트 정제 중...`);
 
   const outLang=_getOutputLang();
@@ -2662,7 +2667,7 @@ async function askQuestion(){
   input.value='';
 
   const provider=_pickLLMProvider();
-  if(!provider){toast('설정에서 Groq·Gemini(무료) 또는 Claude(유료) API 키를 입력하세요');return}
+  if(!provider){toast(_noLLMKeyMsg());return}
 
   const msgBox=document.getElementById('qa-messages');
 
@@ -2839,13 +2844,16 @@ function _iq(s){
 function _populateResultLLMSelect(){
   const sel=document.getElementById('result-llm-provider');
   if(!sel) return;
-  const opts=[];
-  opts.push({v:'auto',t:'자동'});
-  if(state.groqKey&&state.geminiKey) opts.push({v:'free-only',t:'무료만 (Groq→Gemini)'});
-  if(state.groqKey) opts.push({v:'groq-only',t:'Groq (무료)'});
-  if(state.geminiKey) opts.push({v:'gemini-only',t:'Gemini (무료, 대용량)'});
-  if(state.claudeKey) opts.push({v:'claude-only',t:'Claude (유료, 고품질)'});
-  if(state.openaiKey) opts.push({v:'openai-only',t:'OpenAI (유료)'});
+  const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
+  const opts=[{v:'auto',t:'자동'}];
+  const freeKeys=['groq','gemini'].filter(id=>state[keyMap[id]]);
+  if(freeKeys.length>=2) opts.push({v:'free-only',t:'무료만 (Groq→Gemini)'});
+  ['groq','gemini','claude','openai'].forEach(id=>{
+    if(!state[keyMap[id]]||!PROVIDERS[id].canPostProcess) return;
+    const p=PROVIDERS[id];
+    const desc=p.free?'무료':p.costLabel;
+    opts.push({v:id+'-only',t:`${_provLabel(id)} (${desc})`});
+  });
   sel.innerHTML=opts.map(o=>`<option value="${o.v}"${state.llmProvider===o.v?' selected':''}>${o.t}</option>`).join('');
   sel.style.display=opts.length>1?'block':'none';
 }
