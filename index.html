@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.3</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.4</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1334,7 +1334,12 @@ async function startTranscription(){
   document.getElementById('res-full').textContent=fullText;
   updateResultStats(fullText);
 
-  // Save history
+  // Save history — shift qaHistoryMap keys so old Q&A maps correctly after unshift
+  if(state.qaHistoryMap){
+    const shifted={};
+    for(const k in state.qaHistoryMap){const ni=Number(k)+1;if(ni<10) shifted[ni]=state.qaHistoryMap[k]}
+    state.qaHistoryMap=shifted;
+  }
   state.history.unshift({name:file.name,date:fmtNow(),duration:Math.round(duration),lang,text:fullText});
   if(state.history.length>10) state.history.pop();
   await saveState();renderHistory();
@@ -1932,8 +1937,16 @@ function _noLLMKeyMsg(){
   return '설정에서 '+free.join('·')+'(무료) 또는 '+paid.join('·')+'(유료) API 키를 입력하세요';
 }
 
+// Timeout-wrapped fetch — aborts after given ms (default 90s)
+async function _fetchWithTimeout(url,opts,timeoutMs=90000){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{return await fetch(url,{...opts,signal:ctrl.signal})}
+  finally{clearTimeout(timer)}
+}
+
 async function callGroqChat(systemPrompt,userPrompt,maxTok){
-  const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+  const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({
@@ -1952,7 +1965,7 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
 async function callGemini(systemPrompt,userPrompt,maxTok){
   const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
-  const res=await fetch(url,{
+  const res=await _fetchWithTimeout(url,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
@@ -1970,7 +1983,7 @@ async function callGemini(systemPrompt,userPrompt,maxTok){
 }
 
 async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
-  const res=await fetch('https://api.openai.com/v1/chat/completions',{
+  const res=await _fetchWithTimeout('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({
@@ -1983,6 +1996,55 @@ async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
     throw new LLMError('openai',res.status,await res.text(),null);
   }
   return(await res.json()).choices?.[0]?.message?.content||'(결과 없음)';
+}
+
+// ── Unified LLM call by provider name ──
+async function _callLLM(provider,systemPrompt,userPrompt,maxTok){
+  if(provider==='groq') return callGroqChat(systemPrompt,userPrompt,maxTok);
+  if(provider==='gemini') return callGemini(systemPrompt,userPrompt,maxTok);
+  if(provider==='claude') return callClaudeChat(systemPrompt,userPrompt,maxTok);
+  return callOpenAIChat(systemPrompt,userPrompt,maxTok);
+}
+
+// ── Chunked LLM processing with per-chunk error handling & progress ──
+async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label){
+  const limits=_getLLMLimits(provider);
+  const chunkSize=Math.floor(limits.inputChars*0.8);
+  const chunks=[];
+  for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
+  const partials=[];
+  let totalElapsed=0;
+  for(let ci=0;ci<chunks.length;ci++){
+    const chunkStart=Date.now();
+    // Progress with time estimate
+    let eta='';
+    if(ci>0&&totalElapsed>0){
+      const avgMs=totalElapsed/ci;
+      const remainMs=avgMs*(chunks.length-ci);
+      const remainSec=Math.ceil(remainMs/1000);
+      eta=remainSec>=60?` · 약 ${Math.ceil(remainSec/60)}분 남음`:` · 약 ${remainSec}초 남음`;
+    }
+    statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 처리 중 (${label})${eta}</span>`;
+    try{
+      const result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],limits.maxTokens);
+      partials.push(result);
+    }catch(e){
+      // Per-chunk error: log warning but continue with placeholder
+      console.warn(`[Chunk ${ci+1}/${chunks.length}] ${provider} error:`,e);
+      if(e.name==='AbortError'||e.message?.includes('abort')){
+        partials.push(`[구간 ${ci+1}: 시간 초과 — 건너뜀]`);
+        statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1}/${chunks.length} 시간 초과 — 다음 구간 진행 중...</span>`;
+      }else if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth')){
+        throw e; // Rate limit / auth errors → stop and show modal
+      }else{
+        partials.push(`[구간 ${ci+1}: 오류 — 건너뜀]`);
+        statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} 오류 — 다음 구간 진행 중...</span>`;
+      }
+      await new Promise(r=>setTimeout(r,1000)); // brief pause before next chunk
+    }
+    totalElapsed+=Date.now()-chunkStart;
+  }
+  return partials;
 }
 
 // ── Build prompts ──
@@ -2028,34 +2090,16 @@ async function _runSummary(provider,transcriptText,lang){
   let finalText=transcriptText;
   // For very long transcripts that exceed provider limit: chunk → summarize → merge
   if(isLong){
-    summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간별 요약 생성 중 (${label})...</span>`;
-    const chunkSize=Math.floor(limits.inputChars*0.8);
-    const chunks=[];
-    for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
-    const partials=[];
-    for(let ci=0;ci<chunks.length;ci++){
-      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 요약 중 (${label})...</span>`;
-      const sp='다음은 긴 강의 전사의 일부입니다. 핵심 내용을 상세히 정리하세요. 시간 정보가 있으면 포함하세요. 마크다운 사용.';
-      let partial;
-      if(provider==='groq') partial=await callGroqChat(sp,chunks[ci]);
-      else if(provider==='gemini') partial=await callGemini(sp,chunks[ci]);
-      else if(provider==='claude') partial=await callClaudeChat(sp,chunks[ci],limits.maxTokens);
-      else partial=await callOpenAIChat(sp,chunks[ci]);
-      partials.push(`[구간 ${ci+1}]\n${partial}`);
-    }
-    finalText=partials.join('\n\n');
+    const sp='다음은 긴 강의 전사의 일부입니다. 핵심 내용을 상세히 정리하세요. 시간 정보가 있으면 포함하세요. 마크다운 사용.';
+    const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label);
+    finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
   }
 
   const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
 
   try{
-    let summary;
-    if(provider==='groq') summary=await callGroqChat(systemPrompt,userPrompt);
-    else if(provider==='gemini') summary=await callGemini(systemPrompt,userPrompt);
-    else if(provider==='claude') summary=await callClaudeChat(systemPrompt,userPrompt,limits.maxTokens);
-    else summary=await callOpenAIChat(systemPrompt,userPrompt);
-
+    const summary=await _callLLM(provider,systemPrompt,userPrompt,limits.maxTokens);
     summaryEl.style.whiteSpace='normal';
     summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
     if(state.history.length>0) state.history[0].summary=summary;
@@ -2065,12 +2109,12 @@ async function _runSummary(provider,transcriptText,lang){
   }catch(e){
     summaryBtn.disabled=false;
     if(e instanceof LLMError){
-      // Show detailed modal with options
       summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 한도 초과 또는 오류 발생. 선택지를 확인하세요.</span>`;
       showLLMErrorModal(e, (newProvider)=>{
-        // User chose to retry with a different or same provider
         _runSummary(newProvider,transcriptText,lang);
       });
+    }else if(e.name==='AbortError'){
+      summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
     }else{
       summaryEl.innerHTML=`<span style="color:var(--red)">요약 실패: ${e.message}</span>`;
     }
@@ -2375,23 +2419,10 @@ async function generateNotesFromText(transcriptText,lang){
   // For very long transcripts: chunk → partial notes → merge
   let inputText=transcriptText;
   if(isLong){
-    notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간별 노트 생성 중 (${label})...</span>`;
-    const chunkSize=Math.floor(limits.inputChars*0.8);
-    const chunks=[];
-    for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
-    const partials=[];
-    for(let ci=0;ci<chunks.length;ci++){
-      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 노트 생성 중 (${label})...</span>`;
-      const sp=useKorean
-        ?'다음은 긴 강의 전사의 일부입니다. 핵심 내용, 정의, 개념, 예시를 빠짐없이 상세하게 정리하세요. 타임스탬프 포함. 마크다운 사용.'
-        :'This is a portion of a long lecture transcript. Extract all key content, definitions, concepts, examples in detail. Include timestamps. Use markdown.';
-      let partial;
-      if(provider==='groq') partial=await callGroqChat(sp,chunks[ci]);
-      else if(provider==='gemini') partial=await callGemini(sp,chunks[ci]);
-      else if(provider==='claude') partial=await callClaudeChat(sp,chunks[ci],limits.maxTokens);
-      else partial=await callOpenAIChat(sp,chunks[ci]);
-      partials.push(partial);
-    }
+    const sp=useKorean
+      ?'다음은 긴 강의 전사의 일부입니다. 핵심 내용, 정의, 개념, 예시를 빠짐없이 상세하게 정리하세요. 타임스탬프 포함. 마크다운 사용.'
+      :'This is a portion of a long lecture transcript. Extract all key content, definitions, concepts, examples in detail. Include timestamps. Use markdown.';
+    const partials=await _processChunks(provider,transcriptText,()=>sp,notesEl,label);
     inputText=partials.join('\n\n---\n\n');
     notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 노트 생성 중 (${label} · ${templateNames[template]||'표준'})...</span>`;
   }
@@ -2402,13 +2433,7 @@ async function generateNotesFromText(transcriptText,lang){
     :`Analyze the following transcript and write notes in the format above, in English.${isLong?' This is a long lecture — include all key content comprehensively.':''}\n\n${inputText.slice(0,limits.inputChars)}`;
 
   try{
-    let result;
-    if(provider==='groq') result=await callGroqChat(systemPrompt,userPrompt,limits.maxTokens);
-    else if(provider==='gemini') result=await callGemini(systemPrompt,userPrompt,limits.maxTokens);
-    else if(provider==='claude') result=await callClaudeChat(systemPrompt,userPrompt,limits.maxTokens);
-    else result=await callOpenAIChat(systemPrompt,userPrompt,limits.maxTokens);
-
-    // Render markdown as styled HTML with clickable exam points
+    const result=await _callLLM(provider,systemPrompt,userPrompt,limits.maxTokens);
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
     if(state.history.length>0) state.history[0].notes=result;
     await saveState();
@@ -2417,6 +2442,8 @@ async function generateNotesFromText(transcriptText,lang){
     if(e instanceof LLMError){
       notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 설정을 확인하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
+    }else if(e.name==='AbortError'){
+      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
     }else{
       notesEl.innerHTML=`<span style="color:var(--red)">생성 실패: ${e.message}</span>`;
     }
@@ -2608,12 +2635,8 @@ async function refineTranscript(){
 6) Output only the corrected text, no explanations.`;
 
   try{
-    let refined;
     const rLimits=_getLLMLimits(provider);
-    if(provider==='groq') refined=await callGroqChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
-    else if(provider==='gemini') refined=await callGemini(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
-    else if(provider==='claude') refined=await callClaudeChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
-    else refined=await callOpenAIChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
+    const refined=await _callLLM(provider,systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
 
     // Replace 전문 tab content with refined text
     fullEl.innerHTML=`<div id="refine-badge" style="font-size:11px;margin-bottom:8px;padding:8px 12px;background:linear-gradient(135deg,#00d2a015,transparent);border:1px solid #00d2a030;border-radius:8px;display:flex;align-items:center;gap:8px">
@@ -2729,7 +2752,7 @@ ${contextText}`;
   try{
     let answer;
     if(provider==='groq'){
-      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions',{
         method:'POST',
         headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
         body:JSON.stringify({model:'llama-3.3-70b-versatile',messages,temperature:0.4,max_tokens:1000})
@@ -2741,7 +2764,7 @@ ${contextText}`;
         role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]
       }));
       gemContents.push({role:'user',parts:[{text:q}]});
-      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.geminiKey}`,{
+      const res=await _fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.geminiKey}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           system_instruction:{parts:[{text:systemPrompt}]},
@@ -2754,7 +2777,7 @@ ${contextText}`;
     }else if(provider==='claude'){
       answer=await callClaudeChat(systemPrompt,q,1500);
     }else{
-      const res=await fetch('https://api.openai.com/v1/chat/completions',{
+      const res=await _fetchWithTimeout('https://api.openai.com/v1/chat/completions',{
         method:'POST',
         headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
         body:JSON.stringify({model:'gpt-4o-mini',messages,temperature:0.4,max_tokens:1000})
@@ -2885,7 +2908,7 @@ function _pickLLMProvider(){
 
 // Call Claude API (Anthropic) for text completion
 async function callClaudeChat(systemPrompt, userPrompt, maxTokens=3000){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
+  const res=await _fetchWithTimeout('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{
       'Content-Type':'application/json',
