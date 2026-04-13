@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v3.9</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.0</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -600,8 +600,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="result-text" id="res-notes" style="min-height:150px">
       <span style="color:var(--text3)">전사 내용을 기반으로 체계적인 노트를 생성합니다.</span>
     </div>
-    <button id="btn-generate-notes" class="btn btn-ghost" onclick="generateNotes()"
-      style="margin-top:10px;display:none">📝 노트 생성 (무료)</button>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button id="btn-generate-notes" class="btn btn-ghost" onclick="generateNotes()"
+        style="display:none;flex:1;min-width:140px">📝 노트 생성</button>
+      <select id="result-llm-provider" style="display:none;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;cursor:pointer;min-width:100px" onchange="state.llmProvider=this.value;saveState()">
+      </select>
+    </div>
   </div>
 
   <!-- Tab: 요약 -->
@@ -610,7 +614,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>
     </div>
     <button id="btn-generate-summary" class="btn btn-ghost" onclick="generateSummary()"
-      style="margin-top:10px;display:none">✨ 요약 생성 (무료)</button>
+      style="margin-top:10px;display:none">✨ 요약 생성</button>
   </div>
 
   <!-- Tab: Q&A -->
@@ -1308,6 +1312,9 @@ async function startTranscription(){
   const refineBtn=document.getElementById('btn-refine-text');
   if(refineBtn) refineBtn.style.display=hasLLM?'flex':'none';
 
+  // Populate LLM provider selector on result page
+  _populateResultLLMSelect();
+
   // Reset Q&A
   qaHistory=[];
   currentHistoryIdx=0; // just pushed to index 0 with unshift
@@ -1849,14 +1856,23 @@ function showLLMErrorModal(err, retryFn){
 }
 
 // ── API call functions with structured errors ──
-async function callGroqChat(systemPrompt,userPrompt){
+// ── LLM input/output limits per provider ──
+const LLM_LIMITS={
+  groq:  {inputChars:50000, maxTokens:4000},   // Llama 3.3 128k context
+  gemini:{inputChars:200000, maxTokens:8000},   // Gemini 2.0 Flash 1M context
+  claude:{inputChars:80000, maxTokens:6000},    // Claude Sonnet 200k context
+  openai:{inputChars:50000, maxTokens:4000}     // GPT-4o-mini 128k context
+};
+function _getLLMLimits(provider){return LLM_LIMITS[provider]||LLM_LIMITS.groq}
+
+async function callGroqChat(systemPrompt,userPrompt,maxTok){
   const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({
       model:'llama-3.3-70b-versatile',
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
-      temperature:0.3,max_tokens:1500
+      temperature:0.3,max_tokens:maxTok||LLM_LIMITS.groq.maxTokens
     })
   });
   if(!res.ok){
@@ -1866,7 +1882,7 @@ async function callGroqChat(systemPrompt,userPrompt){
   return(await res.json()).choices?.[0]?.message?.content||'(결과 없음)';
 }
 
-async function callGemini(systemPrompt,userPrompt){
+async function callGemini(systemPrompt,userPrompt,maxTok){
   const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
   const res=await fetch(url,{
@@ -1875,7 +1891,7 @@ async function callGemini(systemPrompt,userPrompt){
     body:JSON.stringify({
       system_instruction:{parts:[{text:systemPrompt}]},
       contents:[{parts:[{text:userPrompt}]}],
-      generationConfig:{temperature:0.3,maxOutputTokens:1500}
+      generationConfig:{temperature:0.3,maxOutputTokens:maxTok||LLM_LIMITS.gemini.maxTokens}
     })
   });
   if(!res.ok){
@@ -1886,14 +1902,14 @@ async function callGemini(systemPrompt,userPrompt){
   return data.candidates?.[0]?.content?.parts?.[0]?.text||'(결과 없음)';
 }
 
-async function callOpenAIChat(systemPrompt,userPrompt){
+async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
   const res=await fetch('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({
       model:'gpt-4o-mini',
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
-      temperature:0.3,max_tokens:1500
+      temperature:0.3,max_tokens:maxTok||LLM_LIMITS.openai.maxTokens
     })
   });
   if(!res.ok){
@@ -1907,15 +1923,20 @@ function _getOutputLang(){
   const sel=document.getElementById('pre-output-lang');
   return sel?sel.value:'ko';
 }
-function buildSummaryPrompts(transcriptText,lang){
+function buildSummaryPrompts(transcriptText,lang,provider){
   const outLang=_getOutputLang();
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
+  const limit=_getLLMLimits(provider||'groq').inputChars;
+  const text=transcriptText.slice(0,limit);
+  const lenMin=Math.round(transcriptText.length/500); // rough minutes estimate
+  // Scale detail level based on transcript length
+  const isLong=transcriptText.length>20000;
   const systemPrompt=useKorean
-    ?'당신은 전문 요약가입니다. 전사 텍스트를 간결하고 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 반드시 ##, -, ** 등 마크다운 문법을 사용하세요.'
-    :'You are a professional summarizer. Summarize transcripts into concise, well-structured English summaries using proper Markdown syntax (##, -, **bold**).';
+    ?'당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 반드시 ##, -, ** 등 마크다운 문법을 사용하세요. 긴 강의일수록 더 상세하게, 빠짐없이 요약하세요.'
+    :'You are a professional summarizer. Summarize transcripts into well-structured English summaries using proper Markdown syntax. For long lectures, be thorough and detailed.';
   const userPrompt=useKorean
-    ?`다음 전사 텍스트를 아래 마크다운 형식으로 한국어로 요약하세요. 영어 부분도 모두 한국어로 번역하여 정리하세요. 반드시 이 형식을 지키세요:\n\n## 핵심 주제\n(1~2문장으로 전체 핵심 설명)\n\n## 주요 내용\n- **포인트 1**: 설명 (1~2문장)\n- **포인트 2**: 설명\n- (5~8개)\n\n## 핵심 키워드\n키워드: 용어1, 용어2, 용어3\n\n---\n전사 텍스트:\n${transcriptText.slice(0,12000)}`
-    :`Summarize the following transcript in English using this exact Markdown format:\n\n## Key Topic\n(1~2 sentences)\n\n## Main Points\n- **Point 1**: explanation\n- **Point 2**: explanation\n- (5~8 points)\n\n## Keywords\nKeywords: term1, term2, term3\n\n---\nTranscript:\n${transcriptText.slice(0,12000)}`;
+    ?`다음 전사 텍스트(약 ${lenMin}분 분량)를 아래 마크다운 형식으로 한국어로 요약하세요. 영어 부분도 모두 한국어로 번역하여 정리하세요.${isLong?' 긴 강의이므로 주요 내용을 10~20개 이상 상세하게 작성하고, 각 포인트를 2~3문장으로 충분히 설명하세요. 중요한 내용을 누락하지 마세요.':''}\n\n## 핵심 주제\n(2~3문장으로 전체 핵심 설명)\n\n## 주요 내용 (시간순)\n- **[MM:SS] 포인트 1**: 상세 설명 (2~3문장)\n- **[MM:SS] 포인트 2**: 상세 설명\n- (${isLong?'10~20개 이상':'5~10개'})\n\n## 핵심 키워드\n키워드: 용어1, 용어2, 용어3 (10개 이상)\n\n## 시험 출제 예상 포인트\n- 포인트 1\n- 포인트 2\n\n---\n전사 텍스트:\n${text}`
+    :`Summarize the following transcript (~${lenMin} min) in English using this Markdown format.${isLong?' This is a long lecture — include 10-20+ detailed points, 2-3 sentences each. Do not omit important content.':''}\n\n## Key Topic\n(2~3 sentences)\n\n## Main Points (chronological)\n- **[MM:SS] Point 1**: detailed explanation (2-3 sentences)\n- (${isLong?'10-20+':'5-10'} points)\n\n## Keywords\n(10+ terms)\n\n## Exam-relevant Points\n\n---\nTranscript:\n${text}`;
   return{systemPrompt,userPrompt};
 }
 
@@ -1933,14 +1954,39 @@ async function _runSummary(provider,transcriptText,lang){
   const summaryBtn=document.getElementById('btn-generate-summary');
   summaryBtn.disabled=true;
   const label=provider==='groq'?'Groq (Llama)':provider==='gemini'?'Gemini':provider==='claude'?'Claude':'OpenAI (유료)';
-  summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...</span>`;
+  const limits=_getLLMLimits(provider);
+  const isLong=transcriptText.length>limits.inputChars;
+  summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':''}</span>`;
 
-  const{systemPrompt,userPrompt}=buildSummaryPrompts(transcriptText,lang);
+  let finalText=transcriptText;
+  // For very long transcripts that exceed provider limit: chunk → summarize → merge
+  if(isLong){
+    summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간별 요약 생성 중 (${label})...</span>`;
+    const chunkSize=Math.floor(limits.inputChars*0.8);
+    const chunks=[];
+    for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
+    const partials=[];
+    for(let ci=0;ci<chunks.length;ci++){
+      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 요약 중 (${label})...</span>`;
+      const sp='다음은 긴 강의 전사의 일부입니다. 핵심 내용을 상세히 정리하세요. 시간 정보가 있으면 포함하세요. 마크다운 사용.';
+      let partial;
+      if(provider==='groq') partial=await callGroqChat(sp,chunks[ci]);
+      else if(provider==='gemini') partial=await callGemini(sp,chunks[ci]);
+      else if(provider==='claude') partial=await callClaudeChat(sp,chunks[ci],limits.maxTokens);
+      else partial=await callOpenAIChat(sp,chunks[ci]);
+      partials.push(`[구간 ${ci+1}]\n${partial}`);
+    }
+    finalText=partials.join('\n\n');
+    summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
+  }
+
+  const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
 
   try{
     let summary;
     if(provider==='groq') summary=await callGroqChat(systemPrompt,userPrompt);
     else if(provider==='gemini') summary=await callGemini(systemPrompt,userPrompt);
+    else if(provider==='claude') summary=await callClaudeChat(systemPrompt,userPrompt,limits.maxTokens);
     else summary=await callOpenAIChat(systemPrompt,userPrompt);
 
     summaryEl.style.whiteSpace='normal';
@@ -2253,20 +2299,47 @@ async function generateNotesFromText(transcriptText,lang){
 
   const outLang=_getOutputLang();
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
+  const limits=_getLLMLimits(provider);
+  const isLong=transcriptText.length>limits.inputChars;
   const langInstruction=useKorean
-    ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요.'
-    :'\n\nIMPORTANT: Write entirely in English. Translate any non-English content into English.';
+    ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 긴 강의일수록 더 상세하고 빠짐없이 노트를 작성하세요.'
+    :'\n\nIMPORTANT: Write entirely in English. For long lectures, be thorough and comprehensive.';
+
+  // For very long transcripts: chunk → partial notes → merge
+  let inputText=transcriptText;
+  if(isLong){
+    notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간별 노트 생성 중 (${label})...</span>`;
+    const chunkSize=Math.floor(limits.inputChars*0.8);
+    const chunks=[];
+    for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
+    const partials=[];
+    for(let ci=0;ci<chunks.length;ci++){
+      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 노트 생성 중 (${label})...</span>`;
+      const sp=useKorean
+        ?'다음은 긴 강의 전사의 일부입니다. 핵심 내용, 정의, 개념, 예시를 빠짐없이 상세하게 정리하세요. 타임스탬프 포함. 마크다운 사용.'
+        :'This is a portion of a long lecture transcript. Extract all key content, definitions, concepts, examples in detail. Include timestamps. Use markdown.';
+      let partial;
+      if(provider==='groq') partial=await callGroqChat(sp,chunks[ci]);
+      else if(provider==='gemini') partial=await callGemini(sp,chunks[ci]);
+      else if(provider==='claude') partial=await callClaudeChat(sp,chunks[ci],limits.maxTokens);
+      else partial=await callOpenAIChat(sp,chunks[ci]);
+      partials.push(partial);
+    }
+    inputText=partials.join('\n\n---\n\n');
+    notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 노트 생성 중 (${label} · ${templateNames[template]||'표준'})...</span>`;
+  }
+
   const systemPrompt=(NOTE_TEMPLATES[template]||NOTE_TEMPLATES.standard)+langInstruction;
   const userPrompt=useKorean
-    ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요:\n\n${transcriptText.slice(0,15000)}`
-    :`Analyze the following transcript and write notes in the format above, in English:\n\n${transcriptText.slice(0,15000)}`;
+    ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요.${isLong?' 이것은 긴 강의이므로 가능한 모든 핵심 내용을 빠짐없이 포함하세요.':''}\n\n${inputText.slice(0,limits.inputChars)}`
+    :`Analyze the following transcript and write notes in the format above, in English.${isLong?' This is a long lecture — include all key content comprehensively.':''}\n\n${inputText.slice(0,limits.inputChars)}`;
 
   try{
     let result;
-    if(provider==='groq') result=await callGroqChat(systemPrompt,userPrompt);
-    else if(provider==='gemini') result=await callGemini(systemPrompt,userPrompt);
-    else if(provider==='claude') result=await callClaudeChat(systemPrompt,userPrompt,4000);
-    else result=await callOpenAIChat(systemPrompt,userPrompt);
+    if(provider==='groq') result=await callGroqChat(systemPrompt,userPrompt,limits.maxTokens);
+    else if(provider==='gemini') result=await callGemini(systemPrompt,userPrompt,limits.maxTokens);
+    else if(provider==='claude') result=await callClaudeChat(systemPrompt,userPrompt,limits.maxTokens);
+    else result=await callOpenAIChat(systemPrompt,userPrompt,limits.maxTokens);
 
     // Render markdown as styled HTML with clickable exam points
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
@@ -2469,10 +2542,11 @@ async function refineTranscript(){
 
   try{
     let refined;
-    if(provider==='groq') refined=await callGroqChat(systemPrompt,rawText.slice(0,12000));
-    else if(provider==='gemini') refined=await callGemini(systemPrompt,rawText.slice(0,12000));
-    else if(provider==='claude') refined=await callClaudeChat(systemPrompt,rawText.slice(0,12000),8000);
-    else refined=await callOpenAIChat(systemPrompt,rawText.slice(0,12000));
+    const rLimits=_getLLMLimits(provider);
+    if(provider==='groq') refined=await callGroqChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
+    else if(provider==='gemini') refined=await callGemini(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
+    else if(provider==='claude') refined=await callClaudeChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
+    else refined=await callOpenAIChat(systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
 
     // Replace 전문 tab content with refined text
     fullEl.innerHTML=`<div id="refine-badge" style="font-size:11px;margin-bottom:8px;padding:8px 12px;background:linear-gradient(135deg,#00d2a015,transparent);border:1px solid #00d2a030;border-radius:8px;display:flex;align-items:center;gap:8px">
@@ -2700,6 +2774,18 @@ function _iq(s){
 }
 
 // Helper: pick best LLM provider based on settings with priority ordering
+function _populateResultLLMSelect(){
+  const sel=document.getElementById('result-llm-provider');
+  if(!sel) return;
+  const opts=[];
+  opts.push({v:'auto',t:'자동'});
+  if(state.groqKey) opts.push({v:'groq-only',t:'Groq (무료)'});
+  if(state.geminiKey) opts.push({v:'gemini-only',t:'Gemini (무료, 대용량)'});
+  if(state.claudeKey) opts.push({v:'claude-only',t:'Claude (유료, 고품질)'});
+  sel.innerHTML=opts.map(o=>`<option value="${o.v}"${state.llmProvider===o.v?' selected':''}>${o.t}</option>`).join('');
+  sel.style.display=opts.length>1?'block':'none';
+}
+
 function _pickLLMProvider(){
   const pref=state.llmProvider||'auto';
 
@@ -2886,6 +2972,9 @@ function showHistoryItem(i){
   if(h.notes){notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(h.notes)+'</div>';notesBtn.style.display='flex'}
   else{notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 노트를 생성합니다.</span>';notesBtn.style.display=hasLLM?'flex':'none'}
   if(notesTemplateRow) notesTemplateRow.style.display=hasLLM?'flex':'none';
+
+  // Populate LLM provider selector
+  _populateResultLLMSelect();
 
   // Restore Q&A history
   const savedQA=state.qaHistoryMap&&state.qaHistoryMap[i];
