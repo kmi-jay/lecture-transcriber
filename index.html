@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.8</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.9</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1850,6 +1850,7 @@ class LLMError extends Error {
     if(status===429) this.type='rate_limit';
     else if(status===401||status===403) this.type='auth';
     else if(status>=500) this.type='server';
+    else if(status===400&&/credit|quota|insufficient|billing|balance/i.test(bodyText||'')) this.type='billing';
     else this.type='unknown';
   }
   get friendlyMessage(){
@@ -1869,7 +1870,8 @@ class LLMError extends Error {
     }
     if(this.type==='auth') return `${p} API 키가 유효하지 않습니다.\n설정에서 키를 확인해 주세요.`;
     if(this.type==='server') return `${p} 서버 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.`;
-    return `${p} 오류: ${this.status}`;
+    if(this.type==='billing') return `${p} 크레딧/할당량이 부족합니다.\n${this.provider==='groq'?'console.groq.com':this.provider==='openai'?'platform.openai.com/account/billing':this.provider==='claude'?'console.anthropic.com':'해당 서비스'}에서 충전 후 다시 시도하거나 다른 프로바이더를 사용하세요.`;
+    return `${p} 오류 (${this.status}): ${(this.bodyText||'').slice(0,60)}`;
   }
 }
 
@@ -1922,7 +1924,7 @@ function showLLMErrorModal(err, retryFn){
   // Cancel
   actions.push({label:'취소',primary:false,fn:()=>{}});
 
-  showModal(err.type==='rate_limit'?'무료 한도 초과':err.type==='auth'?'API 키 오류':'서버 오류',
+  showModal(err.type==='rate_limit'?'무료 한도 초과':err.type==='auth'?'API 키 오류':err.type==='billing'?'크레딧 부족':'서버 오류',
     bodyHTML, actions);
 
   // Start countdown timer if applicable
@@ -2061,8 +2063,8 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
       }catch(e){
         lastErr=e;
         console.warn(`[Chunk ${ci+1}/${chunks.length}] attempt ${attempt+1} ${provider} error:`,e);
-        if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth')){
-          throw e; // Rate limit / auth → stop immediately, show modal
+        if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing')){
+          throw e; // Rate limit / auth / billing → stop immediately, show modal
         }
         if(attempt===0){
           // 1st failure → brief wait then retry
