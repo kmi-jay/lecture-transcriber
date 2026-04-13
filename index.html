@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v3.5</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v3.6</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -841,6 +841,23 @@ let recStartTime = null;
 let recTimerInterval = null;
 let transcriptionAborted = false;
 
+// ═════════════════════════════════════════════════════════════════
+//  Wake Lock — prevent screen/CPU sleep during transcription
+// ═════════════════════════════════════════════════════════════════
+let _wakeLock=null;
+async function acquireWakeLock(){
+  if('wakeLock' in navigator){
+    try{
+      _wakeLock=await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release',()=>{_wakeLock=null;});
+      console.log('[WakeLock] acquired');
+    }catch(e){console.warn('[WakeLock] failed:',e)}
+  }
+}
+function releaseWakeLock(){
+  if(_wakeLock){try{_wakeLock.release();_wakeLock=null;console.log('[WakeLock] released')}catch(e){}}
+}
+
 const GROQ_HOURLY_LIMIT = 7200;
 const OVERLAP_SEC = 30;
 
@@ -1146,6 +1163,9 @@ async function startTranscription(){
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
 
+  // Keep device awake during transcription
+  await acquireWakeLock();
+
   // Force AssemblyAI when diarization is enabled
   const diarizeEnabled=document.getElementById('pre-diarization')?.checked;
   if(diarizeEnabled&&state.assemblyaiKey) choice='assemblyai-only';
@@ -1291,6 +1311,9 @@ async function startTranscription(){
     await generateNotesFromText(fullText,lang);
     await generateSummaryFromText(fullText,lang);
   }
+
+  // Release wake lock after all processing is done
+  releaseWakeLock();
 }
 
 async function tryFallback(ch,error,lang,chunks,file){
@@ -1432,7 +1455,7 @@ async function transcribeAssemblyAI(blob,lang){
   const{upload_url}=await uploadRes.json();
 
   // Step 2: Submit transcription
-  const body={audio_url:upload_url};
+  const body={audio_url:upload_url, speech_model:'best'};
   if(lang&&lang!=='auto'){
     // AssemblyAI uses language codes like 'ko','en', etc.
     const langMap={ko:'ko',en:'en',ja:'ja',zh:'zh',es:'es',fr:'fr',de:'de',it:'it',hi:'hi',ar:'ar',ru:'ru'};
@@ -2847,6 +2870,12 @@ loadState();
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
     updateQuotaUI();
+    // Re-acquire wake lock if transcription is still in progress
+    // (OS releases wake lock when page goes hidden)
+    const processPage=document.getElementById('page-process');
+    if(processPage&&processPage.classList.contains('active')&&!transcriptionAborted){
+      acquireWakeLock();
+    }
   }
 });
 
