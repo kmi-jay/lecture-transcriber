@@ -904,15 +904,24 @@ function toast(msg){
 }
 
 // ═════════════════════════════════════════════════════════════════
-//  QUOTA UI
+//  QUOTA
 // ═════════════════════════════════════════════════════════════════
-function updateQuotaUI(){
-  // Check rolling 1h window: if elapsed >1h since windowStart, quota is fully reset
-  const now=Date.now();
+// Effective Groq usage: returns 0 if rolling 1h window has expired
+function getEffectiveGroqUsed(){
   const ws=state.quota.windowStart||0;
-  const elapsedSec=ws?(now-ws)/1000:0;
-  const effectiveUsed=ws&&elapsedSec<3600?state.quota.usedSec:0;
+  if(!ws) return 0;
+  const elapsedMs=Date.now()-ws;
+  if(elapsedMs>=3600000){
+    // Window expired → auto-reset
+    state.quota={windowStart:0,usedSec:0};
+    return 0;
+  }
+  return state.quota.usedSec;
+}
+function getGroqRemainSec(){ return Math.max(0,GROQ_HOURLY_LIMIT-getEffectiveGroqUsed()); }
 
+function updateQuotaUI(){
+  const effectiveUsed=getEffectiveGroqUsed();
   const remainSec=Math.max(0,GROQ_HOURLY_LIMIT-effectiveUsed);
   const remainMin=Math.round(remainSec/60);
   const pct=remainSec/GROQ_HOURLY_LIMIT;
@@ -923,8 +932,9 @@ function updateQuotaUI(){
   document.getElementById('quota-text').textContent=remainMin+'분';
   const u=document.getElementById('set-usage');
   if(u){
-    if(ws&&elapsedSec<3600){
-      const resetInMin=Math.ceil((3600-elapsedSec)/60);
+    const ws=state.quota.windowStart||0;
+    if(ws&&effectiveUsed>0){
+      const resetInMin=Math.max(1,Math.ceil((3600000-(Date.now()-ws))/60000));
       u.textContent=`${Math.round(effectiveUsed/60)}분 사용 (${resetInMin}분 후 초기화)`;
     }else{
       u.textContent='0분 사용 (한도 충분)';
@@ -1039,7 +1049,7 @@ function showPrecheck(){
   const durMin=(duration/60).toFixed(1);
   const chunkSec=state.chunkMin*60;
   const nChunks=Math.ceil(duration/chunkSec);
-  const remainSec=GROQ_HOURLY_LIMIT-state.quota.usedSec;
+  const remainSec=getGroqRemainSec();
   const remainMin=Math.round(remainSec/60);
   const sizeMB=(file.size/1024/1024).toFixed(1);
 
@@ -1084,7 +1094,7 @@ function showPrecheck(){
 function updateCostEstimate(){
   const choice=document.getElementById('pre-api-choice').value;
   const dur=currentAudio.duration;
-  const remainSec=GROQ_HOURLY_LIMIT-state.quota.usedSec;
+  const remainSec=getGroqRemainSec();
   const costDiv=document.getElementById('pre-cost-alert');
   const costText=document.getElementById('pre-cost-text');
   const RATE=0.006,KRW=1400;
@@ -1157,7 +1167,7 @@ async function startTranscription(){
 
   // Build chunk plan
   const chunks=[];
-  let remainGroq=GROQ_HOURLY_LIMIT-state.quota.usedSec;
+  let remainGroq=getGroqRemainSec();
 
   for(let i=0;i<nChunks;i++){
     const startSec=Math.max(0,i*chunkSec-(i>0?OVERLAP_SEC:0));
@@ -1223,7 +1233,7 @@ async function startTranscription(){
       console.error(`Chunk ${i} error:`,e);
 
       // Fallback logic for auto mode
-      if(choice==='auto'){
+      if(choice==='auto'||choice==='free-auto'){
         const switched=await tryFallback(ch,e,lang,chunks,file);
         if(!switched){
           ch.status='error';ch.text=`[오류: ${e.message}]`;
@@ -2679,14 +2689,35 @@ function renderHistory(){
   if(!state.history.length){document.getElementById('history-section').style.display='none';return}
   document.getElementById('history-section').style.display='block';
   document.getElementById('history-list').innerHTML=state.history.map((h,i)=>`
-    <div class="history-item" onclick="showHistoryItem(${i})">
-      <div class="hi-icon">📄</div>
-      <div class="hi-info">
-        <div class="hi-name">${h.name}</div>
-        <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
+    <div class="history-item" style="position:relative">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer" onclick="showHistoryItem(${i})">
+        <div class="hi-icon">📄</div>
+        <div class="hi-info">
+          <div class="hi-name">${escHtml(h.name)}</div>
+          <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
+        </div>
+        <div class="hi-arrow">›</div>
       </div>
-      <div class="hi-arrow">›</div>
+      <button onclick="event.stopPropagation();deleteHistoryItem(${i})" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;padding:8px;cursor:pointer;opacity:0.5;z-index:1" title="삭제">✕</button>
     </div>`).join('');
+}
+async function deleteHistoryItem(i){
+  if(!confirm('이 기록을 삭제할까요?')) return;
+  state.history.splice(i,1);
+  if(state.qaHistoryMap){
+    delete state.qaHistoryMap[i];
+    // Re-index remaining entries
+    const newMap={};
+    Object.keys(state.qaHistoryMap).forEach(k=>{
+      const ki=parseInt(k);
+      if(ki>i) newMap[ki-1]=state.qaHistoryMap[k];
+      else if(ki<i) newMap[ki]=state.qaHistoryMap[k];
+    });
+    state.qaHistoryMap=newMap;
+  }
+  await saveState();
+  renderHistory();
+  toast('기록 삭제됨');
 }
 function showHistoryItem(i){
   const h=state.history[i];if(!h)return;
