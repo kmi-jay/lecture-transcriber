@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.9</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.10</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1980,7 +1980,7 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.groq.maxTokens
     })
-  });
+  },180000);
   if(!res.ok){
     const retryAfter=parseInt(res.headers.get('retry-after'))||null;
     throw new LLMError('groq',res.status,await res.text(),retryAfter);
@@ -1999,7 +1999,7 @@ async function callGemini(systemPrompt,userPrompt,maxTok){
       contents:[{parts:[{text:userPrompt}]}],
       generationConfig:{temperature:0.3,maxOutputTokens:maxTok||PROVIDERS.gemini.maxTokens}
     })
-  });
+  },180000);
   if(!res.ok){
     const retryAfter=parseInt(res.headers.get('retry-after'))||null;
     throw new LLMError('gemini',res.status,await res.text(),retryAfter);
@@ -2017,7 +2017,7 @@ async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.openai.maxTokens
     })
-  });
+  },180000);
   if(!res.ok){
     throw new LLMError('openai',res.status,await res.text(),null);
   }
@@ -2032,6 +2032,17 @@ async function _callLLM(provider,systemPrompt,userPrompt,maxTok){
   return callOpenAIChat(systemPrompt,userPrompt,maxTok);
 }
 
+// ── Live elapsed timer for single LLM calls ──
+function _startLiveTimer(el,msg,label){
+  const t0=Date.now();
+  el.innerHTML=`<span style="color:var(--text2)">⏳ ${msg} (${label})</span>`;
+  return setInterval(()=>{
+    const sec=Math.floor((Date.now()-t0)/1000);
+    const dots='.'.repeat((sec%3)+1);
+    el.innerHTML=`<span style="color:var(--text2)">⏳ ${msg}${dots} (${label}) · ${sec}초 경과</span>`;
+  },1000);
+}
+
 // ── Chunked LLM processing with per-chunk retry & progress ──
 async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride){
   const limits=_getLLMLimits(provider);
@@ -2043,7 +2054,7 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
   let totalElapsed=0;
   for(let ci=0;ci<chunks.length;ci++){
     const chunkStart=Date.now();
-    // Progress with time estimate
+    // Live elapsed timer — ticks every second so user sees activity
     let eta='';
     if(ci>0&&totalElapsed>0){
       const avgMs=totalElapsed/ci;
@@ -2051,7 +2062,12 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
       const remainSec=Math.ceil(remainMs/1000);
       eta=remainSec>=60?` · 약 ${Math.ceil(remainSec/60)}분 남음`:` · 약 ${remainSec}초 남음`;
     }
-    statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 1단계: 구간 ${ci+1}/${chunks.length} 처리 중 (${label})${eta}</span>`;
+    const _tickTimer=setInterval(()=>{
+      const sec=Math.floor((Date.now()-chunkStart)/1000);
+      const dots='.'.repeat((sec%3)+1);
+      statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중${dots} (${label}) · ${sec}초 경과${eta}</span>`;
+    },1000);
+    statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중... (${label})${eta}</span>`;
 
     let result=null;
     let lastErr=null;
@@ -2062,6 +2078,7 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
         break; // success
       }catch(e){
         lastErr=e;
+        clearInterval(_tickTimer);
         console.warn(`[Chunk ${ci+1}/${chunks.length}] attempt ${attempt+1} ${provider} error:`,e);
         if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing')){
           throw e; // Rate limit / auth / billing → stop immediately, show modal
@@ -2069,11 +2086,29 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
         if(attempt===0){
           // 1st failure → brief wait then retry
           const isTimeout=(e.name==='AbortError'||e.message?.includes('abort'));
-          statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} ${isTimeout?'시간 초과':'오류'} — 재시도 중...</span>`;
+          statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} ${isTimeout?'시간 초과':'오류'} — 2초 후 재시도...</span>`;
           await new Promise(r=>setTimeout(r,2000));
+          // Restart timer for retry
+          const retryStart=Date.now();
+          const _retryTimer=setInterval(()=>{
+            const sec=Math.floor((Date.now()-retryStart)/1000);
+            const dots='.'.repeat((sec%3)+1);
+            statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1} 재시도 중${dots} (${label}) · ${sec}초 경과</span>`;
+          },1000);
+          statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1} 재시도 중... (${label})</span>`;
+          try{
+            result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],maxTok);
+            clearInterval(_retryTimer);
+            break;
+          }catch(e2){
+            clearInterval(_retryTimer);
+            lastErr=e2;
+          }
+          break; // exit the for-loop (both attempts done)
         }
       }
     }
+    clearInterval(_tickTimer);
     if(result===null){
       // Both attempts failed → stop and propagate error
       throw lastErr;
@@ -2134,9 +2169,11 @@ async function _runSummary(provider,transcriptText,lang){
   }
 
   const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
+  const _sumTimer=_startLiveTimer(summaryEl,isLong?'2단계: 종합 요약 생성 중':'요약 생성 중',label);
 
   try{
     const summary=await _callLLM(provider,systemPrompt,userPrompt,limits.maxTokens);
+    clearInterval(_sumTimer);
     summaryEl.style.whiteSpace='normal';
     summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
     if(state.history.length>0) state.history[0].summary=summary;
@@ -2144,6 +2181,7 @@ async function _runSummary(provider,transcriptText,lang){
     toast(`요약 완료 (${label})`);
     summaryBtn.disabled=false;
   }catch(e){
+    clearInterval(_sumTimer);
     summaryBtn.disabled=false;
     if(e instanceof LLMError){
       summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 한도 초과 또는 오류 발생. 선택지를 확인하세요.</span>`;
@@ -2151,7 +2189,7 @@ async function _runSummary(provider,transcriptText,lang){
         _runSummary(newProvider,transcriptText,lang);
       });
     }else if(e.name==='AbortError'){
-      summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
+      summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (3분). 다른 프로바이더를 시도하세요.</span>`;
     }else{
       summaryEl.innerHTML=`<span style="color:var(--red)">요약 실패: ${e.message}</span>`;
     }
@@ -2468,19 +2506,22 @@ async function generateNotesFromText(transcriptText,lang){
   const userPrompt=useKorean
     ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요.${isLong?' 이것은 긴 강의이므로 가능한 모든 핵심 내용을 빠짐없이 포함하세요.':''}\n\n${inputText.slice(0,limits.inputChars)}`
     :`Analyze the following transcript and write notes in the format above, in English.${isLong?' This is a long lecture — include all key content comprehensively.':''}\n\n${inputText.slice(0,limits.inputChars)}`;
+  const _notesTimer=_startLiveTimer(notesEl,isLong?`2단계: 종합 노트 생성 중 (${templateNames[template]||'표준'})`:`노트 생성 중 (${templateNames[template]||'표준'})`,label);
 
   try{
     const result=await _callLLM(provider,systemPrompt,userPrompt,limits.maxTokens);
+    clearInterval(_notesTimer);
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
     if(state.history.length>0) state.history[0].notes=result;
     await saveState();
     toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
   }catch(e){
+    clearInterval(_notesTimer);
     if(e instanceof LLMError){
       notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 설정을 확인하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
     }else if(e.name==='AbortError'){
-      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
+      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (3분). 다른 프로바이더를 시도하세요.</span>`;
     }else{
       notesEl.innerHTML=`<span style="color:var(--red)">생성 실패: ${e.message}</span>`;
     }
@@ -2677,15 +2718,18 @@ async function refineTranscript(){
 
   // Show inline progress — don't touch fullEl until success
   statusEl.style.display='block';
-  statusEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 텍스트 정제 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':' 30초~1분 소요'}</span>`;
+  let _refTimer=null;
 
   try{
     let refined;
     if(isLong){
+      // _processChunks handles its own live timer per chunk
       const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok);
       refined=partials.join('\n');
     }else{
+      _refTimer=_startLiveTimer(statusEl,'텍스트 정제 중',label);
       refined=await _callLLM(provider,sp,srcText,refineMaxTok);
+      clearInterval(_refTimer);
     }
 
     // Success — now update fullEl
@@ -2711,6 +2755,7 @@ async function refineTranscript(){
     }
 
   }catch(e){
+    if(_refTimer) clearInterval(_refTimer);
     // Error — show in statusEl, NOT in fullEl (preserve original transcript)
     const errDetail=e instanceof LLMError?` (HTTP ${e.status}${e.bodyText?': '+e.bodyText.slice(0,80):''})`
       :e.name==='AbortError'?' (90초 시간 초과)':` (${e.message})`;
@@ -2847,7 +2892,7 @@ ${contextText}`;
     if(e instanceof LLMError){
       aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ ${e.friendlyMessage}</span>`;
     }else if(e.name==='AbortError'||e.message?.includes('abort')){
-      aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
+      aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ 응답 시간 초과 (3분). 다른 프로바이더를 시도하세요.</span>`;
     }else{
       aiBub.textContent='오류: '+e.message;
     }
@@ -2973,7 +3018,7 @@ async function callClaudeChat(systemPrompt, userPrompt, maxTokens=3000){
       system:systemPrompt,
       messages:[{role:'user',content:userPrompt}]
     })
-  });
+  },180000);
   if(!res.ok){
     const body=await res.text();
     const retryAfter=parseInt(res.headers.get('retry-after')||'0');
