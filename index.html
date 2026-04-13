@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.6</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.7</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2031,8 +2031,9 @@ async function _callLLM(provider,systemPrompt,userPrompt,maxTok){
 }
 
 // ── Chunked LLM processing with per-chunk retry & progress ──
-async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label){
+async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride){
   const limits=_getLLMLimits(provider);
+  const maxTok=maxTokOverride||limits.maxTokens;
   const chunkSize=Math.floor(limits.inputChars*0.8);
   const chunks=[];
   for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
@@ -2055,7 +2056,7 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
     // Try up to 2 times (original + 1 retry)
     for(let attempt=0;attempt<2;attempt++){
       try{
-        result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],limits.maxTokens);
+        result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],maxTok);
         break; // success
       }catch(e){
         lastErr=e;
@@ -2652,34 +2653,40 @@ async function refineTranscript(){
   if(!provider){toast(_noLLMKeyMsg());showPage('settings');return}
   const fullEl=document.getElementById('res-full');
   const statusEl=document.getElementById('refine-status');
-  const rawText=fullEl.textContent;
-  if(!rawText||rawText.length<50){toast('전사 결과가 없습니다');return}
   const btn=document.getElementById('btn-refine-text');
+
+  // Read original text from history (not from DOM — DOM may contain badge/error text)
+  const srcText=state.history.length>0
+    ?( state.history[0].refined||state.history[0].text )
+    :fullEl.textContent;
+  if(!srcText||srcText.length<50){toast('전사 결과가 없습니다');return}
+
   btn.disabled=true;
   const label=_provLabelWithCost(provider);
   const limits=_getLLMLimits(provider);
-  const isLong=rawText.length>limits.inputChars;
+  // For refinement, output ≈ input length — use larger token limit than for summary
+  const refineMaxTok=Math.min(Math.ceil(srcText.length/3)+2000, provider==='gemini'?8000:provider==='claude'?8000:4000);
+  const isLong=srcText.length>limits.inputChars;
 
   const outLang=_getOutputLang();
   const lang=document.getElementById('pre-language')?.value||'ko';
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
   const sp=_buildRefinePrompt(useKorean);
 
-  // Show inline progress
+  // Show inline progress — don't touch fullEl until success
   statusEl.style.display='block';
   statusEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 텍스트 정제 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':' 30초~1분 소요'}</span>`;
 
   try{
     let refined;
     if(isLong){
-      // Chunked refinement — preserve full text without loss
-      const partials=await _processChunks(provider,rawText,()=>sp,statusEl,label);
+      const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok);
       refined=partials.join('\n');
     }else{
-      refined=await _callLLM(provider,sp,rawText,limits.maxTokens);
+      refined=await _callLLM(provider,sp,srcText,refineMaxTok);
     }
 
-    // Show result
+    // Success — now update fullEl
     statusEl.style.display='none';
     fullEl.innerHTML=`<div id="refine-badge" style="font-size:11px;margin-bottom:8px;padding:8px 12px;background:linear-gradient(135deg,#00d2a015,transparent);border:1px solid #00d2a030;border-radius:8px;display:flex;align-items:center;gap:8px">
         <span style="color:var(--green);font-weight:600">✅ 정제 완료</span>
@@ -2702,14 +2709,12 @@ async function refineTranscript(){
     }
 
   }catch(e){
-    statusEl.style.display='none';
+    // Error — show in statusEl, NOT in fullEl (preserve original transcript)
+    const errDetail=e instanceof LLMError?` (HTTP ${e.status}${e.bodyText?': '+e.bodyText.slice(0,80):''})`
+      :e.name==='AbortError'?' (90초 시간 초과)':` (${e.message})`;
+    statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류${errDetail}</span>`;
     if(e instanceof LLMError){
-      fullEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 다른 프로바이더를 시도하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ state.llmProvider=p+'-only'; refineTranscript(); });
-    }else if(e.name==='AbortError'){
-      fullEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
-    }else{
-      fullEl.innerHTML=`<span style="color:var(--red)">정제 실패: ${e.message}</span>`;
     }
   }finally{
     btn.disabled=false;
@@ -2959,7 +2964,7 @@ async function callClaudeChat(systemPrompt, userPrompt, maxTokens=3000){
       'anthropic-dangerous-direct-browser-access':'true'
     },
     body:JSON.stringify({
-      model:'claude-sonnet-4-6',
+      model:'claude-opus-4-5',
       max_tokens:maxTokens,
       system:systemPrompt,
       messages:[{role:'user',content:userPrompt}]
