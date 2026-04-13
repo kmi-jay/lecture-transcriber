@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.5</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.6</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -577,9 +577,14 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
   <!-- Tab: 전문 -->
   <div id="tab-full" class="tab-content" style="display:block">
+    <div id="refine-status" style="display:none;min-height:60px;margin-bottom:10px"></div>
     <div class="result-text" id="res-full"></div>
-    <button id="btn-refine-text" class="btn btn-ghost" onclick="refineTranscript()"
-      style="margin-top:10px;display:none">🔧 텍스트 정제 (외국어 제거·오인식 교정 → 노트·요약 자동 재생성)</button>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button id="btn-refine-text" class="btn btn-ghost" onclick="refineTranscript()"
+        style="display:none;flex:1;min-width:140px">🔧 텍스트 정제</button>
+      <select id="refine-llm-provider" style="display:none;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;cursor:pointer;min-width:100px" onchange="state.llmProvider=this.value;saveState()">
+      </select>
+    </div>
   </div>
 
   <!-- Tab: 강의노트 -->
@@ -613,8 +618,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="result-text" id="res-summary" style="min-height:120px">
       <span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>
     </div>
-    <button id="btn-generate-summary" class="btn btn-ghost" onclick="generateSummary()"
-      style="margin-top:10px;display:none">✨ 요약 생성</button>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button id="btn-generate-summary" class="btn btn-ghost" onclick="generateSummary()"
+        style="display:none;flex:1;min-width:140px">✨ 요약 생성</button>
+      <select id="summary-llm-provider" style="display:none;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;cursor:pointer;min-width:100px" onchange="state.llmProvider=this.value;saveState()">
+      </select>
+    </div>
   </div>
 
   <!-- Tab: Q&A -->
@@ -1149,7 +1158,7 @@ function showPrecheck(){
   }
 
   // Show LLM summary toggle if any LLM key is available
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
   const llmRow=document.getElementById('llm-toggle-row');
   llmRow.style.display=hasLLM?'block':'none';
 
@@ -1293,18 +1302,31 @@ async function startTranscription(){
     try{
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let result;
+      const minExpectedLen=Math.max(10,Math.round(ch.chunkDur/10)); // expect ~1 char per 10s minimum
 
-      if(ch.api==='groq'){
-        result=await transcribeGroq(chunkBlob,lang);
-        if(!state.quota.windowStart) state.quota.windowStart=Date.now();
-        state.quota.usedSec+=ch.chunkDur;
-        await saveState();updateQuotaUI();
-      }else if(ch.api==='assemblyai'){
-        result=await transcribeAssemblyAI(chunkBlob,lang);
-      }else if(ch.api==='gemini'){
-        result=await transcribeGemini(chunkBlob,lang);
-      }else{
-        result=await transcribeOpenAI(chunkBlob,lang);
+      // Try up to 2 attempts for empty/near-empty results
+      for(let attempt=0;attempt<2;attempt++){
+        if(ch.api==='groq'){
+          result=await transcribeGroq(chunkBlob,lang);
+          if(attempt===0){
+            if(!state.quota.windowStart) state.quota.windowStart=Date.now();
+            state.quota.usedSec+=ch.chunkDur;
+            await saveState();updateQuotaUI();
+          }
+        }else if(ch.api==='assemblyai'){
+          result=await transcribeAssemblyAI(chunkBlob,lang);
+        }else if(ch.api==='gemini'){
+          result=await transcribeGemini(chunkBlob,lang);
+        }else{
+          result=await transcribeOpenAI(chunkBlob,lang);
+        }
+        // Validate: retry if result is empty or suspiciously short
+        if(result.text&&result.text.trim().length>=minExpectedLen) break;
+        if(attempt===0){
+          console.warn(`[Chunk ${i}] ${ch.api}: empty/short result (${result.text?.length||0} chars), retrying...`);
+          updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — 빈 결과, 재시도 중...`);
+          await sleep(2000);
+        }
       }
       ch.text=cleanHallucinations(result.text);
       ch.segments=result.segments||[];
@@ -1345,7 +1367,7 @@ async function startTranscription(){
   await saveState();renderHistory();
 
   // Prepare tabs
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
   const wantLLM=document.getElementById('pre-llm-summary')?.checked;
 
   const summaryEl=document.getElementById('res-summary');
@@ -1362,7 +1384,9 @@ async function startTranscription(){
 
   // Show refine button in 전문 tab if LLM is available
   const refineBtn=document.getElementById('btn-refine-text');
-  if(refineBtn) refineBtn.style.display=hasLLM?'flex':'none';
+  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.textContent='🔧 텍스트 정제'}
+  const refineStatus=document.getElementById('refine-status');
+  if(refineStatus) refineStatus.style.display='none';
 
   // Populate LLM provider selector on result page
   _populateResultLLMSelect();
@@ -2591,83 +2615,86 @@ function examPointClick(li){
   askQuestion();
 }
 
-// ─── Transcript refinement ───────────────────────────────────────────────
+// ─── Transcript refinement (with chunked processing for long texts) ──────
+function _buildRefinePrompt(useKorean){
+  return useKorean
+    ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 전문적으로 교정하는 편집자입니다.
+
+[핵심 문제] 음성인식이 전사할 때 다음과 같은 심각한 오류가 빈번하게 발생합니다:
+1. **외국 문자 혼입** — 한자, 일본어, 아랍어 등이 무작위로 삽입됨
+2. **영어 음차 표기** — "audit department"가 "오디트 디파트먼트"로 표기됨
+3. **발음 유사 단어 혼동** — 관리직↔관리적, 감사↔검사
+4. **전문 용어 오인식** — 도메인 전문 용어가 엉뚱한 한국어로 변환
+5. **환각 반복** — 같은 구절이 의미 없이 2~3회 반복
+6. **의미 없는 filler** — "네 네 네", "그래서 그래서" 과도한 반복
+
+[교정 규칙]
+1) 한국어가 아닌 모든 문자를 완전히 제거하고 문맥상 올바른 한국어로 대체
+2) 영어 문장은 한국어로 번역. IT 약어(CISA, ISO 등)는 유지
+3) 영어 음차를 한국어로: "오디트"→"감사", "리스크"→"위험"
+4) 동일 문장 2회 이상 반복 → 1회만
+5) [MM:SS] 타임스탬프, [화자 X] 태그 반드시 유지
+6) 내용 요약·축약 금지 — 오류 교정만
+7) 교정된 본문만 출력 — 설명 없이`
+    :`You are a professional editor correcting speech-to-text transcripts.
+
+[Rules]
+1) Remove foreign characters that don't belong; replace with correct words from context
+2) Keep technical abbreviations in original language
+3) Remove duplicate sentences, keep first occurrence only
+4) Preserve [MM:SS] timestamps and [Speaker X] tags exactly
+5) Don't summarize or shorten — only correct errors
+6) Output corrected text only, no explanations`;
+}
+
 async function refineTranscript(){
   const provider=_pickLLMProvider();
   if(!provider){toast(_noLLMKeyMsg());showPage('settings');return}
   const fullEl=document.getElementById('res-full');
+  const statusEl=document.getElementById('refine-status');
   const rawText=fullEl.textContent;
   if(!rawText||rawText.length<50){toast('전사 결과가 없습니다');return}
   const btn=document.getElementById('btn-refine-text');
   btn.disabled=true;
-  btn.textContent='🔧 정제 중...';
-  const label=_provLabel(provider);
-  toast(`${label}로 텍스트 정제 중...`);
+  const label=_provLabelWithCost(provider);
+  const limits=_getLLMLimits(provider);
+  const isLong=rawText.length>limits.inputChars;
 
   const outLang=_getOutputLang();
   const lang=document.getElementById('pre-language')?.value||'ko';
-  const useKoreanRefine=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
-  const systemPrompt=useKoreanRefine
-    ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 전문적으로 교정하는 편집자입니다.
+  const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
+  const sp=_buildRefinePrompt(useKorean);
 
-[핵심 문제] 음성인식이 전사할 때 다음과 같은 심각한 오류가 빈번하게 발생합니다:
-
-1. **외국 문자 혼입 (hallucination)** — 한자(漢字), 일본어(ひらがな・カタカナ), 아랍어(العربية) 등이 무작위로 삽입됨
-2. **영어 음차 표기** — "audit department"가 "오디트 디파트먼트"로, "risk-based"가 "리스크 베이스드"로 표기됨
-3. **발음 유사 단어 혼동** — 관리직↔관리적, 감사↔검사, 거버넌스↔거버난스
-4. **전문 용어 오인식** — IT·의학·법률 등 도메인 전문 용어가 엉뚱한 한국어로 변환
-5. **환각 반복** — 같은 구절이 의미 없이 2~3회 반복
-6. **의미 없는 filler** — "네 네 네", "그래서 그래서", "어..." 과도한 반복
-
-[교정 규칙 — 반드시 엄격히 지키세요]
-1) 한국어가 아닌 모든 문자(한자, 일본어, 아랍어 등)를 **완전히 제거**하세요. 문맥에서 해당 위치에 올 한국어 단어를 추론하여 대체하세요.
-2) **영어를 한국어로 번역**: 영어로 된 문장이나 구절은 자연스러운 한국어로 번역하세요. 단, IT 전문 약어(CISA, ISO, GDP 등)는 그대로 유지하세요.
-3) **영어 음차를 한국어로**: "오디트"→"감사", "리스크"→"위험", "디파트먼트"→"부서" 등 영어 음차를 의미에 맞는 한국어로 교정하세요.
-4) 동일 문장이 거의 똑같이 2회 이상 반복되면 1회만 남기세요.
-5) [MM:SS] 타임스탬프와 [화자 X] 태그는 반드시 그대로 유지하세요.
-6) 내용을 요약하거나 축약하지 마세요 — 오류 교정과 번역만 하세요.
-7) 교정된 본문만 출력하세요 — 설명이나 주석 없이.`
-    :`You are a professional editor specializing in correcting speech-to-text transcripts.
-
-[Key Issues]
-1. **Foreign script hallucination** — Random characters (CJK, Arabic, etc.) inserted into text
-2. **Similar-sounding word confusion** — Homophones incorrectly substituted
-3. **Technical term errors** — Domain terms incorrectly transcribed
-4. **Repetition hallucination** — Same phrase repeated 2-3 times meaninglessly
-5. **Excessive filler** — "um", "uh", repeated words
-
-[Rules]
-1) Remove all foreign characters that don't belong. Replace with correct words from context.
-2) Keep technical abbreviations and proper nouns in their original language.
-3) Remove duplicate sentences, keep only first occurrence.
-4) Preserve [MM:SS] timestamps and [Speaker X] tags exactly.
-5) Don't summarize or shorten — only correct errors.
-6) Output only the corrected text, no explanations.`;
+  // Show inline progress
+  statusEl.style.display='block';
+  statusEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 텍스트 정제 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':' 30초~1분 소요'}</span>`;
 
   try{
-    const rLimits=_getLLMLimits(provider);
-    const refined=await _callLLM(provider,systemPrompt,rawText.slice(0,rLimits.inputChars),rLimits.maxTokens);
+    let refined;
+    if(isLong){
+      // Chunked refinement — preserve full text without loss
+      const partials=await _processChunks(provider,rawText,()=>sp,statusEl,label);
+      refined=partials.join('\n');
+    }else{
+      refined=await _callLLM(provider,sp,rawText,limits.maxTokens);
+    }
 
-    // Replace 전문 tab content with refined text
+    // Show result
+    statusEl.style.display='none';
     fullEl.innerHTML=`<div id="refine-badge" style="font-size:11px;margin-bottom:8px;padding:8px 12px;background:linear-gradient(135deg,#00d2a015,transparent);border:1px solid #00d2a030;border-radius:8px;display:flex;align-items:center;gap:8px">
         <span style="color:var(--green);font-weight:600">✅ 정제 완료</span>
-        <span style="color:var(--text3)">— ${label} · 외국어 제거 · 오인식 교정</span>
+        <span style="color:var(--text3)">— ${_provLabel(provider)} · 외국어 제거 · 오인식 교정</span>
       </div>`+
       `<div style="white-space:pre-wrap;font-size:14px;line-height:1.8">${escHtml(refined)}</div>`;
     if(state.history.length>0) state.history[0].refined=refined;
     await saveState();
-    toast(`텍스트 정제 완료 (${label})`);
-
-    // Update stats with refined text
+    toast(`텍스트 정제 완료 (${_provLabel(provider)})`);
     updateResultStats(refined);
-
-    // Change button to show re-refine option
     btn.innerHTML='🔧 다시 정제';
 
     // Auto-regenerate notes & summary from refined text
-    const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
+    const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
     if(hasLLM){
-      const lang=document.getElementById('pre-language')?.value||'ko';
       toast('정제본으로 노트·요약 자동 생성 중...');
       try{ await generateNotesFromText(refined,lang); }catch(e2){}
       try{ await generateSummaryFromText(refined,lang); }catch(e2){}
@@ -2675,15 +2702,18 @@ async function refineTranscript(){
     }
 
   }catch(e){
+    statusEl.style.display='none';
     if(e instanceof LLMError){
-      showLLMErrorModal(e,(p)=>{ state.llmProvider=p; refineTranscript(); });
+      fullEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 다른 프로바이더를 시도하세요.</span>`;
+      showLLMErrorModal(e,(p)=>{ state.llmProvider=p+'-only'; refineTranscript(); });
+    }else if(e.name==='AbortError'){
+      fullEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (90초). 다른 프로바이더를 시도하세요.</span>`;
     }else{
-      toast('정제 실패: '+e.message);
+      fullEl.innerHTML=`<span style="color:var(--red)">정제 실패: ${e.message}</span>`;
     }
   }finally{
     btn.disabled=false;
-    if(!btn.innerHTML.includes('다시 정제'))
-      btn.textContent='🔧 텍스트 정제 (외국어 제거·오인식 교정)';
+    if(!btn.innerHTML.includes('다시 정제')) btn.textContent='🔧 텍스트 정제';
   }
 }
 
@@ -2875,8 +2905,6 @@ function _iq(s){
 
 // Helper: pick best LLM provider based on settings with priority ordering
 function _populateResultLLMSelect(){
-  const sel=document.getElementById('result-llm-provider');
-  if(!sel) return;
   const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
   const opts=[{v:'auto',t:'자동'}];
   const freeKeys=['groq','gemini'].filter(id=>state[keyMap[id]]);
@@ -2887,8 +2915,12 @@ function _populateResultLLMSelect(){
     const desc=p.free?'무료':p.costLabel;
     opts.push({v:id+'-only',t:`${_provLabel(id)} (${desc})`});
   });
-  sel.innerHTML=opts.map(o=>`<option value="${o.v}"${state.llmProvider===o.v?' selected':''}>${o.t}</option>`).join('');
-  sel.style.display=opts.length>1?'block':'none';
+  const html=opts.map(o=>`<option value="${o.v}"${state.llmProvider===o.v?' selected':''}>${o.t}</option>`).join('');
+  const show=opts.length>1?'block':'none';
+  ['result-llm-provider','summary-llm-provider','refine-llm-provider'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(sel){sel.innerHTML=html;sel.style.display=show}
+  });
 }
 
 function _pickLLMProvider(){
@@ -3051,7 +3083,7 @@ async function deleteHistoryItem(i){
 function showHistoryItem(i){
   const h=state.history[i];if(!h)return;
   currentHistoryIdx=i;
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey);
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
   document.getElementById('res-info').textContent=`${h.name} · ${Math.round(h.duration/60)}분`;
   // Show refined text if available, else original
   if(h.refined){
@@ -3061,9 +3093,11 @@ function showHistoryItem(i){
     document.getElementById('res-full').textContent=h.text;
   }
 
-  // Show refine button
+  // Show refine button + reset status
   const refineBtn=document.getElementById('btn-refine-text');
-  if(refineBtn) refineBtn.style.display=hasLLM?'flex':'none';
+  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.textContent=h.refined?'🔧 다시 정제':'🔧 텍스트 정제'}
+  const refineStatus=document.getElementById('refine-status');
+  if(refineStatus) refineStatus.style.display='none';
 
   // Summary
   const summaryEl=document.getElementById('res-summary');
