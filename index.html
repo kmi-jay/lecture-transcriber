@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.1</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.2</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -657,30 +657,69 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <h2 style="font-size:18px;font-weight:600">설정</h2>
   </div>
 
-  <!-- API Usage Order -->
+  <!-- API Cost Comparison Table -->
   <div class="settings-section">
-    <div class="card-label">API 역할 안내</div>
-    <div class="api-order">
-      <div class="api-step">
-        <div class="num" style="background:var(--green-dim);color:var(--green)">전사</div>
-        <div class="detail">
-          <strong>Groq</strong> <span class="badge badge-free">무료</span> 시간당 120분 롤링<br>
-          <strong>Gemini</strong> <span class="badge badge-free">무료</span> 하루 1,500건<br>
-          <strong>AssemblyAI</strong> <span class="badge badge-credit">크레딧</span> 가입 시 $50<br>
-          <strong>OpenAI</strong> <span class="badge badge-paid">유료</span> $0.006/분 ≈ ₩9/분
-        </div>
-      </div>
-      <div class="api-step">
-        <div class="num" style="background:var(--accent-dim,#8b5cf620);color:var(--accent,#8b5cf6)">후처리</div>
-        <div class="detail">
-          <strong>Groq</strong> <span class="badge badge-free">무료</span> Llama 3.3, 빠름<br>
-          <strong>Gemini</strong> <span class="badge badge-free">무료</span> 대용량 처리 가능<br>
-          <strong>Claude</strong> <span class="badge badge-paid">유료</span> 최고 품질, 1시간 ≈ $0.10~$0.30<br>
-          <strong>OpenAI</strong> <span class="badge badge-paid">유료</span> GPT-4o-mini
-        </div>
-      </div>
+    <div class="card-label">API 비용 비교 (1분당 비용)</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="width:100%;font-size:11px;border-collapse:collapse;color:var(--text)">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border2);color:var(--text3)">
+            <th style="text-align:left;padding:6px 4px">API</th>
+            <th style="text-align:center;padding:6px 2px">전사</th>
+            <th style="text-align:center;padding:6px 2px">후처리</th>
+            <th style="text-align:right;padding:6px 4px">전사 /분</th>
+            <th style="text-align:right;padding:6px 4px">후처리 /분</th>
+            <th style="text-align:right;padding:6px 4px">한도</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:5px 4px"><strong>Groq</strong></td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--green)">₩0</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--green)">₩0</td>
+            <td style="text-align:right;padding:5px 4px;font-size:10px">시간당 120분</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:5px 4px"><strong>Gemini</strong></td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--green)">₩0</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--green)">₩0</td>
+            <td style="text-align:right;padding:5px 4px;font-size:10px">하루 1,500건</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:5px 4px"><strong>AssemblyAI</strong></td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:center;padding:5px 2px">—</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--blue)">~₩3.5*</td>
+            <td style="text-align:right;padding:5px 4px">—</td>
+            <td style="text-align:right;padding:5px 4px;font-size:10px">$50 크레딧</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:5px 4px"><strong>Claude</strong></td>
+            <td style="text-align:center;padding:5px 2px">—</td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:right;padding:5px 4px">—</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--accent)">~₩2.5~7</td>
+            <td style="text-align:right;padding:5px 4px;font-size:10px">종량제</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 4px"><strong>OpenAI</strong></td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:center;padding:5px 2px">✓</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--red)">~₩9</td>
+            <td style="text-align:right;padding:5px 4px;color:var(--red)">~₩1~2</td>
+            <td style="text-align:right;padding:5px 4px;font-size:10px">종량제</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <p style="font-size:11px;color:var(--text3);margin-top:6px;padding:0 4px">자동 모드: Groq → Gemini → AssemblyAI → OpenAI 순으로 무료 API를 우선 사용합니다.</p>
+    <div style="font-size:10px;color:var(--text3);margin-top:6px;padding:0 4px;line-height:1.6">
+      * AssemblyAI: 가입 시 $50 무료 크레딧 ≈ <strong>약 83시간(5,000분)</strong> 전사 가능. 소진 후 자동 중단.<br>
+      ₩ 환산은 $1 = ₩1,450 기준 근사값. 자동 모드는 무료 API를 우선 사용합니다.
+    </div>
   </div>
 
   <!-- Groq Key -->
@@ -690,35 +729,10 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <input type="password" id="set-groq-key" placeholder="gsk_...">
     </div>
     <div class="hint">
-      <strong>영구 무료</strong> — 카드 등록 불필요. 시간당 120분 전사 (롤링 리셋)<br>
-      전사 (Whisper) + 노트·요약·정제·Q&A (Llama 3.3) 모두 사용<br>
+      <strong>영구 무료</strong> — 카드 등록 불필요<br>
+      전사: Whisper Large V3 (시간당 120분, 1시간마다 롤링 리셋)<br>
+      후처리: Llama 3.3 70B (노트·요약·정제·Q&A)<br>
       <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a> → 구글 가입 → Create API Key
-    </div>
-  </div>
-
-  <!-- AssemblyAI Key -->
-  <div class="api-card">
-    <h3><span style="color:var(--blue)">●</span> AssemblyAI API Key</h3>
-    <div class="field" style="margin-bottom:0">
-      <input type="password" id="set-assemblyai-key" placeholder="가입 시 대시보드에서 확인">
-    </div>
-    <div class="hint">
-      <strong>가입 시 $50 무료 크레딧</strong> — 카드 미등록 시 자동과금 없음<br>
-      <a href="https://www.assemblyai.com/app" target="_blank">assemblyai.com/app</a> → 가입 → 대시보드에서 API Key 복사<br>
-      크레딧 소진 후 카드 미등록이면 단순 중단됨
-    </div>
-  </div>
-
-  <!-- OpenAI Key -->
-  <div class="api-card" style="border-color:#ff6b6b30">
-    <h3><span style="color:var(--red)">●</span> OpenAI API Key <span class="badge badge-paid">유료</span></h3>
-    <div class="field" style="margin-bottom:0">
-      <input type="password" id="set-openai-key" placeholder="sk-...">
-    </div>
-    <div class="hint">
-      <strong style="color:var(--red)">유료</strong> — Whisper 전사 전용. 174분 강의 ≈ ₩1,500<br>
-      <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> → Create new secret key<br>
-      반드시 <a href="https://platform.openai.com/settings/organization/limits" target="_blank">월간 한도</a>를 설정하세요 (예: $5)
     </div>
   </div>
 
@@ -729,9 +743,38 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <input type="password" id="set-gemini-key" placeholder="AIza...">
     </div>
     <div class="hint">
-      <strong>무료 티어 제공</strong> — Gemini 2.0 Flash, 하루 1,500건<br>
-      <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> → 구글 로그인 → Create API Key<br>
-      전사 (멀티모달 오디오) + 노트·요약·정제·Q&A 모두 사용
+      <strong>영구 무료</strong> — 카드 등록 불필요<br>
+      전사: Gemini 2.0 Flash 멀티모달 (하루 1,500건)<br>
+      후처리: 100만 토큰 컨텍스트 → 긴 강의도 한번에 처리 가능<br>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com/app/apikey</a> → 구글 로그인 → Create API Key
+    </div>
+  </div>
+
+  <!-- AssemblyAI Key -->
+  <div class="api-card">
+    <h3><span style="color:var(--blue)">●</span> AssemblyAI API Key</h3>
+    <div class="field" style="margin-bottom:0">
+      <input type="password" id="set-assemblyai-key" placeholder="가입 시 대시보드에서 확인">
+    </div>
+    <div class="hint">
+      <strong>가입 시 $50 무료 크레딧</strong> — 약 5,000분(83시간) 전사 가능. 분당 ~₩3.5<br>
+      전사 전용 (후처리 불가). 화자 구분(Speaker Diarization) 지원.<br>
+      크레딧 소진 후 카드 미등록 시 자동 중단 (과금 없음)<br>
+      <a href="https://www.assemblyai.com/app" target="_blank">assemblyai.com/app</a> → 가입 → 대시보드에서 API Key 복사
+    </div>
+  </div>
+
+  <!-- OpenAI Key -->
+  <div class="api-card" style="border-color:#ff6b6b30">
+    <h3><span style="color:var(--red)">●</span> OpenAI API Key <span class="badge badge-paid">유료</span></h3>
+    <div class="field" style="margin-bottom:0">
+      <input type="password" id="set-openai-key" placeholder="sk-...">
+    </div>
+    <div class="hint">
+      <strong style="color:var(--red)">유료</strong> — 전사 분당 ~₩9 / 후처리 분당 ~₩1~2<br>
+      전사: Whisper ($0.006/분) + 후처리: GPT-4o-mini ($0.15/1M입력토큰)<br>
+      반드시 <a href="https://platform.openai.com/settings/organization/limits" target="_blank">월간 한도</a>를 설정하세요 (예: $5)<br>
+      <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a> → Create new secret key
     </div>
   </div>
 
@@ -742,20 +785,21 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <input type="password" id="set-claude-key" placeholder="sk-ant-...">
     </div>
     <div class="hint">
-      <strong style="color:var(--accent)">유료 — 한국어 교정·강의노트 최고 품질</strong><br>
-      Groq/Gemini보다 정확도가 월등히 높음. ~$0.003/1K 토큰 (1시간 강의 ≈ $0.10~$0.30)<br>
+      <strong style="color:var(--accent)">유료</strong> — 후처리 분당 ~₩2.5~7 (전사 불가)<br>
+      Claude Sonnet 4.6 — 한국어 교정·구조화 노트 최고 품질.<br>
+      Groq/Gemini 무료 API보다 정확도가 월등히 높음.<br>
       <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a> → API Keys
     </div>
   </div>
 
   <!-- LLM Summary Settings -->
   <div class="settings-section" style="margin-top:20px">
-    <div class="card-label">LLM 후보정·노트·요약 설정</div>
+    <div class="card-label">LLM 후처리 설정 (노트·요약·정제·Q&A)</div>
     <div class="card">
       <div class="field" style="margin-bottom:0">
-        <div class="field-label">강의노트·요약에 사용할 LLM</div>
+        <div class="field-label">기본 LLM 선택</div>
         <select id="set-llm-provider">
-          <option value="auto">자동 (Groq → Gemini → Claude 순서)</option>
+          <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
           <option value="free-only">무료만 (Groq → Gemini)</option>
           <option value="groq-first">Groq 우선 → Gemini → Claude</option>
           <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
@@ -765,10 +809,9 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
           <option value="claude-only">Claude만 (Sonnet 4.6)</option>
         </select>
       </div>
-      <p style="font-size:12px;color:var(--text3);margin-top:8px">
-        <strong>Groq</strong>: 무료, 빠름. Llama 3.3 70B. 시간당 6,000토큰 제한.<br>
-        <strong>Gemini</strong>: 무료, 100만 토큰 컨텍스트. 긴 강의에 강점. 하루 1,500건.<br>
-        <strong>Claude</strong>: 유료 (~$0.003/1K토큰). 한국어 교정·구조화 노트 최고 품질.
+      <p style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">
+        이 설정이 <strong>기본값</strong>입니다. 전사 완료 후 결과 화면의 노트 탭에서 <strong>다른 모델로 변경</strong>할 수 있으며, 결과 화면에서 선택하면 그 값이 우선 적용됩니다.<br>
+        한도 초과 시 자동으로 다른 사용 가능한 API로 전환됩니다.
       </p>
     </div>
   </div>
