@@ -1231,15 +1231,16 @@ async function startTranscription(){
       ch.status='done';
     }catch(e){
       console.error(`Chunk ${i} error:`,e);
+      const errMsg=`${ch.api}: ${e.message||e}`;
 
-      // Fallback logic for auto mode
+      // Fallback logic for auto/free-auto mode
       if(choice==='auto'||choice==='free-auto'){
         const switched=await tryFallback(ch,e,lang,chunks,file);
         if(!switched){
-          ch.status='error';ch.text=`[오류: ${e.message}]`;
+          ch.status='error';ch.text=`[오류: ${errMsg}]`;ch.errorMsg=errMsg;
         }
       }else{
-        ch.status='error';ch.text=`[오류: ${e.message}]`;
+        ch.status='error';ch.text=`[오류: ${errMsg}]`;ch.errorMsg=errMsg;
       }
     }
     renderChunks(chunks);
@@ -1347,24 +1348,39 @@ function askUserForOpenAI(ch){
 //  AUDIO CHUNK EXTRACTION
 // ═════════════════════════════════════════════════════════════════
 async function extractChunk(file,startSec,endSec){
-  const arrayBuf=await file.arrayBuffer();
-  const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  const decoded=await audioCtx.decodeAudioData(arrayBuf);
-  const sampleRate=16000;
-  const startSample=Math.floor(startSec*decoded.sampleRate);
-  const endSample=Math.min(Math.floor(endSec*decoded.sampleRate),decoded.length);
-  const length=endSample-startSample;
-  const offlineCtx=new OfflineAudioContext(1,Math.ceil(length*sampleRate/decoded.sampleRate),sampleRate);
-  const source=offlineCtx.createBufferSource();
-  const chunkBuf=audioCtx.createBuffer(decoded.numberOfChannels,length,decoded.sampleRate);
-  for(let c=0;c<decoded.numberOfChannels;c++){
-    const src=decoded.getChannelData(c),dst=chunkBuf.getChannelData(c);
-    for(let i=0;i<length;i++) dst[i]=src[startSample+i];
+  try{
+    const arrayBuf=await file.arrayBuffer();
+    const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    let decoded;
+    try{
+      decoded=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    }catch(decErr){
+      audioCtx.close();
+      // decodeAudioData failed — return original file as-is (API can handle most formats)
+      console.warn('decodeAudioData failed, sending original file:',decErr);
+      return file;
+    }
+    const sampleRate=16000;
+    const startSample=Math.floor(startSec*decoded.sampleRate);
+    const endSample=Math.min(Math.floor(endSec*decoded.sampleRate),decoded.length);
+    const length=endSample-startSample;
+    if(length<=0){audioCtx.close();return file;}
+    const offlineCtx=new OfflineAudioContext(1,Math.ceil(length*sampleRate/decoded.sampleRate),sampleRate);
+    const source=offlineCtx.createBufferSource();
+    const chunkBuf=audioCtx.createBuffer(decoded.numberOfChannels,length,decoded.sampleRate);
+    for(let c=0;c<decoded.numberOfChannels;c++){
+      const src=decoded.getChannelData(c),dst=chunkBuf.getChannelData(c);
+      for(let i=0;i<length;i++) dst[i]=src[startSample+i];
+    }
+    source.buffer=chunkBuf;source.connect(offlineCtx.destination);source.start();
+    const rendered=await offlineCtx.startRendering();
+    audioCtx.close();
+    return encodeWAV(rendered);
+  }catch(e){
+    console.error('extractChunk error:',e);
+    // Last resort: send original file directly
+    return file;
   }
-  source.buffer=chunkBuf;source.connect(offlineCtx.destination);source.start();
-  const rendered=await offlineCtx.startRendering();
-  audioCtx.close();
-  return encodeWAV(rendered);
 }
 
 function encodeWAV(buf){
@@ -1389,7 +1405,8 @@ function encodeWAV(buf){
 // ═════════════════════════════════════════════════════════════════
 async function transcribeGroq(blob,lang){
   const form=new FormData();
-  form.append('file',blob,'chunk.wav');
+  const fname=blob.name||('chunk.'+(blob.type?.includes('wav')?'wav':blob.type?.includes('mp4')?'m4a':blob.type?.includes('webm')?'webm':'wav'));
+  form.append('file',blob,fname);
   form.append('model','whisper-large-v3');
   form.append('response_format','verbose_json');
   if(lang&&lang!=='auto') form.append('language',lang);
@@ -1464,7 +1481,8 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 // ═════════════════════════════════════════════════════════════════
 async function transcribeOpenAI(blob,lang){
   const form=new FormData();
-  form.append('file',blob,'chunk.wav');
+  const fname=blob.name||('chunk.'+(blob.type?.includes('wav')?'wav':blob.type?.includes('mp4')?'m4a':blob.type?.includes('webm')?'webm':'wav'));
+  form.append('file',blob,fname);
   form.append('model','whisper-1');
   form.append('response_format','verbose_json');
   if(lang&&lang!=='auto') form.append('language',lang);
@@ -2626,11 +2644,13 @@ function renderChunks(chunks){
       ch.status==='error'?'var(--red)':'var(--text3)';
     const tag=ch.api==='skip'?'건너뜀':ch.api.toUpperCase();
     const tagCls='ca-'+(ch.api==='skip'?'skip':ch.api);
-    return`<div class="chunk-row">
+    const errInfo=ch.status==='error'&&ch.errorMsg?`<div style="font-size:11px;color:var(--red);margin-top:2px;word-break:break-all">${escHtml(ch.errorMsg).slice(0,120)}</div>`:'';
+    return`<div class="chunk-row" style="flex-wrap:wrap">
       <span class="cs" style="color:${iconColor};font-weight:600">${icon}</span>
       <span class="ci">청크 ${ch.index+1}</span>
       <span class="ct">${fmtTime(ch.startSec)}–${fmtTime(ch.endSec)}</span>
       <span class="ca ${tagCls}">${tag}</span>
+      ${errInfo}
     </div>`;
   }).join('');
 }
@@ -2822,6 +2842,16 @@ _checkIOSInstall();
 //  INIT
 // ═════════════════════════════════════════════════════════════════
 loadState();
+
+// Resume app when returning from background (home button etc.)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    updateQuotaUI();
+  }
+});
+
+// Ensure clicks work after page becomes visible (iOS PWA can freeze event handlers)
+document.addEventListener('touchstart',function(){},true);
 </script>
 </body>
 </html>
