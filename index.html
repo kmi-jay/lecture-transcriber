@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.11</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.12</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1350,9 +1350,9 @@ async function startTranscription(){
     renderChunks(chunks);
   }
 
-  // Merge
+  // Merge + hallucination filter
   updateProgress(nChunks,nChunks,'결과 병합 중...');
-  const fullText=mergeChunks(chunks);
+  const fullText=_removeHallucinations(mergeChunks(chunks));
   const langName=document.getElementById('pre-language').selectedOptions[0].text;
   document.getElementById('res-info').textContent=`${file.name} · ${(duration/60).toFixed(1)}분 · ${langName}`;
   document.getElementById('res-full').textContent=fullText;
@@ -1829,6 +1829,49 @@ function mergeChunks(chunks){
     }
   }
   return merged;
+}
+
+// ── Hallucination detection & removal ──
+// Whisper often generates repeated short phrases during silence (e.g., "아멘" x20, "감사합니다" x10)
+function _removeHallucinations(text){
+  if(!text||text.length<100) return text;
+  const lines=text.split('\n\n');
+  if(lines.length<3) return text;
+
+  // Pass 1: Detect repeated short segments (hallucination signature)
+  // A line whose core text (minus timestamp/speaker) is very short and repeats 3+ times in a row
+  const cleaned=[];
+  let repeatCount=0;
+  let lastCore='';
+  let hallucinationRemoved=0;
+
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line){cleaned.push(line);continue}
+    // Extract core text (strip timestamp [MM:SS] and speaker [화자 X] tags)
+    const core=line.replace(/\[[\d:]+\]\s*/g,'').replace(/\[화자\s*\w*\]\s*/g,'').trim();
+    // Short line (<15 chars) repeating = hallucination
+    if(core.length<15&&core===lastCore){
+      repeatCount++;
+      if(repeatCount>=2){
+        hallucinationRemoved++;
+        continue; // skip this hallucinated line
+      }
+    }else{
+      repeatCount=0;
+      lastCore=core;
+    }
+    cleaned.push(line);
+  }
+
+  // Pass 2: Known hallucination patterns — single-pass regex on the result
+  let result=cleaned.join('\n\n');
+  // Remove lines that are ONLY common Whisper hallucinations
+  const halluPatterns=/^\[[\d:]+\]\s*(?:\[화자\s*\w*\]\s*)?(?:아멘|감사합니다|다음 영상에서 만나요|구독과 좋아요|좋아요와 구독|시청해 주셔서 감사합니다|MBC 뉴스|자막 제공|자막 - Loss|SBS|KBS|MBC)\.?\s*$/gm;
+  result=result.replace(halluPatterns,'').replace(/\n{3,}/g,'\n\n').trim();
+
+  if(hallucinationRemoved>0) console.log(`[Hallucination filter] Removed ${hallucinationRemoved} hallucinated segments`);
+  return result;
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -2742,28 +2785,52 @@ function _buildRefinePrompt(useKorean){
   return useKorean
     ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 전문적으로 교정하는 편집자입니다.
 
-[핵심 문제] 음성인식이 전사할 때 다음과 같은 심각한 오류가 빈번하게 발생합니다:
-1. **외국 문자 혼입** — 한자, 일본어, 아랍어 등이 무작위로 삽입됨
-2. **영어 음차 표기** — "audit department"가 "오디트 디파트먼트"로 표기됨
-3. **발음 유사 단어 혼동** — 관리직↔관리적, 감사↔검사
-4. **전문 용어 오인식** — 도메인 전문 용어가 엉뚱한 한국어로 변환
-5. **환각 반복** — 같은 구절이 의미 없이 2~3회 반복
-6. **의미 없는 filler** — "네 네 네", "그래서 그래서" 과도한 반복
+[핵심 문제] 음성인식이 전사할 때 다음 오류가 빈번합니다:
+
+1. **환각(hallucination)** — 침묵 구간에서 "아멘", "감사합니다", "다음 영상에서 만나요" 등 무관한 텍스트가 반복 생성됨 → 완전히 제거
+2. **외국 문자 혼입** — 한자, 일본어, 아랍어 등이 무작위 삽입 → 문맥에 맞는 한국어로 대체
+3. **전문 용어 오인식** — 도메인 전문 용어가 엉뚱한 단어로 변환. 빈출 오류:
+   - "도면/동행/도메인" → 문맥상 "도메인" (IT 감사 도메인)
+   - "감시/감정/강좌" → "감사" (audit)
+   - "감상/감소" → "감사" (audit)
+   - "형사통제" → "탐지통제" (detective control)
+   - "정정" → "교정" (corrective)
+   - "에스쿨호/에스크로우" → "에스크로" (escrow)
+   - "가스" → "GAS" (Generalized Audit Software) — 일반화된 감사 소프트웨어
+   - "속재/소급제" → "소프트웨어" (software)
+   - "성수도/성숙도" → "성숙도" (maturity)
+   - "중법/준법" → "준법" (compliance)
+   - "컷/컨트롤" → "컨트롤" (control)
+   - "보정/보증" → "보증" (assurance) 또는 "보상" (compensating)
+   - "CAAT/CAT/CD" → "CAAT" (Computer Assisted Audit Techniques)
+   - "플러닝 워크/프레임워크" → "프레임워크" (framework)
+4. **발음 유사 단어 혼동** — "관리직↔관리적", "감사↔검사", "정성적↔정상적"
+5. **영어 음차** — "오디트"→"감사", "리스크"→"위험", "컴플라이언트"→"준거성"
+6. **동일 문장 반복** — 같은 내용이 2~3회 연속 반복
+7. **필러 과다** — "네 네 네", "그래서 그래서" 등
 
 [교정 규칙]
-1) 한국어가 아닌 모든 문자를 완전히 제거하고 문맥상 올바른 한국어로 대체
-2) 영어 문장은 한국어로 번역. IT 약어(CISA, ISO 등)는 유지
-3) 영어 음차를 한국어로: "오디트"→"감사", "리스크"→"위험"
-4) 동일 문장 2회 이상 반복 → 1회만
-5) [MM:SS] 타임스탬프, [화자 X] 태그 반드시 유지
-6) 내용 요약·축약 금지 — 오류 교정만
-7) 교정된 본문만 출력 — 설명 없이`
+1) 환각 구간(무관한 반복 텍스트) 완전 제거
+2) 한국어가 아닌 문자 → 문맥상 올바른 한국어로 대체
+3) 영어 문장 한국어 번역. IT/감사 약어(CISA, ISO, COBIT, GAS, CAAT, ALE, BIA 등)는 영문 유지
+4) 위 전문용어 오인식 목록 참고하여 적극 교정
+5) 동일 문장 2회 이상 반복 → 1회만
+6) [MM:SS] 타임스탬프, [화자 X] 태그 반드시 유지
+7) 내용 요약·축약 절대 금지 — 오류 교정만 수행
+8) 교정된 본문만 출력 — 설명 없이`
     :`You are a professional editor correcting speech-to-text transcripts.
 
+[Common STT Errors]
+1. Hallucination — irrelevant repeated text during silence (e.g., "amen", "thank you") → remove entirely
+2. Domain terminology misrecognized — fix based on context (audit, governance, risk, control terms)
+3. Foreign characters randomly inserted → replace with correct words
+4. Duplicate sentences → keep first occurrence only
+5. Excessive filler words → reduce
+
 [Rules]
-1) Remove foreign characters that don't belong; replace with correct words from context
-2) Keep technical abbreviations in original language
-3) Remove duplicate sentences, keep first occurrence only
+1) Remove hallucinated/irrelevant repeated segments completely
+2) Fix domain terminology errors using context
+3) Keep technical abbreviations (CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, etc.)
 4) Preserve [MM:SS] timestamps and [Speaker X] tags exactly
 5) Don't summarize or shorten — only correct errors
 6) Output corrected text only, no explanations`;
