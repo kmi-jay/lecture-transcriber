@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.12</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.13</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -834,13 +834,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="field" style="margin-bottom:0">
         <div class="field-label">청크 길이</div>
         <select id="set-chunk-min">
-          <option value="5">5분</option>
-          <option value="10" selected>10분 (권장)</option>
+          <option value="10">10분</option>
           <option value="15">15분</option>
+          <option value="20">20분</option>
+          <option value="25" selected>25분 (권장)</option>
+          <option value="0">분할 없음 (전체)</option>
         </select>
       </div>
       <p style="font-size:12px;color:var(--text3);margin-top:8px">
-        긴 강의는 청크 단위로 분할됩니다. 10분이 품질과 효율의 균형점.
+        청크가 클수록 전사 품질이 높아집니다. Groq/OpenAI는 25MB(~25분) 제한.
+        AssemblyAI·Gemini는 분할 없이도 가능합니다.
       </p>
     </div>
   </div>
@@ -898,7 +901,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 // ═════════════════════════════════════════════════════════════════
 let state = {
   groqKey:'', assemblyaiKey:'', openaiKey:'', geminiKey:'', claudeKey:'',
-  chunkMin:10,
+  chunkMin:25,
   llmProvider:'auto', // auto | groq | gemini | claude
   quota:{ date:'', usedSec:0 },
   history:[],
@@ -1135,8 +1138,8 @@ function getAudioDuration(file){
 function showPrecheck(){
   const{file,duration}=currentAudio;
   const durMin=(duration/60).toFixed(1);
-  const chunkSec=state.chunkMin*60;
-  const nChunks=Math.ceil(duration/chunkSec);
+  const chunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
+  const nChunks=chunkSec===Infinity?1:Math.ceil(duration/chunkSec);
   const remainSec=getGroqRemainSec();
   const remainMin=Math.round(remainSec/60);
   const sizeMB=(file.size/1024/1024).toFixed(1);
@@ -1253,16 +1256,25 @@ async function startTranscription(){
   showPage('process');
 
   const{file,duration}=currentAudio;
-  const chunkSec=state.chunkMin*60;
-  const nChunks=Math.ceil(duration/chunkSec);
+  // chunkMin=0 means no splitting; otherwise clamp by API limits
+  // Groq/OpenAI Whisper: ~25MB → ~25min WAV; AssemblyAI/Gemini: no limit
+  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity};
+  const userChunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
+  // Determine effective chunk size per chosen API
+  function _effectiveChunkSec(api){
+    const limit=apiChunkLimits[api]||25*60;
+    return Math.min(userChunkSec,limit);
+  }
+  const defaultChunkSec=Math.min(userChunkSec,25*60); // conservative default
+  const nChunks=userChunkSec===Infinity?1:Math.ceil(duration/defaultChunkSec);
 
   // Build chunk plan
   const chunks=[];
   let remainGroq=getGroqRemainSec();
 
   for(let i=0;i<nChunks;i++){
-    const startSec=Math.max(0,i*chunkSec-(i>0?OVERLAP_SEC:0));
-    const endSec=Math.min(duration,(i+1)*chunkSec);
+    const startSec=Math.max(0,i*defaultChunkSec-(i>0?OVERLAP_SEC:0));
+    const endSec=userChunkSec===Infinity?duration:Math.min(duration,(i+1)*defaultChunkSec);
     const chunkDur=endSec-startSec;
 
     let api;
@@ -1526,8 +1538,11 @@ async function transcribeGroq(blob,lang){
   form.append('file',blob,fname);
   form.append('model','whisper-large-v3');
   form.append('response_format','verbose_json');
-  // 'multi' = multilingual mode: don't force language so Whisper auto-detects per segment
-  if(lang&&lang!=='auto'&&lang!=='multi') form.append('language',lang);
+  form.append('temperature','0');
+  // 'multi'/'auto' = multilingual mode: don't force language so Whisper auto-detects
+  // For bilingual lectures (ko+en), NOT setting language gives better results
+  if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
+  // For Korean: don't force 'ko' as it causes English to be transliterated to Korean
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
@@ -1612,7 +1627,9 @@ async function transcribeOpenAI(blob,lang){
   form.append('file',blob,fname);
   form.append('model','whisper-1');
   form.append('response_format','verbose_json');
-  if(lang&&lang!=='auto'&&lang!=='multi') form.append('language',lang);
+  form.append('temperature','0');
+  // Don't force Korean — let Whisper auto-detect for bilingual audio
+  if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   const res=await _fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
@@ -1629,8 +1646,25 @@ async function transcribeGemini(blob,lang){
   const langName={ko:'한국어',en:'English',ja:'日本語',zh:'中文',es:'Español',fr:'Français',de:'Deutsch',it:'Italiano',hi:'Hindi',ar:'العربية',ru:'Русский',auto:'(자동 감지)',multi:'다국어'}[lang]||lang;
   const isMulti=(lang==='multi'||lang==='auto');
   const prompt=isMulti
-    ?'이 오디오를 있는 그대로 전사해 주세요. 영어는 영어로, 한국어는 한국어로, 각 언어를 원래 언어 그대로 전사하세요. 번역하거나 음차하지 마세요. 타임스탬프 없이 텍스트만 출력하세요.'
-    :`이 오디오를 ${langName}로 전사해 주세요. 타임스탬프 없이 텍스트만 출력하세요. 다른 설명이나 주석 없이 순수한 전사 텍스트만 출력하세요.`;
+    ?`이 오디오를 있는 그대로 빠짐없이 전사해 주세요.
+
+중요 규칙:
+1. 영어는 영어로, 한국어는 한국어로, 각 언어를 원래 언어 그대로 전사하세요.
+2. 절대 번역하지 마세요. 영어 발화를 한국어로 번역하거나 음차(phonetic transcription)하지 마세요.
+3. 모든 발화 내용을 빠짐없이 전사하세요. 요약하거나 축약하지 마세요.
+4. 타임스탬프 없이 텍스트만 출력하세요.
+5. 같은 문장을 반복하지 마세요.
+6. 침묵 구간에 "감사합니다", "구독" 등 환각 텍스트를 생성하지 마세요.
+7. 전문 용어(CISA, audit, governance, compliance 등)는 원어 그대로 유지하세요.`
+    :`이 오디오를 ${langName}로 전사해 주세요.
+
+중요 규칙:
+1. 모든 발화 내용을 빠짐없이 전사하세요. 요약하거나 축약하지 마세요.
+2. 영어 전문용어가 나오면 영어 원문 그대로 유지하세요 (예: audit, compliance, governance, CISA).
+3. 영어를 한국어로 음차하지 마세요 (예: "오디트"가 아니라 "audit"으로).
+4. 같은 문장을 반복하지 마세요.
+5. 침묵 구간에 무관한 텍스트를 생성하지 마세요.
+6. 타임스탬프 없이 텍스트만 출력하세요.`;
   const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
   const res=await _fetchWithTimeout(url,{
@@ -1641,9 +1675,9 @@ async function transcribeGemini(blob,lang){
         {inline_data:{mime_type:'audio/wav',data:base64}},
         {text:prompt}
       ]}],
-      generationConfig:{temperature:0.1,maxOutputTokens:8000}
+      generationConfig:{temperature:0.1,maxOutputTokens:65536}
     })
-  },180000);
+  },300000); // 5 min timeout for full audio transcription
   if(!res.ok) throw new LLMError('gemini',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
   const data=await res.json();
   const text=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -1831,47 +1865,142 @@ function mergeChunks(chunks){
   return merged;
 }
 
-// ── Hallucination detection & removal ──
-// Whisper often generates repeated short phrases during silence (e.g., "아멘" x20, "감사합니다" x10)
+// ── Hallucination detection & removal (v4.13 — comprehensive) ──
+function _extractCore(line){
+  return line.replace(/\[[\d:]+\]\s*/g,'').replace(/\[화자\s*\w*\]\s*/g,'').trim();
+}
 function _removeHallucinations(text){
   if(!text||text.length<100) return text;
   const lines=text.split('\n\n');
-  if(lines.length<3) return text;
+  if(lines.length<2) return text;
 
-  // Pass 1: Detect repeated short segments (hallucination signature)
-  // A line whose core text (minus timestamp/speaker) is very short and repeats 3+ times in a row
-  const cleaned=[];
+  // ── Pass 1: Remove lines whose core text repeats ≥3 times consecutively ──
+  // Now handles ANY length (not just <15 chars) and fuzzy matching (80% similarity)
+  const pass1=[];
   let repeatCount=0;
   let lastCore='';
-  let hallucinationRemoved=0;
+  let halluRemoved=0;
 
   for(let i=0;i<lines.length;i++){
     const line=lines[i].trim();
-    if(!line){cleaned.push(line);continue}
-    // Extract core text (strip timestamp [MM:SS] and speaker [화자 X] tags)
-    const core=line.replace(/\[[\d:]+\]\s*/g,'').replace(/\[화자\s*\w*\]\s*/g,'').trim();
-    // Short line (<15 chars) repeating = hallucination
-    if(core.length<15&&core===lastCore){
+    if(!line){pass1.push(line);continue}
+    const core=_extractCore(line);
+    if(!core){pass1.push(line);continue}
+    // Exact or near-exact match (covers speaker tag variations)
+    const isSame=core===lastCore||
+      (core.length>5&&lastCore.length>5&&(core.includes(lastCore)||lastCore.includes(core)))||
+      (core.length>10&&lastCore.length>10&&_simRatio(core,lastCore)>0.8);
+    if(isSame){
       repeatCount++;
-      if(repeatCount>=2){
-        hallucinationRemoved++;
-        continue; // skip this hallucinated line
-      }
+      if(repeatCount>=2){halluRemoved++;continue}
     }else{
       repeatCount=0;
       lastCore=core;
     }
-    cleaned.push(line);
+    pass1.push(line);
   }
 
-  // Pass 2: Known hallucination patterns — single-pass regex on the result
-  let result=cleaned.join('\n\n');
-  // Remove lines that are ONLY common Whisper hallucinations
-  const halluPatterns=/^\[[\d:]+\]\s*(?:\[화자\s*\w*\]\s*)?(?:아멘|감사합니다|다음 영상에서 만나요|구독과 좋아요|좋아요와 구독|시청해 주셔서 감사합니다|MBC 뉴스|자막 제공|자막 - Loss|SBS|KBS|MBC)\.?\s*$/gm;
+  // ── Pass 2: Detect intra-line repetition (phrase repeated 4+ times within a single line) ──
+  const pass2=pass1.map(line=>{
+    const core=_extractCore(line);
+    if(core.length<20) return line;
+    // Find repeated n-gram phrases (3~30 chars) within the core
+    const cleaned=_deduplicatePhrasesInLine(core);
+    if(cleaned.length<core.length*0.5){
+      // More than half was repetition → likely hallucination, reduce to single instance
+      halluRemoved++;
+    }
+    if(cleaned!==core){
+      return line.replace(core,cleaned);
+    }
+    return line;
+  });
+
+  // ── Pass 3: Merge fragmented speaker segments (diarization fix) ──
+  // If consecutive lines from different speakers are each <60 chars and appear within 5s,
+  // merge them into one line (the diarization split sentences across speakers)
+  const pass3=[];
+  let mergeBuffer=null;
+  for(let i=0;i<pass2.length;i++){
+    const line=pass2[i].trim();
+    if(!line){if(mergeBuffer){pass3.push(mergeBuffer);mergeBuffer=null}pass3.push(line);continue}
+    const core=_extractCore(line);
+    const tsMatch=line.match(/^\[(\d+:?\d*:?\d+)\]/);
+    const speakerMatch=line.match(/\[화자\s*(\w+)\]/);
+    // Short fragment from diarization?
+    if(core.length<80&&speakerMatch&&tsMatch){
+      if(mergeBuffer){
+        // Check time proximity (within 10s)
+        const prevTs=mergeBuffer.match(/^\[(\d+:?\d*:?\d+)\]/);
+        if(prevTs&&_tsToSec(tsMatch[1])-_tsToSec(prevTs[1])<10){
+          // Merge: append core text to buffer
+          const bufCore=_extractCore(mergeBuffer);
+          mergeBuffer=mergeBuffer.replace(bufCore,bufCore+' '+core);
+          continue;
+        }else{
+          pass3.push(mergeBuffer);
+          mergeBuffer=line;
+        }
+      }else{
+        mergeBuffer=line;
+      }
+    }else{
+      if(mergeBuffer){pass3.push(mergeBuffer);mergeBuffer=null}
+      pass3.push(line);
+    }
+  }
+  if(mergeBuffer) pass3.push(mergeBuffer);
+
+  // ── Pass 4: Known hallucination patterns ──
+  let result=pass3.join('\n\n');
+  const halluPatterns=/^\[[\d:]+\]\s*(?:\[화자\s*\w*\]\s*)?(?:아멘|감사합니다|다음 영상에서 만나요|구독과 좋아요|좋아요와 구독|시청해 주셔서 감사합니다|MBC 뉴스|자막 제공|자막 - Loss|SBS|KBS|MBC|더미|더미 더미)\.?\s*$/gm;
   result=result.replace(halluPatterns,'').replace(/\n{3,}/g,'\n\n').trim();
 
-  if(hallucinationRemoved>0) console.log(`[Hallucination filter] Removed ${hallucinationRemoved} hallucinated segments`);
+  if(halluRemoved>0) console.log(`[Hallucination filter v2] Removed ${halluRemoved} segments`);
   return result;
+}
+
+// Similarity ratio (0~1) — simple character overlap
+function _simRatio(a,b){
+  if(!a||!b) return 0;
+  const short=a.length<b.length?a:b;
+  const long=a.length<b.length?b:a;
+  let matches=0;
+  for(let i=0;i<short.length;i++){
+    if(long.includes(short[i])) matches++;
+  }
+  return matches/long.length;
+}
+
+// Deduplicate repeated phrases within a single line
+function _deduplicatePhrasesInLine(text){
+  if(text.length<30) return text;
+  // Try phrase lengths from long to short
+  for(let pLen=Math.min(50,Math.floor(text.length/3));pLen>=5;pLen--){
+    for(let start=0;start<=text.length-pLen*3;start++){
+      const phrase=text.slice(start,start+pLen).trim();
+      if(phrase.length<5) continue;
+      const escaped=phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const rx=new RegExp(escaped,'g');
+      const matches=(text.match(rx)||[]).length;
+      if(matches>=4){
+        // Keep first occurrence, remove subsequent
+        const first=text.indexOf(phrase);
+        const before=text.slice(0,first+phrase.length);
+        const after=text.slice(first+phrase.length).replace(new RegExp('\\s*'+escaped,'g'),'');
+        return (before+' '+after.trim()).replace(/\s{2,}/g,' ').trim();
+      }
+    }
+  }
+  return text;
+}
+
+// Parse timestamp string to seconds
+function _tsToSec(ts){
+  const parts=ts.split(':').map(Number);
+  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2) return parts[0]*60+parts[1];
+  return parts[0]||0;
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1992,11 +2121,11 @@ function showLLMErrorModal(err, retryFn){
 // ── API call functions with structured errors ──
 // ── Provider registry — single source of truth for labels, costs, limits ──
 const PROVIDERS={
-  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:4000, canTranscribe:true,  canPostProcess:true},
-  gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:200000, maxTokens:8000, canTranscribe:true,  canPostProcess:true},
+  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:8000, canTranscribe:true,  canPostProcess:true},
+  gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:800000, maxTokens:65536,canTranscribe:true,  canPostProcess:true},
   assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
-  claude:{label:'Claude',          costLabel:'~₩3~5/분', costPerMin:4,   free:false, inputChars:80000,  maxTokens:6000, canTranscribe:false, canPostProcess:true},
-  openai:{label:'OpenAI',          costLabel:'~₩1~2/분', costPerMin:1.5, free:false, inputChars:50000,  maxTokens:4000, canTranscribe:true,  canPostProcess:true},
+  claude:{label:'Claude',          costLabel:'~₩3~5/분', costPerMin:4,   free:false, inputChars:150000, maxTokens:16000,canTranscribe:false, canPostProcess:true},
+  openai:{label:'OpenAI',          costLabel:'~₩1~2/분', costPerMin:1.5, free:false, inputChars:100000, maxTokens:16384,canTranscribe:true,  canPostProcess:true},
 };
 function _getLLMLimits(provider){const p=PROVIDERS[provider];return p?{inputChars:p.inputChars,maxTokens:p.maxTokens}:{inputChars:50000,maxTokens:4000}}
 function _provLabel(provider){return PROVIDERS[provider]?.label||provider}
@@ -2036,15 +2165,17 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
 async function callGemini(systemPrompt,userPrompt,maxTok){
   const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
+  const effectiveMax=maxTok||PROVIDERS.gemini.maxTokens;
+  const timeoutMs=effectiveMax>16000?300000:180000; // longer timeout for large outputs
   const res=await _fetchWithTimeout(url,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       system_instruction:{parts:[{text:systemPrompt}]},
       contents:[{parts:[{text:userPrompt}]}],
-      generationConfig:{temperature:0.3,maxOutputTokens:maxTok||PROVIDERS.gemini.maxTokens}
+      generationConfig:{temperature:0.3,maxOutputTokens:effectiveMax}
     })
-  },180000);
+  },timeoutMs);
   if(!res.ok){
     const retryAfter=parseInt(res.headers.get('retry-after'))||null;
     throw new LLMError('gemini',res.status,await res.text(),retryAfter);
@@ -2183,8 +2314,8 @@ function buildSummaryPrompts(transcriptText,lang,provider){
   const lenMin=Math.round(transcriptText.length/500); // rough minutes estimate
   // Scale detail level based on transcript length
   const isLong=transcriptText.length>20000;
-  const pointCount=isLong?Math.max(20,Math.round(lenMin/5))+'개 이상':'8~15개';
-  const pointCountEn=isLong?Math.max(20,Math.round(lenMin/5))+'+ points':'8-15 points';
+  const pointCount=isLong?Math.max(30,Math.round(lenMin/3))+'개 이상':'10~20개';
+  const pointCountEn=isLong?Math.max(30,Math.round(lenMin/3))+'+ points':'10-20 points';
   const systemPrompt=useKorean
     ?`당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요.
 
@@ -2268,9 +2399,9 @@ async function _runSummary(provider,transcriptText,lang){
     const outLang2=_getOutputLang();
     const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
     const sp=useK
-      ?'다음은 긴 강의 전사의 일부입니다. 이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 2~3문장으로 내용과 맥락을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거를 반드시 포함하세요. 절대 간략히 쓰지 마세요.'
-      :'This is a portion of a long lecture transcript. Extract ALL key points from this section with 2-3 sentences of explanation each. Include timestamps, definitions, examples, arguments. Do NOT abbreviate. Use markdown.';
-    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?16000:provider==='claude'?16000:8000);
+      ?'다음은 긴 강의 전사의 일부입니다. 이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'
+      :'This is a portion of a long lecture transcript. Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.';
+    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
     finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
@@ -2278,7 +2409,7 @@ async function _runSummary(provider,transcriptText,lang){
 
   const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
   // Scale output tokens — long lectures need more output
-  const scaledSumMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(finalText.length/10)),provider==='gemini'?16000:provider==='claude'?16000:8000);
+  const scaledSumMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(finalText.length/10)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
   const _sumTimer=_startLiveTimer(summaryEl,isLong?'2단계: 종합 요약 생성 중':'요약 생성 중',label);
 
   try{
@@ -2606,10 +2737,10 @@ async function generateNotesFromText(transcriptText,lang){
   // For very long transcripts: each chunk gets the FULL template prompt → concatenate directly (no lossy merge)
   if(isLong){
     const chunkSp=useKorean
-      ?systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 2~4문장으로 충분히 설명하세요. 간략히 쓰지 마세요.'
-      :systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, and argument from this section. Each point must be 2-4 sentences with full explanation. Do NOT abbreviate.';
+      ?systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거, 비교, 실무 포인트를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 충분히 설명하세요. "왜 중요한지", "어떻게 작동하는지", "실무/시험에서 어떻게 나오는지"를 반드시 포함하세요. 간략히 쓰지 마세요. 최대한 길고 상세하게 작성하세요.'
+      :systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, argument, comparison, and practical point. Each point must be 3-5 sentences with full explanation including WHY it matters and HOW it works. Be as thorough and detailed as possible. Do NOT abbreviate.';
     // Scale output tokens: long chunks need long output
-    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?16000:provider==='claude'?16000:8000);
+    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
     const partials=await _processChunks(provider,transcriptText,(ci)=>chunkSp,notesEl,label,chunkMaxTok);
     // Direct concatenation — no double-compression
     const result=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
@@ -2626,7 +2757,7 @@ async function generateNotesFromText(transcriptText,lang){
     ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요. 모든 핵심 내용을 빠짐없이 포함하고, 각 포인트를 2~4문장으로 충분히 설명하세요.\n\n${transcriptText.slice(0,limits.inputChars)}`
     :`Analyze the following transcript and write notes in the format above, in English. Include ALL key insights — each point with 2-4 sentences of explanation.\n\n${transcriptText.slice(0,limits.inputChars)}`;
   // Scale output tokens with input length
-  const scaledMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(transcriptText.length/8)),provider==='gemini'?16000:provider==='claude'?16000:8000);
+  const scaledMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(transcriptText.length/8)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
   const _notesTimer=_startLiveTimer(notesEl,`노트 생성 중 (${templateNames[template]||'표준'})`,label);
 
   try{
@@ -2787,53 +2918,73 @@ function _buildRefinePrompt(useKorean){
 
 [핵심 문제] 음성인식이 전사할 때 다음 오류가 빈번합니다:
 
-1. **환각(hallucination)** — 침묵 구간에서 "아멘", "감사합니다", "다음 영상에서 만나요" 등 무관한 텍스트가 반복 생성됨 → 완전히 제거
-2. **외국 문자 혼입** — 한자, 일본어, 아랍어 등이 무작위 삽입 → 문맥에 맞는 한국어로 대체
-3. **전문 용어 오인식** — 도메인 전문 용어가 엉뚱한 단어로 변환. 빈출 오류:
-   - "도면/동행/도메인" → 문맥상 "도메인" (IT 감사 도메인)
+1. **환각(hallucination)** — 침묵 구간에서 "아멘", "감사합니다", "더미", "시청해 주셔서 감사합니다" 등 반복 → 완전히 제거
+2. **반복 루프** — 같은 구절이 3회 이상 반복 (예: "포트폴리오는 자산을 의미하는 포트폴리오입니다" x50) → 1회만 유지
+3. **영어 음차(transliteration)** — 영어 용어를 한국어로 음차한 것을 원래 영어로 복원:
+   - "오디트/오디션" → "audit"
+   - "오디트 디바트먼트" → "audit department"
+   - "인터널 오디티 펑션" → "internal audit function"
+   - "오디트 챠터/오디큐 차트" → "audit charter"
+   - "리스크" → "risk"
+   - "컴플라이언스/컴플라이언트" → "compliance"
+   - "매니지먼트" → "management"
+   - "프레임워크" → "framework"
+   - "거버넌스/버거런스" → "governance"
+   - "인테그리티" → "integrity"
+   - "디바트먼트" → "department"
+   - "아티피셜 인텔리전스" → "artificial intelligence"
+   - "논 래플리케이션/논 레퓨디에이션" → "non-repudiation"
+4. **전문 용어 오인식** — 도메인 전문 용어 교정:
+   - "도면/동행" → "도메인" (domain)
    - "감시/감정/강좌" → "감사" (audit)
-   - "감상/감소" → "감사" (audit)
+   - "수소 테스트" → "substantive testing"
    - "형사통제" → "탐지통제" (detective control)
-   - "정정" → "교정" (corrective)
-   - "에스쿨호/에스크로우" → "에스크로" (escrow)
-   - "가스" → "GAS" (Generalized Audit Software) — 일반화된 감사 소프트웨어
-   - "속재/소급제" → "소프트웨어" (software)
-   - "성수도/성숙도" → "성숙도" (maturity)
-   - "중법/준법" → "준법" (compliance)
-   - "컷/컨트롤" → "컨트롤" (control)
-   - "보정/보증" → "보증" (assurance) 또는 "보상" (compensating)
-   - "CAAT/CAT/CD" → "CAAT" (Computer Assisted Audit Techniques)
-   - "플러닝 워크/프레임워크" → "프레임워크" (framework)
-4. **발음 유사 단어 혼동** — "관리직↔관리적", "감사↔검사", "정성적↔정상적"
-5. **영어 음차** — "오디트"→"감사", "리스크"→"위험", "컴플라이언트"→"준거성"
-6. **동일 문장 반복** — 같은 내용이 2~3회 연속 반복
-7. **필러 과다** — "네 네 네", "그래서 그래서" 등
+   - "극복 컨트롤" → "corrective control"
+   - "규정 조절" → "deterrent control"
+   - "관계자들/수사자들/검사원" → "감사인/auditor" (문맥에 따라)
+   - "사물 크기/수정 사이즈" → "sample size"
+   - "자신감 수준" → "confidence level / 신뢰 수준"
+   - "인터넷 컨트롤" → "internal control / 내부 통제"
+   - "재료 아이템" → "material misstatement / 중요한 왜곡표시"
+   - "적절한 확률" → "reasonable assurance / 합리적 확신"
+   - "꽈락/과략" → "과락"
+   - "시질적으로" → "실질적으로"
+   - "찬연도/찬염도" → "차년도"
+   - "수입" → "수립" (문맥상 '계획 수립'일 때)
+5. **화자 분할 오류** — 한 문장이 [화자 A], [화자 B], [화자 C]로 2~3초 간격으로 분할됨 → 의미 단위로 병합
+6. **외국 문자 혼입** — 아랍어, 히브리어 등 무작위 삽입 → 제거
+7. **필러 과다** — "네 네 네", "그래서 그래서" 등 → 정리
 
 [교정 규칙]
-1) 환각 구간(무관한 반복 텍스트) 완전 제거
-2) 한국어가 아닌 문자 → 문맥상 올바른 한국어로 대체
-3) 영어 문장 한국어 번역. IT/감사 약어(CISA, ISO, COBIT, GAS, CAAT, ALE, BIA 등)는 영문 유지
-4) 위 전문용어 오인식 목록 참고하여 적극 교정
-5) 동일 문장 2회 이상 반복 → 1회만
-6) [MM:SS] 타임스탬프, [화자 X] 태그 반드시 유지
+1) 환각/반복 루프 완전 제거 (1회만 유지)
+2) 영어 음차 → 영어 원문 복원 (audit, compliance, governance 등)
+3) 영어 문장은 영어 그대로 유지. 번역하지 마세요.
+4) IT/감사 약어(CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, RTO, RPO, BCP, SLA 등) 영문 유지
+5) 화자 분할이 잘못된 경우 의미 단위로 병합 (타임스탬프는 첫 번째 것 유지)
+6) [MM:SS] 타임스탬프 유지
 7) 내용 요약·축약 절대 금지 — 오류 교정만 수행
 8) 교정된 본문만 출력 — 설명 없이`
     :`You are a professional editor correcting speech-to-text transcripts.
 
 [Common STT Errors]
-1. Hallucination — irrelevant repeated text during silence (e.g., "amen", "thank you") → remove entirely
-2. Domain terminology misrecognized — fix based on context (audit, governance, risk, control terms)
-3. Foreign characters randomly inserted → replace with correct words
-4. Duplicate sentences → keep first occurrence only
-5. Excessive filler words → reduce
+1. Hallucination — irrelevant repeated text during silence → remove entirely
+2. Repetition loops — same phrase repeated 3+ times → keep only once
+3. Korean transliteration of English terms — restore to original English (e.g., "오디트"→"audit")
+4. Domain terminology misrecognized — fix based on context (audit, governance, risk, control terms)
+5. Speaker fragmentation — one sentence split across multiple speakers → merge into coherent units
+6. Foreign characters randomly inserted → remove
+7. Duplicate sentences → keep first occurrence only
+8. Excessive filler words → reduce
 
 [Rules]
-1) Remove hallucinated/irrelevant repeated segments completely
-2) Fix domain terminology errors using context
-3) Keep technical abbreviations (CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, etc.)
-4) Preserve [MM:SS] timestamps and [Speaker X] tags exactly
-5) Don't summarize or shorten — only correct errors
-6) Output corrected text only, no explanations`;
+1) Remove hallucinated/repeated segments completely (keep 1 instance)
+2) Restore Korean transliterations to English originals
+3) Keep English sentences in English — do NOT translate
+4) Keep technical abbreviations (CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, etc.)
+5) Merge fragmented speaker segments into meaningful units
+6) Preserve [MM:SS] timestamps
+7) Don't summarize or shorten — only correct errors
+8) Output corrected text only, no explanations`;
 }
 
 async function refineTranscript(){
@@ -2852,8 +3003,8 @@ async function refineTranscript(){
   btn.disabled=true;
   const label=_provLabelWithCost(provider);
   const limits=_getLLMLimits(provider);
-  // For refinement, output ≈ input length — use larger token limit than for summary
-  const refineMaxTok=Math.min(Math.ceil(srcText.length/3)+2000, provider==='gemini'?8000:provider==='claude'?8000:4000);
+  // For refinement, output ≈ input length — needs large token limit
+  const refineMaxTok=Math.min(Math.ceil(srcText.length/2)+4000, provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
   const isLong=srcText.length>limits.inputChars;
 
   const outLang=_getOutputLang();
@@ -3008,7 +3159,7 @@ ${contextText}`;
         body:JSON.stringify({
           system_instruction:{parts:[{text:systemPrompt}]},
           contents:gemContents,
-          generationConfig:{temperature:0.4,maxOutputTokens:1000}
+          generationConfig:{temperature:0.4,maxOutputTokens:4000}
         })
       });
       if(!res.ok) throw new LLMError('gemini',res.status,await res.text(),null);
