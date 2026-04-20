@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.15</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.16</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -486,7 +486,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
         <b>AssemblyAI</b> — 무료 크레딧. 한국어 전용 모델 사용. 화자분리(diarization) 지원. 영어 용어 인식 우수하나 문장이 파편화될 수 있음.<br>
         <b>Gemini</b> — 무료. AI 멀티모달 방식. 타임스탬프 미지원. 긴 침묵 구간에서 환각 발생 가능. 프롬프트로 제어 가능.<br>
         <br>
-        <b>💡 권장:</b> 한영 혼합 강의는 <b>다국어</b> 모드 + <b>정제(LLM)</b> 후처리를 함께 사용하면 음차→영어 복원 등 품질이 크게 향상됩니다.
+        <b>💡 권장:</b> 한영 혼합 강의는 <b>다국어</b> 모드 + <b>정제(LLM)</b> 후처리를 함께 사용하면 음차→영어 복원 등 품질이 크게 향상됩니다.<br><b>📝 강의 주제 입력:</b> 주제를 입력하면 전사·정제·요약 모든 단계에서 해당 분야의 전문 용어 인식률이 향상됩니다.
       </div>
     </details>
   </div>
@@ -508,6 +508,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <option value="ru">러시아어</option>
       <option value="auto">자동감지</option>
     </select>
+  </div>
+
+  <div class="field">
+    <div class="field-label">강의 주제 · 분야 <span style="font-size:11px;color:var(--text3);font-weight:400">(선택)</span></div>
+    <input type="text" id="pre-context" placeholder="예: CISA 감사 시험, 의학 해부학, 민법 총칙, 경영학 마케팅, 회계원리" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg1);color:var(--text1);font-size:14px;box-sizing:border-box">
+    <p style="font-size:11px;color:var(--text3);margin-top:4px">입력하면 AI가 해당 분야의 전문 용어를 더 정확하게 인식·교정합니다</p>
   </div>
 
   <div class="field" id="diarization-row" style="display:none">
@@ -544,6 +550,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
         <option value="same">전사 언어와 동일</option>
       </select>
     </div>
+  </div>
+
+  <div class="field" id="precheck-autorefine-row" style="display:none">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+      <input type="checkbox" id="pre-auto-refine" style="width:18px;height:18px;accent-color:var(--accent)">
+      <div>
+        <div style="font-size:14px;font-weight:500">전사 후 자동 정제</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">전사 완료 후 AI가 오인식된 용어를 자동으로 교정합니다</div>
+      </div>
+    </label>
   </div>
 
   <div id="llm-toggle-row" class="field" style="display:none">
@@ -916,6 +932,8 @@ let state = {
   groqKey:'', assemblyaiKey:'', openaiKey:'', geminiKey:'', claudeKey:'',
   chunkMin:25,
   llmProvider:'auto', // auto | groq | gemini | claude
+  context:'',
+  autoRefine:false,
   quota:{ date:'', usedSec:0 },
   history:[],
   qaHistoryMap:{} // per-history-index Q&A persistence
@@ -977,6 +995,8 @@ function applyStateToUI(){
   document.getElementById('set-claude-key').value=state.claudeKey||'';
   document.getElementById('set-llm-provider').value=state.llmProvider||'auto';
   document.getElementById('set-chunk-min').value=state.chunkMin;
+  const ctxEl=document.getElementById('pre-context');
+  if(ctxEl) ctxEl.value=state.context||'';
   updateQuotaUI();
 }
 
@@ -1190,6 +1210,11 @@ function showPrecheck(){
   const llmChoice=document.getElementById('pre-llm-choice');
   if(llmChoice) llmChoice.value=state.llmProvider||'auto';
 
+  const autoRefineRow=document.getElementById('precheck-autorefine-row');
+  if(autoRefineRow) autoRefineRow.style.display=hasLLM?'block':'none';
+  const autoRefineEl=document.getElementById('pre-auto-refine');
+  if(autoRefineEl) autoRefineEl.checked=state.autoRefine||false;
+
   sel.onchange=updateCostEstimate;
   updateCostEstimate();
   showPage('precheck');
@@ -1249,6 +1274,10 @@ async function startTranscription(){
   const lang=document.getElementById('pre-language').value;
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
+
+  state.context=document.getElementById('pre-context')?.value?.trim()||'';
+  state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
+  await saveState();
 
   // Keep device awake during transcription
   await acquireWakeLock();
@@ -1425,6 +1454,16 @@ async function startTranscription(){
 
   showPage('result');
 
+  // Auto-refine if enabled
+  if(state.autoRefine){
+    const llmProv=_pickLLMProvider();
+    if(llmProv){
+      // Small delay to let UI render
+      await sleep(500);
+      await refineTranscript();
+    }
+  }
+
   // Auto-run if checkbox was ticked
   if(wantLLM&&hasLLM){
     await generateNotesFromText(fullText,lang);
@@ -1557,7 +1596,8 @@ async function transcribeGroq(blob,lang){
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   // For Korean: don't force 'ko' as it causes English to be transliterated to Korean
   // Whisper prompt: guide domain vocabulary + suppress silence hallucination
-  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 도메인, 감사위원회, 감사관, 트랜잭션, 소스코드, 컴플라이언스, 위약금, 프록시, 성숙도 모델, 품질보증, 준법감사, 시스템, 거버넌스, 상각, 내부통제, 보상통제, 탐지통제, 교정통제, 예방통제, 직무분리, 자산식별. 침묵 구간에서는 텍스트를 생성하지 마세요.');
+  const _wCtx=state.context||'';
+  form.append('prompt', _wCtx ? `${_wCtx}. 이 주제의 전문 용어를 정확하게 인식하세요. 침묵 구간에서는 텍스트를 생성하지 마세요.` : '침묵 구간에서는 텍스트를 생성하지 마세요.');
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
@@ -1646,7 +1686,8 @@ async function transcribeOpenAI(blob,lang){
   // Don't force Korean — let Whisper auto-detect for bilingual audio
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   // Whisper prompt: guide domain vocabulary + suppress silence hallucination
-  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 도메인, 감사위원회, 감사관, 트랜잭션, 소스코드, 컴플라이언스, 위약금, 프록시, 성숙도 모델, 품질보증, 준법감사, 시스템, 거버넌스, 상각, 내부통제, 보상통제, 탐지통제, 교정통제, 예방통제, 직무분리, 자산식별. 침묵 구간에서는 텍스트를 생성하지 마세요.');
+  const _wCtx=state.context||'';
+  form.append('prompt', _wCtx ? `${_wCtx}. 이 주제의 전문 용어를 정확하게 인식하세요. 침묵 구간에서는 텍스트를 생성하지 마세요.` : '침묵 구간에서는 텍스트를 생성하지 마세요.');
   const res=await _fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
@@ -1673,7 +1714,8 @@ async function transcribeGemini(blob,lang){
 5. 같은 문장을 반복하지 마세요.
 6. 침묵 구간에 절대 텍스트를 생성하지 마세요. "감사합니다", "Thank you", "구독", "시청해 주셔서 감사합니다", "Thank you for watching" 등은 환각입니다.
 7. 전문 용어(CISA, audit, governance, compliance, substantive testing, detective control, escrow, CAAT, GAS 등)는 원어 그대로 유지하세요.
-8. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.`
+8. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.
+${state.context ? `9. 이 오디오의 주제는 "${state.context}"입니다. 이 분야의 전문 용어를 정확하게 전사하세요.` : ''}`
     :`이 오디오를 ${langName}로 전사해 주세요.
 
 중요 규칙:
@@ -1683,7 +1725,8 @@ async function transcribeGemini(blob,lang){
 4. 같은 문장을 반복하지 마세요.
 5. 침묵 구간에 절대 텍스트를 생성하지 마세요. "감사합니다", "Thank you", "시청해 주셔서 감사합니다" 등은 환각입니다.
 6. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.
-7. 타임스탬프 없이 텍스트만 출력하세요.`;
+7. 타임스탬프 없이 텍스트만 출력하세요.
+${state.context ? `8. 이 오디오의 주제는 "${state.context}"입니다. 이 분야의 전문 용어를 정확하게 전사하세요.` : ''}`;
   const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
   const res=await _fetchWithTimeout(url,{
@@ -2444,8 +2487,9 @@ function buildSummaryPrompts(transcriptText,lang,provider){
   const isLong=transcriptText.length>20000;
   const pointCount=isLong?Math.max(30,Math.round(lenMin/3))+'개 이상':'10~20개';
   const pointCountEn=isLong?Math.max(30,Math.round(lenMin/3))+'+ points':'10-20 points';
+  const ctxNote=state.context?`[주제: ${state.context}]\n\n`:'';
   const systemPrompt=useKorean
-    ?`당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요.
+    ?`${ctxNote}당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요.
 
 핵심 원칙:
 - 각 포인트는 반드시 2~4문장으로 "왜 중요한지", "어떻게 작동하는지", "어떤 맥락인지" 설명 포함
@@ -2453,7 +2497,7 @@ function buildSummaryPrompts(transcriptText,lang,provider){
 - 정의, 예시, 근거, 비교가 언급되었으면 반드시 포함
 - 긴 강의일수록 더 많은 포인트를, 더 상세하게 작성
 - 반드시 ##, -, ** 등 마크다운 문법을 사용`
-    :`You are a professional summarizer. Create thorough, well-structured English summaries using Markdown.
+    :`${ctxNote}You are a professional summarizer. Create thorough, well-structured English summaries using Markdown.
 
 Key principles:
 - Each point MUST have 2-4 sentences explaining WHY it matters, HOW it works, and WHAT context it fits
@@ -3041,106 +3085,64 @@ function examPointClick(li){
 
 // ─── Transcript refinement (with chunked processing for long texts) ──────
 function _buildRefinePrompt(useKorean){
+  const ctx=state.context||'';
+  const ctxLine=ctx?`\n[강의 주제] ${ctx}\n`:'';
+  const ctxRule=ctx
+    ?`"${ctx}" 분야의 전문 용어, 약어, 개념을 정확하게 교정하세요. 이 분야에서 자주 사용되는 용어가 유사한 발음의 다른 단어로 잘못 인식되었을 가능성이 높습니다.`
+    :'전문 용어와 약어를 문맥에 맞게 교정하세요.';
+
   return useKorean
-    ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 전문적으로 교정하는 편집자입니다.
+    ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 교정하는 전문 편집자입니다.
+${ctxLine}
+[교정 대상 — 음성인식의 공통 오류]
 
-[핵심 문제] 음성인식이 전사할 때 다음 오류가 빈번합니다:
+1. **환각(hallucination)** — 침묵 구간에서 생성된 무관한 텍스트 → 완전 제거
+   (예: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you" 등)
 
-1. **환각(hallucination)** — 침묵 구간에서 "아멘", "감사합니다", "더미", "시청해 주셔서 감사합니다" 등 반복 → 완전히 제거
-2. **반복 루프** — 같은 구절이 3회 이상 반복 (예: "포트폴리오는 자산을 의미하는 포트폴리오입니다" x50) → 1회만 유지
-3. **영어 음차(transliteration)** — 영어 용어를 한국어로 음차한 것을 원래 영어로 복원:
-   - "오디트/오디션" → "audit"
-   - "오디트 디바트먼트" → "audit department"
-   - "인터널 오디티 펑션" → "internal audit function"
-   - "오디트 챠터/오디큐 차트" → "audit charter"
-   - "리스크" → "risk"
-   - "컴플라이언스/컴플라이언트" → "compliance"
-   - "매니지먼트" → "management"
-   - "프레임워크" → "framework"
-   - "거버넌스/버거런스" → "governance"
-   - "인테그리티" → "integrity"
-   - "디바트먼트" → "department"
-   - "아티피셜 인텔리전스" → "artificial intelligence"
-   - "논 래플리케이션/논 레퓨디에이션" → "non-repudiation"
-4. **전문 용어 오인식** — 도메인 전문 용어 교정:
-   - "도면/동행" → "도메인" (domain)
-   - "감시/감정/강좌" → "감사" (audit)
-   - "수소 테스트" → "substantive testing"
-   - "형사통제" → "탐지통제" (detective control)
-   - "극복 컨트롤" → "corrective control"
-   - "규정 조절" → "deterrent control"
-   - "관계자들/수사자들/검사원" → "감사인/auditor" (문맥에 따라)
-   - "사물 크기/수정 사이즈" → "sample size"
-   - "자신감 수준" → "confidence level / 신뢰 수준"
-   - "인터넷 컨트롤" → "internal control / 내부 통제"
-   - "재료 아이템" → "material misstatement / 중요한 왜곡표시"
-   - "적절한 확률" → "reasonable assurance / 합리적 확신"
-   - "꽈락/과략" → "과락"
-   - "시질적으로" → "실질적으로"
-   - "찬연도/찬염도" → "차년도"
-   - "수입" → "수립" (문맥상 '계획 수립'일 때)
-   - "감수사" → "감사 도구" 또는 "감사" (문맥에 따라)
-   - "석유모" → "소규모"
-   - "속재" → "소프트웨어" (software)
-   - "에세스/에세스하고" → "액세스" (access)
-   - "에스쿠로" → "에스크로" (escrow)
-   - "재승자" → "제3자"
-   - "거버넣은" → "거버넌스"
-   - "오노코" → "온오프" (on/off)
-   - "감위험도" → "각 위험도"
-   - "준법감사로" → "준법감사에서" (문맥에 따라)
-   - "위험결" → "위험별"
-   - "동행" → "도메인" (domain — 고질적 오류, 여러 번 반복)
-   - "검사위원회" → "감사위원회"
-   - "에스코르" → "에스크로" (escrow)
-   - "감정관" → "감사관"
-   - "테레비션" → "트랜잭션" (transaction)
-   - "소스콧" → "소스코드" (source code)
-   - "컴플레인트" → "컴플라이언스" (compliance) 또는 "컴플라이언트" (compliant)
-   - "이약금 정황" → "위약금 조항"
-   - "오더쿨" → "온오프" (on/off)
-   - "청공군원" → "참고문헌"
-   - "경련지/경영점" → "경영진" (management)
-   - "클록실" → "프록시" (proxy)
-   - "AAD" → "ALE" (Annual Loss Expectancy)
-   - "삼각대 계산/삼각괴" → "상각계산" (depreciation calculation)
-   - "품릴보전" → "품질보증" (quality assurance)
-   - "감상평가" → "감사표" (audit report)
-   - "성수도 모델" → "성숙도 모델" (maturity model)
-   - "가위 없는 자책평가" → "각 위험도 자체 평가"
-   - "주문법 검사" → "준법감사" (compliance audit)
-   - "시팀" → "시스템" (system)
-   - "이민에 대한" → "1인에 대한"
-5. **화자 분할 오류** — 한 문장이 [화자 A], [화자 B], [화자 C]로 2~3초 간격으로 분할됨 → 의미 단위로 병합
+2. **반복 루프** — 같은 구절이 2회 이상 연속 반복 → 1회만 유지
+
+3. **영어 음차(transliteration) 복원** — 영어 용어가 한국어로 음차 표기된 경우 원래 영어로 복원
+   (예: "오디트"→"audit", "컴플라이언스"→"compliance", "프레임워크"→"framework", "매니지먼트"→"management", "거버넌스"→"governance")
+   원칙: 학술·업무 맥락에서 영어 원문이 통용되는 용어는 영어로 복원
+
+4. **전문 용어 오인식** — ${ctxRule}
+   음성인식은 전문 용어를 발음이 비슷한 일상 단어로 잘못 인식합니다.
+   문맥을 분석하여 해당 분야에서 올바른 용어로 복원하세요.
+   (예: "동행"→"도메인", "감수사"→"감사 도구", "석유모"→"소규모" 등 — 이런 종류의 오류를 문맥으로 판단하여 교정)
+
+5. **화자 분할 오류** — 한 문장이 [화자 A], [화자 B] 등으로 잘못 분할됨 → 의미 단위로 병합
+
 6. **외국 문자 혼입** — 아랍어, 히브리어 등 무작위 삽입 → 제거
-7. **필러 과다** — "네 네 네", "그래서 그래서" 등 → 정리
+
+7. **필러 과다** — "네 네 네", "그래서 그래서" 등 과도한 반복 → 정리
 
 [교정 규칙]
-1) 환각/반복 루프 완전 제거 (1회만 유지)
-2) 영어 음차 → 영어 원문 복원 (audit, compliance, governance 등)
+1) 환각·반복 완전 제거 (1회만 유지)
+2) 영어 음차 → 영어 원문 복원
 3) 영어 문장은 영어 그대로 유지. 번역하지 마세요.
-4) IT/감사 약어(CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, RTO, RPO, BCP, SLA 등) 영문 유지
-5) 화자 분할이 잘못된 경우 의미 단위로 병합 (타임스탬프는 첫 번째 것 유지)
+4) ${ctxRule}
+5) 화자 분할 오류 → 의미 단위로 병합 (타임스탬프는 첫 번째 것 유지)
 6) [MM:SS] 타임스탬프 유지
 7) 내용 요약·축약 절대 금지 — 오류 교정만 수행
-8) 교정된 본문만 출력 — 설명 없이`
+8) 교정된 본문만 출력 — 설명·주석 없이`
     :`You are a professional editor correcting speech-to-text transcripts.
-
+${ctx?`\n[Topic] ${ctx}\n`:''}
 [Common STT Errors]
-1. Hallucination — irrelevant repeated text during silence → remove entirely
-2. Repetition loops — same phrase repeated 3+ times → keep only once
-3. Korean transliteration of English terms — restore to original English (e.g., "오디트"→"audit")
-4. Domain terminology misrecognized — fix based on context (audit, governance, risk, control terms)
-5. Speaker fragmentation — one sentence split across multiple speakers → merge into coherent units
+1. Hallucination — irrelevant text generated during silence → remove entirely
+2. Repetition loops — same phrase repeated 2+ times consecutively → keep only once
+3. Korean transliteration of English terms → restore to original English
+   (e.g., "오디트"→"audit", "컴플라이언스"→"compliance")
+4. Domain terminology misrecognized — ${ctx?`Use your knowledge of "${ctx}" to identify and correct misrecognized terms.`:'Fix misrecognized terms based on context.'}
+   STT often replaces specialized terms with similar-sounding common words. Analyze context to restore the correct terminology.
+5. Speaker fragmentation — one sentence split across multiple speakers → merge
 6. Foreign characters randomly inserted → remove
-7. Duplicate sentences → keep first occurrence only
-8. Excessive filler words → reduce
+7. Excessive filler words → reduce
 
 [Rules]
-1) Remove hallucinated/repeated segments completely (keep 1 instance)
+1) Remove hallucinated/repeated segments (keep 1 instance)
 2) Restore Korean transliterations to English originals
 3) Keep English sentences in English — do NOT translate
-4) Keep technical abbreviations (CISA, ISO, COBIT, GAS, CAAT, ALE, BIA, etc.)
+4) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
 5) Merge fragmented speaker segments into meaningful units
 6) Preserve [MM:SS] timestamps
 7) Don't summarize or shorten — only correct errors
