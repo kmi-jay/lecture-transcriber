@@ -1557,7 +1557,7 @@ async function transcribeGroq(blob,lang){
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   // For Korean: don't force 'ko' as it causes English to be transliterated to Korean
   // Whisper prompt: guide domain vocabulary + suppress silence hallucination
-  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 침묵 구간에서는 텍스트를 생성하지 마세요.');
+  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 도메인, 감사위원회, 감사관, 트랜잭션, 소스코드, 컴플라이언스, 위약금, 프록시, 성숙도 모델, 품질보증, 준법감사, 시스템, 거버넌스, 상각, 내부통제, 보상통제, 탐지통제, 교정통제, 예방통제, 직무분리, 자산식별. 침묵 구간에서는 텍스트를 생성하지 마세요.');
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
@@ -1646,7 +1646,7 @@ async function transcribeOpenAI(blob,lang){
   // Don't force Korean — let Whisper auto-detect for bilingual audio
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   // Whisper prompt: guide domain vocabulary + suppress silence hallucination
-  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 침묵 구간에서는 텍스트를 생성하지 마세요.');
+  form.append('prompt','CISA, audit, governance, compliance, risk, control, framework, IT governance, internal audit, substantive testing, detective control, corrective control, escrow, CAAT, GAS, ALE, BIA, BCP, RTO, RPO. 도메인, 감사위원회, 감사관, 트랜잭션, 소스코드, 컴플라이언스, 위약금, 프록시, 성숙도 모델, 품질보증, 준법감사, 시스템, 거버넌스, 상각, 내부통제, 보상통제, 탐지통제, 교정통제, 예방통제, 직무분리, 자산식별. 침묵 구간에서는 텍스트를 생성하지 마세요.');
   const res=await _fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
@@ -1841,6 +1841,19 @@ function mergeChunks(chunks){
         const ts=fmtTime(absStart);
         const speakerChanged=seg.speaker&&seg.speaker!==lastSpeaker;
 
+        // ── TIMESTAMP-BASED OVERLAP DEDUP for chunk i>0 ──
+        // Skip segments in the overlap zone (already covered by previous chunk)
+        // overlapEnd = where the previous chunk actually ends
+        // Add 2-second buffer to account for potential rounding/edge cases
+        let skipDueToOverlap=false;
+        if(i>0){
+          const overlapEnd=sorted[i-1].endSec;
+          if(absStart<overlapEnd-2){
+            skipDueToOverlap=true;
+          }
+        }
+        if(skipDueToOverlap) continue; // Skip this segment entirely
+
         // Add timestamp at segment start, every ~30 seconds, or when speaker changes
         if(j===0||!lastParaTime||absStart-lastParaTime>=PARA_BREAK_SEC||speakerChanged){
           if(segmentText&&j>0) segmentText+='\n\n';
@@ -1856,8 +1869,9 @@ function mergeChunks(chunks){
       if(i===0){
         merged+=segmentText;
       }else{
-        // ── Robust chunk overlap deduplication ──
-        // Compare paragraphs at the start of new chunk against tail of merged text
+        // ── Fallback text-similarity dedup (used if timestamps didn't eliminate overlap) ──
+        // This is now a backup in case segments have no timestamps
+        // Primary dedup is TIMESTAMP-BASED above
         const prevTail=merged.slice(-400);
         const newParas=segmentText.split('\n\n');
         let skipCount=0;
@@ -3076,6 +3090,27 @@ function _buildRefinePrompt(useKorean){
    - "감위험도" → "각 위험도"
    - "준법감사로" → "준법감사에서" (문맥에 따라)
    - "위험결" → "위험별"
+   - "동행" → "도메인" (domain — 고질적 오류, 여러 번 반복)
+   - "검사위원회" → "감사위원회"
+   - "에스코르" → "에스크로" (escrow)
+   - "감정관" → "감사관"
+   - "테레비션" → "트랜잭션" (transaction)
+   - "소스콧" → "소스코드" (source code)
+   - "컴플레인트" → "컴플라이언스" (compliance) 또는 "컴플라이언트" (compliant)
+   - "이약금 정황" → "위약금 조항"
+   - "오더쿨" → "온오프" (on/off)
+   - "청공군원" → "참고문헌"
+   - "경련지/경영점" → "경영진" (management)
+   - "클록실" → "프록시" (proxy)
+   - "AAD" → "ALE" (Annual Loss Expectancy)
+   - "삼각대 계산/삼각괴" → "상각계산" (depreciation calculation)
+   - "품릴보전" → "품질보증" (quality assurance)
+   - "감상평가" → "감사표" (audit report)
+   - "성수도 모델" → "성숙도 모델" (maturity model)
+   - "가위 없는 자책평가" → "각 위험도 자체 평가"
+   - "주문법 검사" → "준법감사" (compliance audit)
+   - "시팀" → "시스템" (system)
+   - "이민에 대한" → "1인에 대한"
 5. **화자 분할 오류** — 한 문장이 [화자 A], [화자 B], [화자 C]로 2~3초 간격으로 분할됨 → 의미 단위로 병합
 6. **외국 문자 혼입** — 아랍어, 히브리어 등 무작위 삽입 → 제거
 7. **필러 과다** — "네 네 네", "그래서 그래서" 등 → 정리
