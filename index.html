@@ -524,14 +524,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="field" id="precheck-llm-row" style="display:none">
     <div class="field-label">AI 후처리 (노트·요약·정제)</div>
     <select id="pre-llm-choice">
-      <option value="auto">자동 (Groq → Gemini → Claude)</option>
+      <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
       <option value="free-only">무료만 (Groq → Gemini)</option>
-      <option value="groq-first">Groq 우선 → Gemini → Claude</option>
-      <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
-      <option value="claude-first">Claude 우선 → Groq → Gemini</option>
+      <option value="groq-first">Groq 우선 → Gemini → Claude → OpenAI</option>
+      <option value="gemini-first">Gemini 우선 → Groq → Claude → OpenAI</option>
+      <option value="claude-first">Claude 우선 → Groq → Gemini → OpenAI</option>
+      <option value="openai-first">OpenAI 우선 → Groq → Gemini → Claude</option>
       <option value="groq-only">Groq만 (Llama, 무료)</option>
       <option value="gemini-only">Gemini만 (무료)</option>
       <option value="claude-only">Claude만 (유료)</option>
+      <option value="openai-only">OpenAI만 (GPT-4o-mini, 유료)</option>
     </select>
     <p style="font-size:12px;color:var(--text3);margin-top:4px">노트 생성, 요약, 텍스트 정제에 사용할 AI를 선택합니다</p>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -3414,6 +3416,7 @@ function _pickLLMProvider(){
     'groq-first':['groq','gemini','claude','openai'],
     'gemini-first':['gemini','groq','claude','openai'],
     'claude-first':['claude','groq','gemini','openai'],
+    'openai-first':['openai','groq','gemini','claude'],
   };
   const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
   const order=orders[pref]||orders['auto'];
