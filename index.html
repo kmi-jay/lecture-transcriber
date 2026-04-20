@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.16</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.17</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1595,9 +1595,9 @@ async function transcribeGroq(blob,lang){
   // For bilingual lectures (ko+en), NOT setting language gives better results
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
   // For Korean: don't force 'ko' as it causes English to be transliterated to Korean
-  // Whisper prompt: guide domain vocabulary + suppress silence hallucination
+  // Whisper prompt: guide domain vocabulary (prompt param is for vocabulary priming, not instructions)
   const _wCtx=state.context||'';
-  form.append('prompt', _wCtx ? `${_wCtx}. 이 주제의 전문 용어를 정확하게 인식하세요. 침묵 구간에서는 텍스트를 생성하지 마세요.` : '침묵 구간에서는 텍스트를 생성하지 마세요.');
+  if(_wCtx) form.append('prompt', _wCtx);
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.groqKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('groq',res.status,await res.text(),parseInt(res.headers.get('retry-after'))||null);
@@ -1685,9 +1685,9 @@ async function transcribeOpenAI(blob,lang){
   form.append('temperature','0');
   // Don't force Korean — let Whisper auto-detect for bilingual audio
   if(lang&&lang!=='auto'&&lang!=='multi'&&lang!=='ko') form.append('language',lang);
-  // Whisper prompt: guide domain vocabulary + suppress silence hallucination
+  // Whisper prompt: guide domain vocabulary (prompt param is for vocabulary priming, not instructions)
   const _wCtx=state.context||'';
-  form.append('prompt', _wCtx ? `${_wCtx}. 이 주제의 전문 용어를 정확하게 인식하세요. 침묵 구간에서는 텍스트를 생성하지 마세요.` : '침묵 구간에서는 텍스트를 생성하지 마세요.');
+  if(_wCtx) form.append('prompt', _wCtx);
   const res=await _fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form},180000);
   if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
@@ -1713,15 +1713,15 @@ async function transcribeGemini(blob,lang){
 4. 타임스탬프 없이 텍스트만 출력하세요.
 5. 같은 문장을 반복하지 마세요.
 6. 침묵 구간에 절대 텍스트를 생성하지 마세요. "감사합니다", "Thank you", "구독", "시청해 주셔서 감사합니다", "Thank you for watching" 등은 환각입니다.
-7. 전문 용어(CISA, audit, governance, compliance, substantive testing, detective control, escrow, CAAT, GAS 등)는 원어 그대로 유지하세요.
+7. 전문 용어와 약어는 원어 그대로 유지하세요. 영어 용어를 한국어로 음차하지 마세요.
 8. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.
 ${state.context ? `9. 이 오디오의 주제는 "${state.context}"입니다. 이 분야의 전문 용어를 정확하게 전사하세요.` : ''}`
     :`이 오디오를 ${langName}로 전사해 주세요.
 
 중요 규칙:
 1. 모든 발화 내용을 빠짐없이 전사하세요. 요약하거나 축약하지 마세요.
-2. 영어 전문용어가 나오면 영어 원문 그대로 유지하세요 (예: audit, compliance, governance, CISA).
-3. 영어를 한국어로 음차하지 마세요 (예: "오디트"가 아니라 "audit"으로).
+2. 영어 전문용어가 나오면 영어 원문 그대로 유지하세요.
+3. 영어를 한국어로 음차하지 마세요.
 4. 같은 문장을 반복하지 마세요.
 5. 침묵 구간에 절대 텍스트를 생성하지 마세요. "감사합니다", "Thank you", "시청해 주셔서 감사합니다" 등은 환각입니다.
 6. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.
@@ -2058,6 +2058,34 @@ function _removeHallucinations(text){
     pass4.push(line);
   }
 
+  // ── Pass 4.5: Whisper prompt-leak detection ──
+  // Whisper sometimes outputs the prompt text itself as hallucinated content
+  // Also catches instruction-like text that shouldn't appear in transcription
+  const pass4b=[];
+  const promptLeakRx=/텍스트(?:를|가)?\s*(?:를\s*)?(?:생성|완성)|침묵\s*구간|자막\s*제공|번역\s*제공|전문\s*용어를?\s*(?:정확하게\s*)?인식/;
+  for(const line of pass4){
+    const core=_extractCore(line);
+    if(!core){pass4b.push(line);continue}
+    // Line is primarily prompt-leak text
+    if(promptLeakRx.test(core)){
+      // Check if line has substantial real content beyond the prompt leak
+      const cleaned=core.replace(promptLeakRx,'').replace(/[.\s,]+$/,'').trim();
+      if(cleaned.length<20){
+        // Mostly prompt-leak, remove entirely
+        halluRemoved++;continue;
+      }
+      // Has some real content mixed in — keep the cleaned version
+      // But only if the real part is substantial enough
+      if(cleaned.length>core.length*0.3){
+        pass4b.push(line.replace(core,cleaned));
+      }else{
+        halluRemoved++;continue;
+      }
+    }else{
+      pass4b.push(line);
+    }
+  }
+
   // ── Pass 5: Short filler / silence hallucination lines ──
   // Catches "Thank you", "Thank you for watching!", foreign language snippets, lone punctuation, etc.
   const pass5=[];
@@ -2065,13 +2093,17 @@ function _removeHallucinations(text){
   const shortHalluRx=/^(?:\.+|thank\s*you\.?|thanks?\.?|thank\s*you\s*(?:for\s*(?:watching|listening|viewing|your\s*attention))[\s!.]*|please\s*subscribe[\s!.]*|subscribe[\s!.]*|like\s*and\s*subscribe[\s!.]*|see\s*you\s*next\s*time[\s!.]*|bye[\s!.]*|goodbye[\s!.]*|takk?\s.*|merci.*|danke.*|gracias.*|спасибо.*|ありがとう.*|謝謝.*)$/i;
   // Foreign script detection (not Korean/English/numbers/punctuation)
   const foreignScriptRx=/^[^\uAC00-\uD7A3\u3131-\u318Ea-zA-Z0-9\s.,!?;:'"()\[\]–—\-·…\/~@#$%^&*+=₩\\]+$/;
-  for(const line of pass4){
+  for(const line of pass4b){
     const core=_extractCore(line);
     if(!core){pass5.push(line);continue}
     // Very short lines that are just filler
     if(core.length<60&&shortHalluRx.test(core.trim())){halluRemoved++;continue}
     // Lines that are ONLY foreign script (not Korean/English)
     if(core.length<80&&foreignScriptRx.test(core.trim())){halluRemoved++;continue}
+    // Short English-only gibberish in Korean audio (e.g., "hazards", "Ter Parsis befeller", "5 F graphic")
+    if(core.length<50 && /^[a-zA-Z0-9\s.,!?'"-]+$/.test(core.trim()) && !/^(?:IT|IS|CISA|CAAT|GAS|COBIT|ISO|BIA|ALE|OK|GDP|AI|API|CEO|CIO|CFO|QA|PMO)\b/i.test(core.trim())){
+      halluRemoved++;continue;
+    }
     // Lone dots or whitespace-only cores
     if(/^[\s.·…]+$/.test(core)){halluRemoved++;continue}
     pass5.push(line);
@@ -2089,14 +2121,19 @@ function _removeHallucinations(text){
     }else{
       // Flush: if >=3 consecutive short lines, check if they're all similar/hallucinated
       if(shortRun.length>=3){
-        // Check if majority share >50% similarity → hallucination cluster
-        let halluCluster=true;
-        for(let j=1;j<shortRun.length;j++){
-          if(_simRatio(shortRun[0].core,shortRun[j].core)<0.3&&
-             !shortHalluRx.test(shortRun[j].core.trim())){
-            halluCluster=false;break;
-          }
+        // Check if this is a hallucination cluster
+        // Criteria: majority are either (a) similar to each other, (b) match known hallucination patterns,
+        // (c) are very short (<15 chars), or (d) are only English/foreign text
+        let halluScore=0;
+        for(let j=0;j<shortRun.length;j++){
+          const c=shortRun[j].core.trim();
+          if(shortHalluRx.test(c)) halluScore++;
+          else if(c.length<15) halluScore++;
+          else if(/^[a-zA-Z0-9\s.,!?'"-]+$/.test(c)) halluScore++;
+          else if(promptLeakRx.test(c)) halluScore++;
+          else if(j>0&&_simRatio(shortRun[0].core,c)>0.3) halluScore++;
         }
+        const halluCluster=halluScore>=shortRun.length*0.6;
         if(halluCluster){
           halluRemoved+=shortRun.length;
           // Keep none — all are hallucination
@@ -2112,13 +2149,16 @@ function _removeHallucinations(text){
   }
   // Flush remaining
   if(shortRun.length>=3){
-    let halluCluster=true;
-    for(let j=1;j<shortRun.length;j++){
-      if(_simRatio(shortRun[0].core,shortRun[j].core)<0.3&&
-         !shortHalluRx.test(shortRun[j].core.trim())){
-        halluCluster=false;break;
-      }
+    let halluScore=0;
+    for(let j=0;j<shortRun.length;j++){
+      const c=shortRun[j].core.trim();
+      if(shortHalluRx.test(c)) halluScore++;
+      else if(c.length<15) halluScore++;
+      else if(/^[a-zA-Z0-9\s.,!?'"-]+$/.test(c)) halluScore++;
+      else if(promptLeakRx.test(c)) halluScore++;
+      else if(j>0&&_simRatio(shortRun[0].core,c)>0.3) halluScore++;
     }
+    const halluCluster=halluScore>=shortRun.length*0.6;
     if(halluCluster) halluRemoved+=shortRun.length;
     else shortRun.forEach(r=>pass6.push(r.line));
   }else{
