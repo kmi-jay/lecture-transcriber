@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.19</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.20</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -470,13 +470,18 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="field">
     <div class="field-label">전사 방법 (음성→텍스트)</div>
     <select id="pre-api-choice">
-      <option value="auto">자동 (Groq → AssemblyAI → Gemini → Google → OpenAI)</option>
-      <option value="free-auto">무료만 (Groq → AssemblyAI → Gemini)</option>
-      <option value="groq-only">Groq만 (한도 내에서만, 무료)</option>
-      <option value="assemblyai-only">AssemblyAI만 (무료 크레딧)</option>
-      <option value="gemini-only">Gemini만 (무료)</option>
-      <option value="google-only">Google (Chirp 2, 유료)</option>
-      <option value="openai-only">OpenAI만 (유료)</option>
+      <optgroup label="🤖 자동 모드">
+        <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
+        <option value="quality-auto">품질 우선 (Google → OpenAI → AssemblyAI → Groq)</option>
+        <option value="free-auto">무료만 (Groq → AssemblyAI → Gemini)</option>
+      </optgroup>
+      <optgroup label="📌 직접 선택">
+        <option value="google-only">Google (Chirp 2, 유료) — Plaud 동일 엔진</option>
+        <option value="openai-only">OpenAI Whisper (유료)</option>
+        <option value="assemblyai-only">AssemblyAI (무료 크레딧)</option>
+        <option value="groq-only">Groq Whisper (무료, 한도 있음)</option>
+        <option value="gemini-only">Gemini 멀티모달 (무료)</option>
+      </optgroup>
     </select>
     <p style="font-size:11px;color:var(--text3);margin-top:4px">Groq·AssemblyAI·Google·OpenAI = 전용 음성인식 | Gemini = AI 멀티모달 전사 | Claude = 음성 미지원</p>
     <details style="margin-top:6px;font-size:11px;color:var(--text3)">
@@ -1256,19 +1261,41 @@ function updateCostEstimate(){
   const costText=document.getElementById('pre-cost-text');
   const RATE=0.006,KRW=1400;
 
-  if(choice==='groq-only'||choice==='assemblyai-only'){
+  if(choice==='groq-only'||choice==='assemblyai-only'||choice==='gemini-only'){
     costDiv.style.display='none';
+  }else if(choice==='free-auto'){
+    costDiv.style.display='flex';
+    costText.textContent='무료 API만 사용합니다 (비용 없음)';
+    costDiv.className='alert alert-info';
   }else if(choice==='openai-only'){
     const cost=(dur/60)*RATE;
     costDiv.style.display='flex';
     costText.textContent=`예상 비용: $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
+  }else if(choice==='google-only'){
+    const gRate=PROVIDERS.google.costPerMin;
+    costDiv.style.display='flex';
+    costText.textContent=`예상 비용: ≈ ₩${Math.round((dur/60)*gRate)}`;
+  }else if(choice==='quality-auto'){
+    // Quality mode: estimate based on top available paid provider
+    if(state.googleSttKey){
+      const gRate=PROVIDERS.google.costPerMin;
+      costDiv.style.display='flex';
+      costText.textContent=`품질 우선: Google (Chirp 2) 사용 — 예상 ≈ ₩${Math.round((dur/60)*gRate)}`;
+    }else if(state.openaiKey){
+      const cost=(dur/60)*RATE;
+      costDiv.style.display='flex';
+      costText.textContent=`품질 우선: OpenAI 사용 — 예상 $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
+    }else{
+      costDiv.style.display='flex';
+      costText.textContent='품질 우선: 유료 API 키 미등록 → 무료 API로 대체됩니다';
+    }
   }else{
-    // auto: Groq free → AssemblyAI free → OpenAI only if both exhausted
+    // auto (cost-saving): Groq free → AssemblyAI free → paid fallback
     const openaiSec=Math.max(0,dur-remainSec);
-    if(openaiSec>0&&!state.assemblyaiKey){
+    if(openaiSec>0&&!state.assemblyaiKey&&!state.geminiKey){
       const cost=(openaiSec/60)*RATE;
       costDiv.style.display='flex';
-      costText.textContent=`${_provLabel('groq')} ${remainSec>0?Math.round(remainSec/60)+'분 무료 + ':''}${_provLabel('assemblyai')} 키 미등록 시 ${_provLabel('openai')} 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
+      costText.textContent=`무료 한도 초과 시 유료 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
     }else{
       costDiv.style.display='none';
     }
@@ -1320,7 +1347,7 @@ async function startTranscription(){
   if(choice==='gemini-only'&&!state.geminiKey){toast('설정에서 Gemini API 키를 입력하세요');return}
   if(choice==='google-only'&&!state.googleSttKey){toast('설정에서 Google Cloud STT API 키를 입력하세요');return}
   if(choice==='openai-only'&&!state.openaiKey){toast('설정에서 OpenAI API 키를 입력하세요');return}
-  if((choice==='auto'||choice==='free-auto')&&!state.groqKey&&!state.assemblyaiKey&&!state.geminiKey&&!state.googleSttKey&&!state.openaiKey){
+  if((choice==='auto'||choice==='free-auto'||choice==='quality-auto')&&!state.groqKey&&!state.assemblyaiKey&&!state.geminiKey&&!state.googleSttKey&&!state.openaiKey){
     toast('설정에서 최소 1개 API 키를 입력하세요');return;
   }
 
@@ -1360,8 +1387,16 @@ async function startTranscription(){
       else if(state.assemblyaiKey){api='assemblyai'}
       else if(state.geminiKey){api='gemini'}
       else{api='skip'}
+    }else if(choice==='quality-auto'){
+      // Quality first: Google → OpenAI → AssemblyAI → Groq → Gemini
+      if(state.googleSttKey){api='google'}
+      else if(state.openaiKey){api='openai'}
+      else if(state.assemblyaiKey){api='assemblyai'}
+      else if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
+      else if(state.geminiKey){api='gemini'}
+      else{api='skip'}
     }else{
-      // auto: Groq → AssemblyAI → Gemini → Google → OpenAI
+      // auto (cost-saving): Groq → AssemblyAI → Gemini → Google → OpenAI
       if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
       else if(state.assemblyaiKey){api='assemblyai'}
       else if(state.geminiKey){api='gemini'}
@@ -1369,7 +1404,7 @@ async function startTranscription(){
       else if(state.openaiKey){api='openai'}
       else{api='skip'}
     }
-    if(api==='groq'&&choice!=='auto'&&choice!=='free-auto') remainGroq-=chunkDur;
+    if(api==='groq'&&choice!=='auto'&&choice!=='free-auto'&&choice!=='quality-auto') remainGroq-=chunkDur;
 
     chunks.push({index:i,startSec,endSec,chunkDur,api,status:api==='skip'?'skipped':'pending',text:''});
   }
@@ -1424,8 +1459,8 @@ async function startTranscription(){
       console.error(`Chunk ${i} error:`,e);
       const errMsg=`${ch.api}: ${e.message||e}`;
 
-      // Fallback logic for auto/free-auto mode
-      if(choice==='auto'||choice==='free-auto'){
+      // Fallback logic for auto modes
+      if(choice==='auto'||choice==='free-auto'||choice==='quality-auto'){
         const switched=await tryFallback(ch,e,lang,chunks,file);
         if(!switched){
           ch.status='error';ch.text=`[오류: ${errMsg}]`;ch.errorMsg=errMsg;
@@ -1512,14 +1547,16 @@ async function startTranscription(){
 }
 
 async function tryFallback(ch,error,lang,chunks,file){
-  // Fallback chain: Groq → AssemblyAI → Gemini → Google → OpenAI
-  const fallbackAPIs=[];
-  const allAPIs=['groq','assemblyai','gemini','google','openai'];
+  // Fallback chain varies by mode
+  const choice=document.getElementById('pre-api-choice').value;
+  const costChain=['groq','assemblyai','gemini','google','openai'];
+  const qualityChain=['google','openai','assemblyai','groq','gemini'];
+  const freeChain=['groq','assemblyai','gemini'];
+  const allAPIs=choice==='quality-auto'?qualityChain:choice==='free-auto'?freeChain:costChain;
   const keyMap={groq:'groqKey',assemblyai:'assemblyaiKey',gemini:'geminiKey',google:'googleSttKey',openai:'openaiKey'};
-  const idx=allAPIs.indexOf(ch.api);
-  for(let i=0;i<allAPIs.length;i++){
-    if(i===idx) continue;
-    const fb=allAPIs[i];
+  const fallbackAPIs=[];
+  for(const fb of allAPIs){
+    if(fb===ch.api) continue;
     if(state[keyMap[fb]]) fallbackAPIs.push(fb);
   }
 
