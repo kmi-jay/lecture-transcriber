@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.17</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.18</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1406,7 +1406,11 @@ async function startTranscription(){
 
   // Merge + hallucination filter
   updateProgress(nChunks,nChunks,'결과 병합 중...');
-  const fullText=_removeHallucinations(mergeChunks(chunks));
+  let fullText=_removeHallucinations(mergeChunks(chunks));
+  // Post-merge cleanup: strip leading dots/noise from paragraphs, remove empty paragraphs
+  fullText=fullText.replace(/(\[\d+:\d+\])\s*(?:[.\s·…]{2,})/g,'$1  ')
+    .replace(/\n\n\s*[.\s·…]+\s*\n\n/g,'\n\n')
+    .replace(/\n{3,}/g,'\n\n').trim();
   const langName=document.getElementById('pre-language').selectedOptions[0].text;
   document.getElementById('res-info').textContent=`${file.name} · ${(duration/60).toFixed(1)}분 · ${langName}`;
   document.getElementById('res-full').textContent=fullText;
@@ -2049,12 +2053,20 @@ function _removeHallucinations(text){
   }
   if(mergeBuffer) pass3.push(mergeBuffer);
 
-  // ── Pass 4: Known hallucination patterns (exact match — short filler lines) ──
+  // ── Pass 4: Known hallucination patterns ──
   const pass4=[];
   const halluExact=/^(?:아멘|감사합니다|다음 영상에서 만나요|구독과 좋아요|좋아요와 구독|시청해\s*주셔서\s*감사합니다|MBC 뉴스|자막 제공|자막 - Loss|SBS|KBS|MBC|더미|더미 더미)\.?\s*$/i;
+  // Compound hallucination: line composed entirely of hallucination fragments
+  const halluFragRx=/(?:시청해?\s*주셔서\s*감사합니다|감사합니다|Thank\s*you(?:\s*for\s*(?:watching|listening|viewing))?|아멘|구독과?\s*좋아요|좋아요와?\s*구독|다음\s*영상|자막\s*제공|더미)/gi;
   for(const line of pass3){
     const core=_extractCore(line);
-    if(core&&halluExact.test(core)){halluRemoved++;continue}
+    if(!core){pass4.push(line);continue}
+    if(halluExact.test(core)){halluRemoved++;continue}
+    // Check compound: strip all hallucination fragments, see if anything meaningful remains
+    if(core.length<120){
+      const stripped=core.replace(halluFragRx,'').replace(/[.\s,!?·…]+/g,' ').trim();
+      if(stripped.length<10){halluRemoved++;continue}
+    }
     pass4.push(line);
   }
 
@@ -3132,61 +3144,94 @@ function _buildRefinePrompt(useKorean){
     :'전문 용어와 약어를 문맥에 맞게 교정하세요.';
 
   return useKorean
-    ?`당신은 음성인식(Whisper/AssemblyAI) 전사본을 교정하는 전문 편집자입니다.
+    ?`당신은 음성인식(Whisper) 전사본을 교정하는 전문 편집자입니다. Whisper의 한국어 인식 특성을 깊이 이해하고 있습니다.
 ${ctxLine}
-[교정 대상 — 음성인식의 공통 오류]
+[핵심 원칙]
+Whisper는 한국어 전문 용어를 발음이 유사한 다른 단어로 치환하는 오류를 매우 빈번하게 발생시킵니다.
+모든 문장을 읽을 때 "이 단어가 문맥상 맞는가?"를 반드시 따져보세요.
 
-1. **환각(hallucination)** — 침묵 구간에서 생성된 무관한 텍스트 → 완전 제거
-   (예: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you" 등)
+[교정 대상 — Whisper 한국어 공통 오류]
 
-2. **반복 루프** — 같은 구절이 2회 이상 연속 반복 → 1회만 유지
+1. **발음 유사 단어 치환 (가장 빈번하고 중요한 오류)**
+   Whisper는 전문 용어를 발음이 비슷한 일상어/다른 단어로 잘못 인식합니다.
+   ${ctxRule}
+   오류 유형별 예시 (패턴 이해용 — 실제로는 문맥으로 판단):
+   - 외래어→유사 한국어: "소프트웨어"→"속재/석재", "액세스"→"에세스", "에스크로"→"에스쿠로"
+   - 전문어→일상어: "소규모"→"석유모", "감사"→"감수사/감상", "준법"→"중법/주법", "거버넌스"→"거버넣은"
+   - 코딩→코팅, 보증→보정, 초점→표정, 외압→외야, 차질→사진, 위함→위험, 사항→회상
+   - 숫자/약어 분리: "CAAT"→"C, A, A, T", "ALE"→"AL", "IS 감사"→"나이스 감사/IS3사"
+   - 모든 문장에서 문맥에 맞지 않는 단어가 있다면 발음이 유사한 올바른 단어를 찾아 교정하세요.
 
-3. **영어 음차(transliteration) 복원** — 영어 용어가 한국어로 음차 표기된 경우 원래 영어로 복원
-   (예: "오디트"→"audit", "컴플라이언스"→"compliance", "프레임워크"→"framework", "매니지먼트"→"management", "거버넌스"→"governance")
-   원칙: 학술·업무 맥락에서 영어 원문이 통용되는 용어는 영어로 복원
+2. **문장 단위 중복 (Whisper 반복 오류)**
+   같은 내용이 약간 다른 표현으로 연속 2~3회 반복되는 경우가 있습니다.
+   → 가장 정확하고 완전한 버전 1회만 유지하고 나머지 제거
+   예: "직무 분리가 이루어지지 않용자. 그래서 직무 분리가 이루어지지 않았다." → 두 번째만 유지
 
-4. **전문 용어 오인식** — ${ctxRule}
-   음성인식은 전문 용어를 발음이 비슷한 일상 단어로 잘못 인식합니다.
-   문맥을 분석하여 해당 분야에서 올바른 용어로 복원하세요.
-   (예: "동행"→"도메인", "감수사"→"감사 도구", "석유모"→"소규모" 등 — 이런 종류의 오류를 문맥으로 판단하여 교정)
+3. **환각(hallucination)** — 침묵 구간에서 생성된 무관한 텍스트 → 완전 제거
+   (예: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you", "텍스트를 생성하지 마세요" 등)
 
-5. **화자 분할 오류** — 한 문장이 [화자 A], [화자 B] 등으로 잘못 분할됨 → 의미 단위로 병합
+4. **영어 음차(transliteration) 복원** — 학술/업무 맥락에서 영어 원문이 통용되는 용어는 영어로 복원
+   (예: "오디트"→"audit", "컴플라이언스"→"compliance", "프레임워크"→"framework", "에스크로"→"escrow")
 
-6. **외국 문자 혼입** — 아랍어, 히브리어 등 무작위 삽입 → 제거
+5. **약어 복원** — 개별 글자로 분리된 약어를 원래 형태로 결합
+   (예: "C, A, A, T"→"CAAT", "A, L, E"→"ALE", "I, S"→"IS")
 
-7. **필러 과다** — "네 네 네", "그래서 그래서" 등 과도한 반복 → 정리
+6. **화자 분할 오류** — 한 문장이 여러 화자로 잘못 분할됨 → 의미 단위로 병합
 
-[교정 규칙]
-1) 환각·반복 완전 제거 (1회만 유지)
-2) 영어 음차 → 영어 원문 복원
-3) 영어 문장은 영어 그대로 유지. 번역하지 마세요.
-4) ${ctxRule}
-5) 화자 분할 오류 → 의미 단위로 병합 (타임스탬프는 첫 번째 것 유지)
-6) [MM:SS] 타임스탬프 유지
-7) 내용 요약·축약 절대 금지 — 오류 교정만 수행
-8) 교정된 본문만 출력 — 설명·주석 없이`
-    :`You are a professional editor correcting speech-to-text transcripts.
+7. **외국 문자 혼입** — 아랍어, 히브리어 등 무작위 삽입 → 제거
+
+8. **필러 과다** — "네 네 네", "그래서 그래서" 등 과도한 반복 → 정리
+
+[교정 규칙 — 반드시 준수]
+1) 환각·반복 완전 제거 (가장 정확한 1회만 유지)
+2) 발음 유사 오인식 → 문맥에 맞는 올바른 단어로 복원 (이것이 가장 중요한 작업)
+3) 영어 음차 → 영어 원문 복원
+4) 영어 문장은 영어 그대로 유지. 번역하지 마세요.
+5) 분리된 약어 → 결합 (C, A, A, T → CAAT)
+6) ${ctxRule}
+7) [MM:SS] 타임스탬프 반드시 유지
+8) 내용 요약·축약 절대 금지 — 오류 교정만 수행
+9) 교정된 본문만 출력 — 설명·주석 없이`
+    :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
 ${ctx?`\n[Topic] ${ctx}\n`:''}
-[Common STT Errors]
-1. Hallucination — irrelevant text generated during silence → remove entirely
-2. Repetition loops — same phrase repeated 2+ times consecutively → keep only once
-3. Korean transliteration of English terms → restore to original English
-   (e.g., "오디트"→"audit", "컴플라이언스"→"compliance")
-4. Domain terminology misrecognized — ${ctx?`Use your knowledge of "${ctx}" to identify and correct misrecognized terms.`:'Fix misrecognized terms based on context.'}
-   STT often replaces specialized terms with similar-sounding common words. Analyze context to restore the correct terminology.
-5. Speaker fragmentation — one sentence split across multiple speakers → merge
-6. Foreign characters randomly inserted → remove
-7. Excessive filler words → reduce
+[Core Principle]
+Whisper frequently replaces Korean specialized terms with similar-sounding everyday words.
+For every sentence, ask: "Does this word make sense in context?"
 
-[Rules]
-1) Remove hallucinated/repeated segments (keep 1 instance)
-2) Restore Korean transliterations to English originals
-3) Keep English sentences in English — do NOT translate
-4) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
-5) Merge fragmented speaker segments into meaningful units
-6) Preserve [MM:SS] timestamps
-7) Don't summarize or shorten — only correct errors
-8) Output corrected text only, no explanations`;
+[Common Whisper Korean Errors]
+
+1. **Phonetic substitution (most frequent and critical)**
+   Whisper replaces domain terms with phonetically similar words.
+   ${ctx?`Use your knowledge of "${ctx}" to identify and correct misrecognized terms.`:'Fix misrecognized terms based on context.'}
+   Error pattern examples (for understanding — judge by context in practice):
+   - Foreign loanwords mangled: "소프트웨어"→"속재", "액세스"→"에세스", "에스크로"→"에스쿠로"
+   - Specialized→common: "소규모"→"석유모", "감사"→"감수사", "거버넌스"→"거버넣은"
+   - Single-char swaps: 코딩→코팅, 보증→보정, 초점→표정, 외압→외야
+   - Abbreviation splitting: "CAAT"→"C, A, A, T", "ALE"→"AL"
+   - Analyze EVERY word that seems out of place and find the phonetically similar correct term.
+
+2. **Sentence-level duplication** — same content repeated 2-3 times with slight variation → keep only the most accurate version
+
+3. **Hallucination** — irrelevant text during silence → remove entirely
+
+4. **Korean transliteration** → restore to original English (e.g., "오디트"→"audit")
+
+5. **Abbreviation reconstruction** — split letters → combine (C, A, A, T → CAAT)
+
+6. **Speaker fragmentation** — merge incorrectly split segments
+
+7. **Foreign characters** randomly inserted → remove
+
+[Rules — Must Follow]
+1) Remove hallucinated/repeated segments (keep most accurate version)
+2) Fix phonetic substitutions — this is the MOST IMPORTANT task
+3) Restore Korean transliterations to English originals
+4) Keep English sentences in English — do NOT translate
+5) Combine split abbreviations (C, A, A, T → CAAT)
+6) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
+7) Preserve [MM:SS] timestamps
+8) Don't summarize or shorten — only correct errors
+9) Output corrected text only, no explanations`;
 }
 
 async function refineTranscript(){
