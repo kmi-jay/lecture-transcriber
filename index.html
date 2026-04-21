@@ -537,16 +537,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="field" id="precheck-llm-row" style="display:none">
     <div class="field-label">AI 후처리 (노트·요약·정제)</div>
     <select id="pre-llm-choice">
-      <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
-      <option value="free-only">무료만 (Groq → Gemini)</option>
-      <option value="groq-first">Groq 우선 → Gemini → Claude → OpenAI</option>
-      <option value="gemini-first">Gemini 우선 → Groq → Claude → OpenAI</option>
-      <option value="claude-first">Claude 우선 → Groq → Gemini → OpenAI</option>
-      <option value="openai-first">OpenAI 우선 → Groq → Gemini → Claude</option>
-      <option value="groq-only">Groq만 (Llama, 무료)</option>
-      <option value="gemini-only">Gemini만 (무료)</option>
-      <option value="claude-only">Claude만 (유료)</option>
-      <option value="openai-only">OpenAI만 (GPT-4o-mini, 유료)</option>
+      <optgroup label="🤖 자동 모드">
+        <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
+        <option value="quality-llm">품질 우선 (Claude → OpenAI → Gemini → Groq)</option>
+        <option value="free-only">무료만 (Groq → Gemini)</option>
+      </optgroup>
+      <optgroup label="📌 직접 선택">
+        <option value="claude-only">Claude (유료, 최고 품질)</option>
+        <option value="openai-only">OpenAI GPT-4o-mini (유료)</option>
+        <option value="gemini-only">Gemini (무료, 대용량)</option>
+        <option value="groq-only">Groq Llama (무료, 빠름)</option>
+      </optgroup>
     </select>
     <p style="font-size:12px;color:var(--text3);margin-top:4px">노트 생성, 요약, 텍스트 정제에 사용할 AI를 선택합니다</p>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -870,14 +871,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="field" style="margin-bottom:0">
         <div class="field-label">기본 LLM 선택</div>
         <select id="set-llm-provider">
-          <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
-          <option value="free-only">무료만 (Groq → Gemini)</option>
-          <option value="groq-first">Groq 우선 → Gemini → Claude</option>
-          <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
-          <option value="claude-first">Claude 우선 → Groq → Gemini</option>
-          <option value="groq-only">Groq만 (Llama 3.3 70B)</option>
-          <option value="gemini-only">Gemini만 (2.0 Flash)</option>
-          <option value="claude-only">Claude만 (Sonnet 4.6)</option>
+          <optgroup label="🤖 자동 모드">
+            <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
+            <option value="quality-llm">품질 우선 (Claude → OpenAI → Gemini → Groq)</option>
+            <option value="free-only">무료만 (Groq → Gemini)</option>
+          </optgroup>
+          <optgroup label="📌 직접 선택">
+            <option value="claude-only">Claude Sonnet 4.6 (유료, 최고 품질)</option>
+            <option value="openai-only">OpenAI GPT-4o-mini (유료)</option>
+            <option value="gemini-only">Gemini 2.0 Flash (무료, 대용량)</option>
+            <option value="groq-only">Groq Llama 3.3 70B (무료, 빠름)</option>
+          </optgroup>
         </select>
       </div>
       <p style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">
@@ -1261,41 +1265,56 @@ function updateCostEstimate(){
   const costText=document.getElementById('pre-cost-text');
   const RATE=0.006,KRW=1400;
 
+  const durMin=Math.round(dur/60*10)/10; // 소수 1자리 분
+  function _costLine(provId,minutes){
+    const p=PROVIDERS[provId];
+    if(!p||p.free) return `${p?p.label:provId} — 무료`;
+    const total=Math.round(p.costPerMin*minutes);
+    return `${p.label} — 분당 ${_provCost(provId)}, ${minutes.toFixed(1)}분 ≈ ₩${total.toLocaleString()}`;
+  }
+
   if(choice==='groq-only'||choice==='assemblyai-only'||choice==='gemini-only'){
-    costDiv.style.display='none';
+    costDiv.style.display='flex';
+    costText.textContent=`${_provLabel(choice.replace('-only',''))} — 무료`;
   }else if(choice==='free-auto'){
     costDiv.style.display='flex';
-    costText.textContent='무료 API만 사용합니다 (비용 없음)';
-    costDiv.className='alert alert-info';
+    costText.textContent='무료 API만 사용 (비용 없음)';
   }else if(choice==='openai-only'){
-    const cost=(dur/60)*RATE;
     costDiv.style.display='flex';
-    costText.textContent=`예상 비용: $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
+    costText.textContent=_costLine('openai',durMin);
   }else if(choice==='google-only'){
-    const gRate=PROVIDERS.google.costPerMin;
     costDiv.style.display='flex';
-    costText.textContent=`예상 비용: ≈ ₩${Math.round((dur/60)*gRate)}`;
+    costText.textContent=_costLine('google',durMin);
   }else if(choice==='quality-auto'){
-    // Quality mode: estimate based on top available paid provider
+    // Quality mode: show which provider will be used + cost breakdown
     if(state.googleSttKey){
-      const gRate=PROVIDERS.google.costPerMin;
       costDiv.style.display='flex';
-      costText.textContent=`품질 우선: Google (Chirp 2) 사용 — 예상 ≈ ₩${Math.round((dur/60)*gRate)}`;
+      costText.textContent=`품질 우선 → ${_costLine('google',durMin)}`;
     }else if(state.openaiKey){
-      const cost=(dur/60)*RATE;
       costDiv.style.display='flex';
-      costText.textContent=`품질 우선: OpenAI 사용 — 예상 $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
+      costText.textContent=`품질 우선 → ${_costLine('openai',durMin)}`;
+    }else if(state.assemblyaiKey){
+      costDiv.style.display='flex';
+      costText.textContent='품질 우선 → AssemblyAI — 무료 크레딧';
     }else{
       costDiv.style.display='flex';
-      costText.textContent='품질 우선: 유료 API 키 미등록 → 무료 API로 대체됩니다';
+      costText.textContent='품질 우선: 유료 API 키 미등록 → 무료 API로 대체';
     }
   }else{
-    // auto (cost-saving): Groq free → AssemblyAI free → paid fallback
-    const openaiSec=Math.max(0,dur-remainSec);
-    if(openaiSec>0&&!state.assemblyaiKey&&!state.geminiKey){
-      const cost=(openaiSec/60)*RATE;
+    // auto (cost-saving): free first → paid fallback
+    if(state.groqKey||state.assemblyaiKey||state.geminiKey){
+      const freeNames=[];
+      if(state.groqKey) freeNames.push('Groq');
+      if(state.assemblyaiKey) freeNames.push('AssemblyAI');
+      if(state.geminiKey) freeNames.push('Gemini');
       costDiv.style.display='flex';
-      costText.textContent=`무료 한도 초과 시 유료 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
+      costText.textContent=`비용 절약 → ${freeNames.join(' → ')} (무료)${state.googleSttKey||state.openaiKey?' → 실패 시 유료 대체':''}`;
+    }else if(state.googleSttKey){
+      costDiv.style.display='flex';
+      costText.textContent=`무료 API 없음 → ${_costLine('google',durMin)}`;
+    }else if(state.openaiKey){
+      costDiv.style.display='flex';
+      costText.textContent=`무료 API 없음 → ${_costLine('openai',durMin)}`;
     }else{
       costDiv.style.display='none';
     }
@@ -3701,7 +3720,7 @@ function _iq(s){
 // Helper: pick best LLM provider based on settings with priority ordering
 function _populateResultLLMSelect(){
   const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
-  const opts=[{v:'auto',t:'자동'}];
+  const opts=[{v:'auto',t:'비용 절약 (무료 우선)'},{v:'quality-llm',t:'품질 우선 (Claude→OpenAI)'}];
   const freeKeys=['groq','gemini'].filter(id=>state[keyMap[id]]);
   if(freeKeys.length>=2) opts.push({v:'free-only',t:'무료만 (Groq→Gemini)'});
   ['groq','gemini','claude','openai'].forEach(id=>{
@@ -3730,6 +3749,7 @@ function _pickLLMProvider(){
   // Priority orders
   const orders={
     'auto':['groq','gemini','claude','openai'],
+    'quality-llm':['claude','openai','gemini','groq'],
     'free-only':['groq','gemini'],
     'groq-first':['groq','gemini','claude','openai'],
     'gemini-first':['gemini','groq','claude','openai'],
