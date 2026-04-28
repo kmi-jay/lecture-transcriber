@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.21</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.22</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -496,6 +496,18 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
         <b>💡 권장:</b> 한영 혼합 강의는 <b>다국어</b> 모드 + <b>정제(LLM)</b> 후처리를 함께 사용하면 음차→영어 복원 등 품질이 크게 향상됩니다.<br><b>📝 강의 주제 입력:</b> 주제를 입력하면 전사·정제·요약 모든 단계에서 해당 분야의 전문 용어 인식률이 향상됩니다.
       </div>
     </details>
+  </div>
+
+  <div class="field">
+    <div class="field-label">청크 분할</div>
+    <select id="pre-chunk-min">
+      <option value="0">분할 없음 (전체를 한 번에)</option>
+      <option value="10">10분 단위</option>
+      <option value="15">15분 단위</option>
+      <option value="20">20분 단위</option>
+      <option value="25">25분 단위 (Groq/OpenAI 최대)</option>
+    </select>
+    <p id="pre-chunk-hint" style="font-size:11px;color:var(--text3);margin-top:4px"></p>
   </div>
 
   <div class="field">
@@ -1252,8 +1264,29 @@ function showPrecheck(){
   const autoRefineEl=document.getElementById('pre-auto-refine');
   if(autoRefineEl) autoRefineEl.checked=state.autoRefine||false;
 
-  sel.onchange=updateCostEstimate;
+  // Chunk selector initialization
+  const preChunkSel=document.getElementById('pre-chunk-min');
+  preChunkSel.value=String(state.chunkMin||25);
+  function updateChunkHint(){
+    const api=sel.value;
+    const hint=document.getElementById('pre-chunk-hint');
+    const dur=currentAudio.duration;
+    const chunkVal=parseInt(preChunkSel.value);
+    const n=chunkVal===0?1:Math.ceil(dur/(chunkVal*60));
+    document.getElementById('pre-chunk-val').textContent=n;
+    if(api==='assemblyai-only'||api==='gemini-only'||api==='google-only'){
+      hint.textContent='이 프로바이더는 분할 없이 전체 처리 가능합니다. "분할 없음" 권장.';
+    }else if(api==='groq-only'||api==='openai-only'){
+      hint.textContent='Groq/OpenAI는 최대 25분(25MB)까지. 긴 파일은 25분 이하로 설정하세요.';
+    }else{
+      hint.textContent=`${n}개 청크로 분할됩니다. 청크가 클수록 문맥 유지에 유리합니다.`;
+    }
+  }
+  preChunkSel.onchange=updateChunkHint;
+
+  sel.onchange=()=>{updateCostEstimate();updateChunkHint()};
   updateCostEstimate();
+  updateChunkHint();
   showPage('precheck');
 }
 
@@ -1351,6 +1384,9 @@ async function startTranscription(){
 
   state.context=document.getElementById('pre-context')?.value?.trim()||'';
   state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
+  // Read chunk setting from precheck page (overrides settings page value)
+  const preChunkVal=document.getElementById('pre-chunk-min')?.value;
+  if(preChunkVal!==undefined) state.chunkMin=parseInt(preChunkVal);
   await saveState();
 
   // Keep device awake during transcription
@@ -1589,8 +1625,10 @@ async function tryFallback(ch,error,lang,chunks,file){
       if(!approved) continue;
     }
     try{
-      toast(`${ch.api.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
+      const failedApi=ch.api; // save original before overwriting
+      toast(`${failedApi.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
       ch.api=fb;
+      renderChunks(chunks); // update UI immediately to show new model
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let result;
       if(fb==='groq') result=await transcribeGroq(chunkBlob,lang);
@@ -1602,8 +1640,9 @@ async function tryFallback(ch,error,lang,chunks,file){
       ch.segments=result.segments||[];
       ch.status='done';
 
-      // Switch remaining pending chunks too
-      chunks.filter(c=>c.status==='pending'&&c.api===ch.api).forEach(c=>c.api=fb);
+      // Switch remaining pending chunks too (use saved failedApi, not ch.api which is already fb)
+      chunks.filter(c=>c.status==='pending'&&c.api===failedApi).forEach(c=>c.api=fb);
+      renderChunks(chunks); // refresh UI with updated models
       if(fb==='groq'){state.quota.usedSec+=ch.chunkDur;await saveState();updateQuotaUI()}
       return true;
     }catch(e2){console.error(`Fallback ${fb} failed:`,e2)}
