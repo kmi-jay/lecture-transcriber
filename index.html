@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.24</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.25</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1417,7 +1417,8 @@ async function startTranscription(){
   const{file,duration}=currentAudio;
   // chunkMin=0 means no splitting; otherwise clamp by API limits
   // Groq/OpenAI Whisper: ~25MB → ~25min WAV; AssemblyAI/Gemini: no limit
-  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity, google:Infinity};
+  // Google STT inline base64 has ~10MB limit → ~10min for compressed audio
+  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity, google:10*60};
   const userChunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
   // Determine effective chunk size per chosen API
   function _effectiveChunkSec(api){
@@ -1929,7 +1930,7 @@ async function transcribeGoogleSTT(blob,lang){
       config,
       audio:{content:base64}
     })
-  },30000);
+  },180000); // 3 min — large base64 uploads need time
 
   if(!res.ok) throw new LLMError('google',res.status,await res.text(),null);
   const opData=await res.json();
