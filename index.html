@@ -1356,9 +1356,12 @@ async function startTranscription(){
   // Keep device awake during transcription
   await acquireWakeLock();
 
-  // Force AssemblyAI when diarization is enabled
+  // Force AssemblyAI when diarization is enabled — but only in cost-saving/free auto modes
+  // In quality-auto, google-only, or other explicit selections, respect user choice
   const diarizeEnabled=document.getElementById('pre-diarization')?.checked;
-  if(diarizeEnabled&&state.assemblyaiKey) choice='assemblyai-only';
+  if(diarizeEnabled&&state.assemblyaiKey&&(choice==='auto'||choice==='free-auto')){
+    choice='assemblyai-only';
+  }
 
   // Validate keys
   if(choice==='groq-only'&&!state.groqKey){toast('설정에서 Groq API 키를 입력하세요');return}
