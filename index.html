@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.26</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.27</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2727,7 +2727,9 @@ function _startLiveTimer(el,msg,label){
 async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride){
   const limits=_getLLMLimits(provider);
   const maxTok=maxTokOverride||limits.maxTokens;
-  const chunkSize=Math.floor(limits.inputChars*0.8);
+  // Chunk size = min(input capacity, estimated output capacity) — prevents output truncation
+  const outputCapacityChars=Math.floor(maxTok*1.5); // Korean: ~1.5 chars per token
+  const chunkSize=Math.min(Math.floor(limits.inputChars*0.8), outputCapacityChars);
   const chunks=[];
   for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
   const partials=[];
@@ -3531,9 +3533,13 @@ async function refineTranscript(){
   btn.disabled=true;
   const label=_provLabelWithCost(provider);
   const limits=_getLLMLimits(provider);
-  // For refinement, output ≈ input length — needs large token limit
-  const refineMaxTok=Math.min(Math.ceil(srcText.length/2)+4000, provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
-  const isLong=srcText.length>limits.inputChars;
+  // For refinement, output ≈ input length
+  // Estimate: Korean ~1.5-2 chars per token → max output chars ≈ maxTokens * 1.5
+  const modelMaxTok=limits.maxTokens;
+  const maxOutputChars=Math.floor(modelMaxTok*1.5); // conservative: how many chars this model can output
+  const refineMaxTok=modelMaxTok; // always use full model capacity for refine
+  // Force chunking if input exceeds EITHER input limit OR estimated output capacity
+  const isLong=srcText.length>limits.inputChars||srcText.length>maxOutputChars;
 
   const outLang=_getOutputLang();
   const lang=document.getElementById('pre-language')?.value||'ko';
