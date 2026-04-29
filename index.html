@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.25</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.26</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1271,15 +1271,30 @@ function showPrecheck(){
     const api=sel.value;
     const hint=document.getElementById('pre-chunk-hint');
     const dur=currentAudio.duration;
+    // Force chunk limit for APIs with size restrictions
+    if(api==='google-only'||api==='quality-auto'){
+      // Google STT inline base64 ~10MB limit → max 10min chunks
+      const curVal=parseInt(preChunkSel.value);
+      if(curVal===0||curVal>10) preChunkSel.value='10';
+    }else if(api==='groq-only'||api==='openai-only'){
+      const curVal=parseInt(preChunkSel.value);
+      if(curVal===0||curVal>25) preChunkSel.value='25';
+    }
     const chunkVal=parseInt(preChunkSel.value);
     const n=chunkVal===0?1:Math.ceil(dur/(chunkVal*60));
     document.getElementById('pre-chunk-val').textContent=n;
-    if(api==='assemblyai-only'||api==='gemini-only'||api==='google-only'){
-      hint.textContent='이 프로바이더는 분할 없이 전체 처리 가능합니다. "분할 없음" 권장.';
+    if(api==='google-only'||api==='quality-auto'){
+      hint.textContent='Google STT는 청크당 10분 이하 필수 (base64 용량 제한). 자동 조정됨.';
+      hint.style.color='var(--amber)';
+    }else if(api==='assemblyai-only'||api==='gemini-only'){
+      hint.textContent='이 프로바이더는 분할 없이 전체 처리 가능합니다.';
+      hint.style.color='var(--text3)';
     }else if(api==='groq-only'||api==='openai-only'){
-      hint.textContent='Groq/OpenAI는 최대 25분(25MB)까지. 긴 파일은 25분 이하로 설정하세요.';
+      hint.textContent='Groq/OpenAI는 최대 25분(25MB). 자동 조정됨.';
+      hint.style.color='var(--text3)';
     }else{
       hint.textContent=`${n}개 청크로 분할됩니다. 청크가 클수록 문맥 유지에 유리합니다.`;
+      hint.style.color='var(--text3)';
     }
   }
   preChunkSel.onchange=updateChunkHint;
@@ -1897,11 +1912,13 @@ async function transcribeGoogleSTT(blob,lang){
   const isAutoLang=(!lang||lang==='auto'||lang==='multi');
 
   // Detect encoding from blob type
+  // extractChunk() normally outputs WAV 16kHz mono via encodeWAV()
+  // But if decodeAudioData fails, it returns the original file as-is
   let encoding='LINEAR16';
-  let sampleRate=16000;
+  let sampleRate=16000; // extractChunk encodes at 16kHz
   const blobType=blob.type||'';
-  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=48000;}
-  else if(blobType.includes('ogg')) {encoding='OGG_OPUS';sampleRate=48000;}
+  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=0;} // original file fallback
+  else if(blobType.includes('ogg')) {encoding='OGG_OPUS';sampleRate=0;}
   else if(blobType.includes('mp3')||blobType.includes('mpeg')) {encoding='MP3';sampleRate=0;}
   else if(blobType.includes('wav')) {encoding='LINEAR16';sampleRate=16000;}
   else if(blobType.includes('flac')) {encoding='FLAC';sampleRate=0;}
@@ -1909,13 +1926,13 @@ async function transcribeGoogleSTT(blob,lang){
 
   const config={
     encoding,
-    sampleRateHertz:sampleRate,
     languageCode:isAutoLang?'ko-KR':(langMap[lang]||'ko-KR'),
     model:'chirp_2',
     enableAutomaticPunctuation:true,
-    enableWordTimeOffsets:true,
-    enableWordConfidence:true
+    enableWordTimeOffsets:true
   };
+  // Only set sampleRateHertz for raw PCM formats; self-describing formats auto-detect
+  if(sampleRate>0) config.sampleRateHertz=sampleRate;
 
   if(isAutoLang){
     config.alternativeLanguageCodes=['en-US','ja-JP','zh-CN'];
@@ -2604,7 +2621,7 @@ function showLLMErrorModal(err, retryFn){
 // ── API call functions with structured errors ──
 // ── Provider registry — single source of truth for labels, costs, limits ──
 const PROVIDERS={
-  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:8000, canTranscribe:true,  canPostProcess:true},
+  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:32768, canTranscribe:true,  canPostProcess:true},
   gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:800000, maxTokens:65536,canTranscribe:true,  canPostProcess:true},
   google:{label:'Google (Chirp)',  costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
@@ -2630,6 +2647,8 @@ async function _fetchWithTimeout(url,opts,timeoutMs=90000){
 }
 
 async function callGroqChat(systemPrompt,userPrompt,maxTok){
+  // Longer timeout for large refine outputs (up to 5 min)
+  const timeoutMs=maxTok>4000?300000:180000;
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
@@ -2638,7 +2657,7 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.groq.maxTokens
     })
-  },180000);
+  },timeoutMs);
   if(!res.ok){
     const retryAfter=parseInt(res.headers.get('retry-after'))||null;
     throw new LLMError('groq',res.status,await res.text(),retryAfter);
@@ -2669,6 +2688,7 @@ async function callGemini(systemPrompt,userPrompt,maxTok){
 }
 
 async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
+  const timeoutMs=maxTok>4000?300000:180000;
   const res=await _fetchWithTimeout('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
@@ -2677,7 +2697,7 @@ async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.openai.maxTokens
     })
-  },180000);
+  },timeoutMs);
   if(!res.ok){
     throw new LLMError('openai',res.status,await res.text(),null);
   }
