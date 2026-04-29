@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.27</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.28</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1433,23 +1433,48 @@ async function startTranscription(){
   // chunkMin=0 means no splitting; otherwise clamp by API limits
   // Groq/OpenAI Whisper: ~25MB → ~25min WAV; AssemblyAI/Gemini: no limit
   // Google STT inline base64 has ~10MB limit → ~10min for compressed audio
-  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity, google:10*60};
+  // Google inline base64: raw WAV doubles in base64, so ~5min WAV ≈ 10MB base64
+  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity, google:5*60};
   const userChunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
   // Determine effective chunk size per chosen API
   function _effectiveChunkSec(api){
     const limit=apiChunkLimits[api]||25*60;
     return Math.min(userChunkSec,limit);
   }
-  const defaultChunkSec=Math.min(userChunkSec,25*60); // conservative default
-  const nChunks=userChunkSec===Infinity?1:Math.ceil(duration/defaultChunkSec);
+  // Determine the primary API to calculate chunk sizes
+  let primaryApi='groq';
+  if(choice==='openai-only') primaryApi='openai';
+  else if(choice==='google-only') primaryApi='google';
+  else if(choice==='assemblyai-only') primaryApi='assemblyai';
+  else if(choice==='gemini-only') primaryApi='gemini';
+  else if(choice==='groq-only') primaryApi='groq';
+  else if(choice==='quality-auto'){
+    if(state.googleSttKey) primaryApi='google';
+    else if(state.openaiKey) primaryApi='openai';
+    else if(state.assemblyaiKey) primaryApi='assemblyai';
+    else if(state.groqKey) primaryApi='groq';
+    else primaryApi='gemini';
+  }else if(choice==='free-auto'){
+    if(state.groqKey) primaryApi='groq';
+    else if(state.assemblyaiKey) primaryApi='assemblyai';
+    else primaryApi='gemini';
+  }else{
+    if(state.groqKey) primaryApi='groq';
+    else if(state.assemblyaiKey) primaryApi='assemblyai';
+    else if(state.geminiKey) primaryApi='gemini';
+    else if(state.googleSttKey) primaryApi='google';
+    else primaryApi='openai';
+  }
+  const defaultChunkSec=_effectiveChunkSec(primaryApi);
+  const nChunks=defaultChunkSec===Infinity||userChunkSec===Infinity?1:Math.ceil(duration/defaultChunkSec);
 
   // Build chunk plan
   const chunks=[];
   let remainGroq=getGroqRemainSec();
 
   for(let i=0;i<nChunks;i++){
-    const startSec=Math.max(0,i*defaultChunkSec-(i>0?OVERLAP_SEC:0));
-    const endSec=userChunkSec===Infinity?duration:Math.min(duration,(i+1)*defaultChunkSec);
+    const startSec=nChunks===1?0:Math.max(0,i*defaultChunkSec-(i>0?OVERLAP_SEC:0));
+    const endSec=nChunks===1?duration:Math.min(duration,(i+1)*defaultChunkSec);
     const chunkDur=endSec-startSec;
 
     let api;
@@ -1534,7 +1559,9 @@ async function startTranscription(){
       ch.status='done';
     }catch(e){
       console.error(`Chunk ${i} error:`,e);
-      const errMsg=`${ch.api}: ${e.message||e}`;
+      const errDetail=e instanceof LLMError?`HTTP ${e.status}${e.bodyText?' — '+e.bodyText.slice(0,80):''}`:
+        (e instanceof Error?e.message:String(e));
+      const errMsg=`${ch.api}: ${errDetail}`;
 
       // Fallback logic for auto modes
       if(choice==='auto'||choice==='free-auto'||choice==='quality-auto'){
@@ -1638,9 +1665,10 @@ async function tryFallback(ch,error,lang,chunks,file){
   }
 
   for(const fb of fallbackAPIs){
-    if(fb==='openai'){
-      // Ask user permission for paid API
-      const approved=await askUserForOpenAI(ch);
+    // In quality-auto, user already chose paid APIs — no permission needed
+    // In cost-saving/free modes, ask before switching to paid APIs
+    if(choice!=='quality-auto'&&(fb==='openai'||fb==='google')){
+      const approved=await askPaidFallback(ch,fb);
       if(!approved) continue;
     }
     try{
@@ -1669,13 +1697,15 @@ async function tryFallback(ch,error,lang,chunks,file){
   return false;
 }
 
-function askUserForOpenAI(ch){
+function askPaidFallback(ch,apiId){
   return new Promise(resolve=>{
     const durMin=(ch.chunkDur/60).toFixed(1);
-    const cost=(ch.chunkDur/60*0.006).toFixed(3);
+    const costPerMin=PROVIDERS[apiId]?.costPerMin||1;
+    const costKRW=Math.round(ch.chunkDur/60*costPerMin);
+    const label=_provLabel(apiId);
     showModal('유료 API 전환',
-      `무료 API가 모두 실패했습니다.<br><br>남은 청크를 OpenAI로 처리할까요?<br>이 청크: ${durMin}분 ≈ $${cost} (≈ ₩${Math.round(ch.chunkDur/60*0.006*1400)})`,
-      [{label:'OpenAI로 계속',primary:true,fn:()=>resolve(true)},
+      `무료 API가 모두 실패했습니다.<br><br>남은 청크를 ${label}로 처리할까요?<br>이 청크: ${durMin}분 ≈ ₩${costKRW}`,
+      [{label:`${label}로 계속`,primary:true,fn:()=>resolve(true)},
        {label:'건너뛰기',primary:false,fn:()=>resolve(false)}]);
   });
 }
@@ -1917,12 +1947,18 @@ async function transcribeGoogleSTT(blob,lang){
   let encoding='LINEAR16';
   let sampleRate=16000; // extractChunk encodes at 16kHz
   const blobType=blob.type||'';
-  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=0;} // original file fallback
+  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=0;}
   else if(blobType.includes('ogg')) {encoding='OGG_OPUS';sampleRate=0;}
   else if(blobType.includes('mp3')||blobType.includes('mpeg')) {encoding='MP3';sampleRate=0;}
   else if(blobType.includes('wav')) {encoding='LINEAR16';sampleRate=16000;}
   else if(blobType.includes('flac')) {encoding='FLAC';sampleRate=0;}
   else if(blobType.includes('mp4')||blobType.includes('m4a')) {encoding='MP3';sampleRate=0;}
+
+  // Check base64 size — Google inline limit is ~10MB
+  const base64SizeMB=base64.length*0.75/1024/1024;
+  if(base64SizeMB>10){
+    throw new LLMError('google',413,`오디오 파일이 너무 큽니다 (${base64SizeMB.toFixed(1)}MB). Google STT 인라인 한도는 ~10MB입니다. 청크 크기를 줄여주세요.`,null);
+  }
 
   const config={
     encoding,
@@ -2031,7 +2067,7 @@ function blobToBase64(blob){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=()=>resolve(reader.result.split(',')[1]);
-    reader.onerror=reject;
+    reader.onerror=()=>reject(new Error(`FileReader 오류: 파일 읽기 실패 (${(blob.size/1024/1024).toFixed(1)}MB)`));
     reader.readAsDataURL(blob);
   });
 }
