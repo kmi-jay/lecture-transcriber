@@ -1,5 +1,5 @@
 // Lispen Service Worker v5
-const CACHE = 'lispen-v41';
+const CACHE = 'lispen-v42';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
