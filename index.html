@@ -2949,7 +2949,7 @@ async function _runSummary(provider,transcriptText,lang){
     const sp=useK
       ?'다음은 긴 강의 전사의 일부입니다. 이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'
       :'This is a portion of a long lecture transcript. Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.';
-    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
+    const chunkMaxTok=limits.maxTokens;
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
     finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
@@ -2957,7 +2957,7 @@ async function _runSummary(provider,transcriptText,lang){
 
   const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
   // Scale output tokens — long lectures need more output
-  const scaledSumMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(finalText.length/10)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
+  const scaledSumMaxTok=limits.maxTokens;
   const _sumTimer=_startLiveTimer(summaryEl,isLong?'2단계: 종합 요약 생성 중':'요약 생성 중',label);
 
   try{
@@ -3288,7 +3288,7 @@ async function generateNotesFromText(transcriptText,lang){
       ?systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거, 비교, 실무 포인트를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 충분히 설명하세요. "왜 중요한지", "어떻게 작동하는지", "실무/시험에서 어떻게 나오는지"를 반드시 포함하세요. 간략히 쓰지 마세요. 최대한 길고 상세하게 작성하세요.'
       :systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, argument, comparison, and practical point. Each point must be 3-5 sentences with full explanation including WHY it matters and HOW it works. Be as thorough and detailed as possible. Do NOT abbreviate.';
     // Scale output tokens: long chunks need long output
-    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
+    const chunkMaxTok=limits.maxTokens;
     const partials=await _processChunks(provider,transcriptText,(ci)=>chunkSp,notesEl,label,chunkMaxTok);
     // Direct concatenation — no double-compression
     const result=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
@@ -3305,7 +3305,7 @@ async function generateNotesFromText(transcriptText,lang){
     ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요. 모든 핵심 내용을 빠짐없이 포함하고, 각 포인트를 2~4문장으로 충분히 설명하세요.\n\n${transcriptText.slice(0,limits.inputChars)}`
     :`Analyze the following transcript and write notes in the format above, in English. Include ALL key insights — each point with 2-4 sentences of explanation.\n\n${transcriptText.slice(0,limits.inputChars)}`;
   // Scale output tokens with input length
-  const scaledMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(transcriptText.length/8)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
+  const scaledMaxTok=limits.maxTokens;
   const _notesTimer=_startLiveTimer(notesEl,`노트 생성 중 (${templateNames[template]||'표준'})`,label);
 
   try{
