@@ -502,10 +502,10 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="field-label">청크 분할</div>
     <select id="pre-chunk-min">
       <option value="0">분할 없음 (전체를 한 번에)</option>
+      <option value="3">3분 단위 (Google STT 최대)</option>
+      <option value="5">5분 단위</option>
       <option value="10">10분 단위</option>
-      <option value="15">15분 단위</option>
-      <option value="20">20분 단위</option>
-      <option value="25">25분 단위 (Groq/OpenAI 최대)</option>
+      <option value="12">12분 단위 (Groq/OpenAI 최대)</option>
     </select>
     <p id="pre-chunk-hint" style="font-size:11px;color:var(--text3);margin-top:4px"></p>
   </div>
@@ -910,15 +910,15 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="field" style="margin-bottom:0">
         <div class="field-label">청크 길이</div>
         <select id="set-chunk-min">
-          <option value="10">10분</option>
-          <option value="15">15분</option>
-          <option value="20">20분</option>
-          <option value="25" selected>25분 (권장)</option>
+          <option value="3">3분 (Google STT 최대)</option>
+          <option value="5">5분</option>
+          <option value="10" selected>10분 (권장)</option>
+          <option value="12">12분 (Groq/OpenAI 최대)</option>
           <option value="0">분할 없음 (전체)</option>
         </select>
       </div>
       <p style="font-size:12px;color:var(--text3);margin-top:8px">
-        청크가 클수록 전사 품질이 높아집니다. Groq/OpenAI는 25MB(~25분) 제한.
+        청크가 클수록 전사 품질이 높아집니다. Google STT는 3분, Groq/OpenAI는 12분 제한.
         AssemblyAI·Gemini는 분할 없이도 가능합니다.
       </p>
     </div>
@@ -1273,24 +1273,24 @@ function showPrecheck(){
     const dur=currentAudio.duration;
     // Force chunk limit for APIs with size restrictions
     if(api==='google-only'||api==='quality-auto'){
-      // Google STT inline base64 ~10MB limit → max 10min chunks
+      // Google STT inline base64 ~10MB limit → max 3min WAV chunks
       const curVal=parseInt(preChunkSel.value);
-      if(curVal===0||curVal>10) preChunkSel.value='10';
+      if(curVal===0||curVal>3) preChunkSel.value='3';
     }else if(api==='groq-only'||api==='openai-only'){
       const curVal=parseInt(preChunkSel.value);
-      if(curVal===0||curVal>25) preChunkSel.value='25';
+      if(curVal===0||curVal>12) preChunkSel.value='10';
     }
     const chunkVal=parseInt(preChunkSel.value);
     const n=chunkVal===0?1:Math.ceil(dur/(chunkVal*60));
     document.getElementById('pre-chunk-val').textContent=n;
     if(api==='google-only'||api==='quality-auto'){
-      hint.textContent='Google STT는 청크당 10분 이하 필수 (base64 용량 제한). 자동 조정됨.';
+      hint.textContent='Google STT는 청크당 3분 이하 필수 (base64 용량 제한). 자동 조정됨.';
       hint.style.color='var(--amber)';
     }else if(api==='assemblyai-only'||api==='gemini-only'){
       hint.textContent='이 프로바이더는 분할 없이 전체 처리 가능합니다.';
       hint.style.color='var(--text3)';
     }else if(api==='groq-only'||api==='openai-only'){
-      hint.textContent='Groq/OpenAI는 최대 25분(25MB). 자동 조정됨.';
+      hint.textContent='Groq/OpenAI는 최대 12분(25MB). 자동 조정됨.';
       hint.style.color='var(--text3)';
     }else{
       hint.textContent=`${n}개 청크로 분할됩니다. 청크가 클수록 문맥 유지에 유리합니다.`;
