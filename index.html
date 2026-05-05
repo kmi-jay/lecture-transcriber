@@ -376,7 +376,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <p>녹음된 오디오·회의 파일을 불러옵니다</p>
     </div>
   </div>
-  <input type="file" id="file-input" accept="audio/*" style="display:none"
+  <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.webm,.mp4,.aac,.flac" style="display:none"
     onchange="handleFile(this.files[0])">
 
   <!-- PWA Install Banner -->
@@ -405,8 +405,18 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
+  <!-- Search -->
+  <div id="home-search-wrap" style="margin-top:16px;display:none">
+    <div style="position:relative">
+      <input type="text" id="home-search" placeholder="파일명, 태그, 프로젝트 검색..."
+        oninput="filterHomeList(this.value)"
+        style="width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    </div>
+  </div>
+
   <!-- Projects Section -->
-  <div id="projects-section" style="margin-top:20px">
+  <div id="projects-section" style="margin-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div class="card-label">프로젝트</div>
       <button onclick="createNewProject()" style="background:none;border:none;color:var(--primary);font-size:20px;cursor:pointer;padding:4px" title="새 프로젝트">+</button>
@@ -729,7 +739,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <button class="btn btn-ghost" onclick="downloadResult()" style="flex:1">💾 TXT</button>
     <button class="btn btn-ghost" onclick="downloadMarkdown()" style="flex:1">📄 MD</button>
   </div>
-  <button class="btn btn-ghost" onclick="showPage('home')" style="margin-top:8px">← 홈으로</button>
+  <button class="btn btn-ghost" onclick="_goBackFromResult()" style="margin-top:8px">← 뒤로</button>
 </div>
 
 <!-- ═══════ PAGE: Project Detail ═══════ -->
@@ -770,8 +780,9 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <button onclick="removeFromProject()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;color:var(--amber)">📤 프로젝트에서 제거</button>
     </div>
     <div id="proj-files-list" style="display:flex;flex-direction:column;gap:4px"></div>
-    <div style="margin-top:12px">
-      <button onclick="showAddFileDialog()" class="btn btn-ghost" style="width:100%;font-size:13px;padding:10px">+ 미분류 파일 추가</button>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="showAddFileDialog()" class="btn btn-ghost" style="flex:1;font-size:13px;padding:10px">+ 미분류 파일 추가</button>
+      <button onclick="exportProject()" class="btn btn-ghost" style="font-size:13px;padding:10px;white-space:nowrap">📥 전체 내보내기</button>
     </div>
   </div>
 </div>
@@ -1061,6 +1072,12 @@ let recordChunks = [];
 let recStartTime = null;
 let recTimerInterval = null;
 let transcriptionAborted = false;
+let _isProcessing = false;
+
+// Prevent accidental page close during processing
+window.addEventListener('beforeunload', e => {
+  if(_isProcessing){e.preventDefault();e.returnValue=''}
+});
 
 // ═════════════════════════════════════════════════════════════════
 //  Wake Lock — prevent screen/CPU sleep during transcription
@@ -1138,6 +1155,15 @@ window.addEventListener('popstate', e=>{
     showPage('home', true);
   }
 });
+function _goBackFromResult(){
+  // Go back to project detail if we came from there, otherwise home
+  const h=_pageHistory.length>=2?_pageHistory[_pageHistory.length-2]:null;
+  if(h==='project'&&currentProjectId){
+    openProjectDetail(currentProjectId);
+  }else{
+    showPage('home');
+  }
+}
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
@@ -1474,6 +1500,7 @@ async function startTranscription(){
   const lang=document.getElementById('pre-language').value;
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
+  _isProcessing=true;
 
   state.context=document.getElementById('pre-context')?.value?.trim()||'';
   state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
@@ -1737,6 +1764,7 @@ async function startTranscription(){
   // to avoid double cost (auto-run ignores template selection)
 
   // Release wake lock after all processing is done
+  _isProcessing=false;
   releaseWakeLock();
 }
 
@@ -3228,7 +3256,7 @@ ${briefInput}`;
         const fullSummary=`${brief}\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
         summaryEl.style.whiteSpace='normal';
         summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullSummary)+'</div>';
-        if(state.history.length>0) state.history[0].summary=fullSummary;
+        {const _h=_curHist();if(_h) _h.summary=fullSummary;}
         await saveState();
         toast(`요약 완료 — ${estChunks}구간 (${label})`);
         summaryBtn.disabled=false;
@@ -3238,7 +3266,7 @@ ${briefInput}`;
         const fallback=`> ⚠️ 핵심 브리프 생성 실패 (${e.message}). 구간별 요약은 아래에 있습니다.\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
         summaryEl.style.whiteSpace='normal';
         summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fallback)+'</div>';
-        if(state.history.length>0) state.history[0].summary=fallback;
+        {const _h=_curHist();if(_h) _h.summary=fallback;}
         await saveState();
         toast(`구간별 요약 완료 (브리프 실패)`);
         summaryBtn.disabled=false;
@@ -3265,7 +3293,7 @@ ${briefInput}`;
     clearInterval(_sumTimer);
     summaryEl.style.whiteSpace='normal';
     summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
-    if(state.history.length>0) state.history[0].summary=summary;
+    {const _h=_curHist();if(_h) _h.summary=summary;}
     await saveState();
     toast(`요약 완료 (${label})`);
     summaryBtn.disabled=false;
@@ -3672,7 +3700,7 @@ ${tocInput}`;
       ?`\n\n> ⚠️ 처리 중 프로바이더 전환 발생: 일부 구간은 ${_provLabel(partials._finalProvider)}에서 처리됨. 품질 차이가 있을 수 있습니다.\n\n`:'';
     const result=header+switchNote+sections;
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
-    if(state.history.length>0) state.history[0].notes=result;
+    {const _h=_curHist();if(_h) _h.notes=result;}
     await saveState();
     const provInfo=partials._providerSwitched?` → ${_provLabel(partials._finalProvider)}로 전환됨`:'';
     toast(`노트 생성 완료 — ${partials.length}구간 (${label}${provInfo} · ${templateNames[template]||'표준'})`);
@@ -3692,7 +3720,7 @@ ${tocInput}`;
     const result=await _callLLM(provider,systemPrompt,userPrompt,scaledMaxTok);
     clearInterval(_notesTimer);
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
-    if(state.history.length>0) state.history[0].notes=result;
+    {const _h=_curHist();if(_h) _h.notes=result;}
     await saveState();
     toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
   }catch(e){
@@ -3946,8 +3974,9 @@ async function refineTranscript(){
   const btn=document.getElementById('btn-refine-text');
 
   // Read original text from history (not from DOM — DOM may contain badge/error text)
-  const srcText=state.history.length>0
-    ?( state.history[0].refined||state.history[0].text )
+  const _rh=_curHist();
+  const srcText=_rh
+    ?( _rh.refined||_rh.text )
     :fullEl.textContent;
   if(!srcText||srcText.length<50){toast('전사 결과가 없습니다');return}
 
@@ -3990,7 +4019,7 @@ async function refineTranscript(){
         <span style="color:var(--text3)">— ${_provLabel(provider)} · 외국어 제거 · 오인식 교정</span>
       </div>`+
       `<div style="white-space:pre-wrap;font-size:14px;line-height:1.8">${escHtml(refined)}</div>`;
-    if(state.history.length>0) state.history[0].refined=refined;
+    {const _h=_curHist();if(_h) _h.refined=refined;}
     await saveState();
     toast(`텍스트 정제 완료 (${_provLabel(provider)})`);
     updateResultStats(refined);
@@ -4027,6 +4056,7 @@ async function refineTranscript(){
 // ═════════════════════════════════════════════════════════════════
 let qaHistory=[]; // {role:'user'|'assistant', content:string}
 let currentHistoryIdx=-1; // track which history item is loaded
+function _curHist(){return currentHistoryIdx>=0?state.history[currentHistoryIdx]:state.history[0]||null}
 
 async function askQuestion(){
   const input=document.getElementById('qa-input');
@@ -4314,9 +4344,10 @@ function updateProgress(cur,total,text){
 // ── Title editing ──
 function _saveTitle(val){
   const title=val.trim();
-  if(state.history.length>0){
-    state.history[0].title=title;
-    state.history[0].name=title||state.history[0].name;
+  const h=_curHist();
+  if(h){
+    h.title=title;
+    h.name=title||h.name;
     saveState();renderHistory();
   }
 }
@@ -4373,10 +4404,10 @@ function downloadResult(){
   URL.revokeObjectURL(a.href);
 }
 function downloadRefinedText(){
-  const refined=state.history.length>0?state.history[0].refined:null;
-  if(!refined){toast('정제된 텍스트가 없습니다');return}
-  const name=state.history[0].name||'전사';
-  const blob=new Blob([refined],{type:'text/plain;charset=utf-8'});
+  const h=_curHist();
+  if(!h||!h.refined){toast('정제된 텍스트가 없습니다');return}
+  const name=h.name||'전사';
+  const blob=new Blob([h.refined],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`정제_${name.replace(/\.[^.]+$/,'')}_${fmtNow()}.txt`;
@@ -4385,8 +4416,9 @@ function downloadRefinedText(){
 }
 function _getActiveTabMarkdown(){
   // 원본 마크다운을 state에서 직접 반환 (HTML 렌더링 전 원문)
-  if(_activeTab==='notes') return state.history.length>0&&state.history[0].notes?state.history[0].notes:'';
-  if(_activeTab==='summary') return state.history.length>0&&state.history[0].summary?state.history[0].summary:'';
+  const h=_curHist();
+  if(_activeTab==='notes') return h&&h.notes?h.notes:'';
+  if(_activeTab==='summary') return h&&h.summary?h.summary:'';
   // full, qa는 마크다운 원본이 없으므로 textContent 사용
   return _getActiveTabText();
 }
@@ -4396,8 +4428,9 @@ function downloadMarkdown(){
   if(_activeTab==='full'){
     // 전체 통합 MD (전문 탭에서 누르면 전체 포함)
     const transcript=document.getElementById('res-full').textContent;
-    const notes=state.history.length>0&&state.history[0].notes?state.history[0].notes:'';
-    const summary=state.history.length>0&&state.history[0].summary?state.history[0].summary:'';
+    const hh=_curHist();
+    const notes=hh&&hh.notes?hh.notes:'';
+    const summary=hh&&hh.summary?hh.summary:'';
     md=`# 전사 노트\n생성일: ${new Date().toLocaleString('ko-KR')}\n\n`;
     if(notes){ md+=`---\n\n## 노트\n\n${notes}\n\n`; }
     if(summary){ md+=`---\n\n## 요약\n\n${summary}\n\n`; }
@@ -4463,6 +4496,28 @@ function renderProjects(){
   // Show/hide unclassified section
   document.getElementById('unclassified-section').style.display=unclassified.length||!state.history.length?'block':'none';
   document.getElementById('unclassified-list').innerHTML=unclassifiedHtml||'<p style="color:var(--text3);font-size:13px;padding:12px">분류되지 않은 파일이 없습니다</p>';
+  _updateSearchVisibility();
+}
+
+// Show search bar when there are items
+function _updateSearchVisibility(){
+  const el=document.getElementById('home-search-wrap');
+  if(el) el.style.display=(state.history.length>=3||state.projects.length>=2)?'block':'none';
+}
+
+// Filter projects and files on home page
+function filterHomeList(query){
+  const q=query.toLowerCase().trim();
+  // Filter project cards
+  document.querySelectorAll('#projects-list .card').forEach(card=>{
+    const text=card.textContent.toLowerCase();
+    card.style.display=(!q||text.includes(q))?'':'none';
+  });
+  // Filter unclassified items
+  document.querySelectorAll('#unclassified-list .history-item').forEach(item=>{
+    const text=item.textContent.toLowerCase();
+    item.style.display=(!q||text.includes(q))?'':'none';
+  });
 }
 
 // Alias for backward compatibility
@@ -4748,6 +4803,29 @@ function mergeSelectedFiles(type){
     switchTab('qa',document.querySelectorAll('#result-tabs button')[3]);
     toast('통합 Q&A 준비 완료');
   }
+}
+
+// ── Export entire project as one markdown ──
+function exportProject(){
+  if(!currentProjectId) return;
+  const proj=state.projects.find(p=>p.id===currentProjectId);
+  if(!proj) return;
+  const files=state.history.filter(h=>h.projectId===currentProjectId);
+  if(!files.length){toast('내보낼 파일이 없습니다');return}
+  let md=`# ${proj.name}\n\n생성일: ${new Date().toLocaleString('ko-KR')}\n파일 수: ${files.length}개\n\n`;
+  files.forEach((h,i)=>{
+    md+=`---\n\n## ${i+1}. ${h.title||h.name}\n\n`;
+    md+=`> ${h.date||''} · ${h.duration?Math.round(h.duration/60)+'분':''}\n\n`;
+    if(h.summary){md+=`### 요약\n\n${h.summary}\n\n`}
+    if(h.notes){md+=`### 노트\n\n${h.notes}\n\n`}
+    md+=`### 전문\n\n${h.refined||h.text}\n\n`;
+  });
+  const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${proj.name}_${fmtNow()}.md`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast('프로젝트 내보내기 완료');
 }
 
 // ── Quick move: from unclassified list, move file to a project ──
