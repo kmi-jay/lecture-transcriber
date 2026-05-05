@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.33</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.34</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -405,11 +405,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
-  <!-- History -->
-  <div id="history-section" style="display:none;margin-top:20px">
-    <div class="card-label">최근 기록</div>
-    <div class="card" style="padding:4px 16px">
-      <div id="history-list"></div>
+  <!-- Projects Section -->
+  <div id="projects-section" style="margin-top:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="card-label">프로젝트</div>
+      <button onclick="createNewProject()" style="background:none;border:none;color:var(--primary);font-size:20px;cursor:pointer;padding:4px">+</button>
+    </div>
+    <div id="projects-list"></div>
+    <div id="unclassified-section" style="margin-top:16px">
+      <div class="card-label">미분류</div>
+      <div id="unclassified-list"></div>
     </div>
   </div>
 </div>
@@ -620,6 +625,18 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <p id="res-info" style="font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0"></p>
       <p id="res-provider-info" style="font-size:11px;color:var(--text3);margin:0;display:none"></p>
     </div>
+
+    <!-- Project and Tags Assignment -->
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <select id="res-project-select" onchange="assignToProject()"
+        style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer;flex:1;min-width:150px">
+        <option value="">프로젝트 선택...</option>
+      </select>
+      <input id="res-tags-input" type="text" placeholder="태그 (쉼표로 구분)"
+        style="flex:1;min-width:150px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none"
+        onchange="updateFileTags()" onkeydown="if(event.key==='Enter') updateFileTags()">
+    </div>
+    <div id="res-tags-display" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
   </div>
 
   <div class="result-tabs" id="result-tabs">
@@ -711,6 +728,35 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <button class="btn btn-ghost" onclick="downloadMarkdown()" style="flex:1">📄 MD</button>
   </div>
   <button class="btn btn-ghost" onclick="showPage('home')" style="margin-top:8px">← 홈으로</button>
+</div>
+
+<!-- ═══════ PAGE: Project Detail ═══════ -->
+<div id="page-project" class="page">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <button class="nav-btn" onclick="showPage('home')" style="width:36px;height:36px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <input id="proj-title" type="text" placeholder="프로젝트명"
+      style="flex:1;font-size:18px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:4px 0;outline:none"
+      onchange="updateProjectTitle()">
+  </div>
+
+  <div class="field">
+    <div class="field-label">태그</div>
+    <input id="proj-tags" type="text" placeholder="쉼표로 구분하여 입력 (예: 수학, 2학기)"
+      style="width:100%;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);outline:none">
+    <div id="proj-tags-display" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+  </div>
+
+  <div style="margin-top:16px">
+    <div class="card-label">파일 목록</div>
+    <div id="proj-action-bar" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="mergeSelectedFiles('summary')" class="btn btn-sm btn-ghost">통합 요약</button>
+      <button onclick="mergeSelectedFiles('notes')" class="btn btn-sm btn-ghost">통합 노트</button>
+      <button onclick="mergeSelectedFiles('qa')" class="btn btn-sm btn-ghost">통합 Q&A</button>
+    </div>
+    <div id="proj-files-list" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
 </div>
 
 <!-- ═══════ PAGE: Settings ═══════ -->
@@ -988,7 +1034,8 @@ let state = {
   autoRefine:false,
   quota:{ date:'', usedSec:0 },
   history:[],
-  qaHistoryMap:{} // per-history-index Q&A persistence
+  qaHistoryMap:{}, // per-history-index Q&A persistence
+  projects:[] // [{id, name, createdAt, tags:[]}]
 };
 
 let currentAudio = null;
@@ -1624,8 +1671,7 @@ async function startTranscription(){
     state.qaHistoryMap=shifted;
   }
   const _title=document.getElementById('res-title').value||file.name.replace(/\.[^.]+$/,'');
-  state.history.unshift({name:file.name,title:_title,date:fmtNow(),duration:Math.round(duration),lang,text:fullText});
-  if(state.history.length>10) state.history.pop();
+  state.history.unshift({name:file.name,title:_title,date:fmtNow(),duration:Math.round(duration),lang,text:fullText,projectId:null,tags:[]});
   await saveState();renderHistory();
 
   // Prepare tabs
@@ -4360,22 +4406,47 @@ function updateResultStats(text){
   el.style.display='block';
 }
 
-function renderHistory(){
-  if(!state.history.length){document.getElementById('history-section').style.display='none';return}
-  document.getElementById('history-section').style.display='block';
-  document.getElementById('history-list').innerHTML=state.history.map((h,i)=>`
+function renderProjects(){
+  // Render project cards
+  const projectsHtml=state.projects.map(p=>{
+    const filesInProject=state.history.filter(h=>h.projectId===p.id);
+    const latestDate=filesInProject.length>0?filesInProject[0].date:'없음';
+    return `
+    <div class="card" style="cursor:pointer;transition:all .2s" onclick="openProjectDetail('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+        <div style="flex:1;min-width:0">
+          <div class="hi-name">${escHtml(p.name)}</div>
+          <div class="hi-meta">${filesInProject.length}개 파일 · 최신: ${latestDate}</div>
+        </div>
+        <div style="font-size:20px">📁</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('projects-list').innerHTML=projectsHtml||'<p style="color:var(--text3);font-size:13px;padding:12px">프로젝트를 생성하여 강의를 체계적으로 정리하세요</p>';
+
+  // Render unclassified files
+  const unclassified=state.history.filter(h=>!h.projectId);
+  const unclassifiedHtml=unclassified.map((h,i)=>{
+    const histIdx=state.history.indexOf(h);
+    return `
     <div class="history-item" style="position:relative">
-      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer" onclick="showHistoryItem(${i})">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer" onclick="showHistoryItem(${histIdx})">
         <div class="hi-icon">📄</div>
-        <div class="hi-info">
+        <div class="hi-info" style="flex:1;min-width:0">
           <div class="hi-name">${escHtml(h.title||h.name)}</div>
           <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
+          ${h.tags&&h.tags.length?`<div style="font-size:10px;color:var(--text3);margin-top:4px">${h.tags.map(t=>`<span style="display:inline-block;background:var(--surface);padding:2px 6px;border-radius:4px;margin-right:4px">${escHtml(t)}</span>`).join('')}</div>`:''}
         </div>
         <div class="hi-arrow">›</div>
       </div>
-      <button onclick="event.stopPropagation();deleteHistoryItem(${i})" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;padding:8px;cursor:pointer;opacity:0.5;z-index:1" title="삭제">✕</button>
-    </div>`).join('');
+      <button onclick="event.stopPropagation();deleteHistoryItem(${histIdx})" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;padding:8px;cursor:pointer;opacity:0.5;z-index:1" title="삭제">✕</button>
+    </div>`;
+  }).join('');
+  document.getElementById('unclassified-list').innerHTML=unclassifiedHtml||'<p style="color:var(--text3);font-size:13px;padding:12px">분류되지 않은 파일이 없습니다</p>';
 }
+
+// Alias for backward compatibility
+function renderHistory(){ renderProjects(); }
 async function deleteHistoryItem(i){
   if(!confirm('이 기록을 삭제할까요?')) return;
   state.history.splice(i,1);
@@ -4447,7 +4518,189 @@ function showHistoryItem(i){
     msgBox.appendChild(bub);
   });
 
+  // Populate project select and tags
+  populateProjectSelect();
+  document.getElementById('res-tags-input').value=h.tags&&h.tags.join(', ')||'';
+  renderTags();
+
   showPage('result');
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  PROJECT MANAGEMENT
+// ═════════════════════════════════════════════════════════════════
+let currentProjectId=null;
+
+function createNewProject(){
+  const name=prompt('프로젝트명을 입력하세요');
+  if(!name) return;
+  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  state.projects.push({id,name,createdAt:fmtNow(),tags:[]});
+  saveState();
+  renderProjects();
+  toast('프로젝트 생성됨');
+}
+
+function openProjectDetail(projectId){
+  const proj=state.projects.find(p=>p.id===projectId);
+  if(!proj) return;
+  currentProjectId=projectId;
+  document.getElementById('proj-title').value=proj.name;
+  document.getElementById('proj-tags').value=proj.tags.join(', ');
+  renderProjectFiles();
+  showPage('project');
+}
+
+function updateProjectTitle(){
+  if(!currentProjectId) return;
+  const proj=state.projects.find(p=>p.id===currentProjectId);
+  if(proj){
+    proj.name=document.getElementById('proj-title').value||'(제목없음)';
+    saveState();
+    renderProjects();
+  }
+}
+
+function renderProjectFiles(){
+  if(!currentProjectId) return;
+  const proj=state.projects.find(p=>p.id===currentProjectId);
+  if(!proj) return;
+
+  const files=state.history.filter(h=>h.projectId===currentProjectId);
+  const html=files.map((h,idx)=>{
+    const histIdx=state.history.indexOf(h);
+    return `
+    <div class="card" style="padding:12px;display:flex;gap:12px">
+      <input type="checkbox" data-idx="${histIdx}" style="width:18px;height:18px;cursor:pointer" onchange="updateActionBar()">
+      <div style="flex:1;cursor:pointer;display:flex;align-items:center;gap:12px" onclick="showHistoryItem(${histIdx})">
+        <div style="flex:1;min-width:0">
+          <div class="hi-name">${escHtml(h.title||h.name)}</div>
+          <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
+        </div>
+        <div class="hi-arrow">›</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('proj-files-list').innerHTML=html||'<p style="color:var(--text3);font-size:13px;padding:12px">이 프로젝트에 파일이 없습니다</p>';
+}
+
+function updateActionBar(){
+  const checkboxes=document.querySelectorAll('#proj-files-list input[type="checkbox"]:checked');
+  const bar=document.getElementById('proj-action-bar');
+  if(checkboxes.length>0){
+    bar.style.display='flex';
+  } else {
+    bar.style.display='none';
+  }
+}
+
+function mergeSelectedFiles(type){
+  const checkboxes=document.querySelectorAll('#proj-files-list input[type="checkbox"]:checked');
+  if(checkboxes.length===0) {toast('파일을 선택하세요');return;}
+
+  const indices=Array.from(checkboxes).map(cb=>parseInt(cb.getAttribute('data-idx')));
+  const files=indices.map(i=>state.history[i]);
+
+  const merged=files.map(h=>{
+    const text=h.refined||h.text;
+    return `[${escHtml(h.title||h.name)}]\n\n${text}`;
+  }).join('\n\n---\n\n');
+
+  if(type==='summary'){
+    mergeAndGenerateSummary(merged);
+  } else if(type==='notes'){
+    mergeAndGenerateNotes(merged);
+  } else if(type==='qa'){
+    mergeAndSetupQA(merged);
+  }
+}
+
+async function mergeAndGenerateSummary(text){
+  if(!text) return;
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
+  if(!hasLLM){toast('LLM 설정이 필요합니다');return;}
+
+  document.getElementById('res-summary').innerHTML='<div style="color:var(--text3);text-align:center;padding:20px">요약 생성 중...</div>';
+  try{
+    const summary=await generateSummaryFromText(text,'ko');
+    document.getElementById('res-summary').innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
+    showPage('result');
+    switchTab('summary',document.querySelectorAll('.result-tabs button')[2]);
+  }catch(e){
+    toast('오류: '+e.message);
+    document.getElementById('res-summary').innerHTML='<span style="color:var(--text3)">요약 생성 실패</span>';
+  }
+}
+
+async function mergeAndGenerateNotes(text){
+  if(!text) return;
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
+  if(!hasLLM){toast('LLM 설정이 필요합니다');return;}
+
+  document.getElementById('res-notes').innerHTML='<div style="color:var(--text3);text-align:center;padding:20px">노트 생성 중...</div>';
+  try{
+    const notes=await generateNotesFromText(text,'ko');
+    document.getElementById('res-notes').innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(notes)+'</div>';
+    showPage('result');
+    switchTab('notes',document.querySelectorAll('.result-tabs button')[1]);
+  }catch(e){
+    toast('오류: '+e.message);
+    document.getElementById('res-notes').innerHTML='<span style="color:var(--text3)">노트 생성 실패</span>';
+  }
+}
+
+function mergeAndSetupQA(text){
+  if(!text) return;
+  // Set the merged text as the current transcript context
+  document.getElementById('res-full').textContent=text;
+  qaHistory=[];
+  const msgBox=document.getElementById('qa-messages');
+  msgBox.innerHTML='<div class="qa-system-msg">다중 파일 통합 Q&A 모드. 질문을 입력하세요.</div>';
+  // Clear title and info for merged content
+  document.getElementById('res-title').value='통합 Q&A';
+  document.getElementById('res-info').textContent='여러 파일의 통합 Q&A';
+  showPage('result');
+  switchTab('qa',document.querySelectorAll('.result-tabs button')[3]);
+  toast('통합 Q&A 준비 완료');
+}
+
+function populateProjectSelect(){
+  const select=document.getElementById('res-project-select');
+  if(!select) return;
+  const h=state.history[currentHistoryIdx];
+  const html='<option value="">프로젝트 선택...</option>'+
+    state.projects.map(p=>`<option value="${p.id}" ${h&&h.projectId===p.id?'selected':''}>${escHtml(p.name)}</option>`).join('');
+  select.innerHTML=html;
+}
+
+function assignToProject(){
+  if(currentHistoryIdx===null||currentHistoryIdx===undefined) return;
+  const h=state.history[currentHistoryIdx];
+  if(!h) return;
+  const projectId=document.getElementById('res-project-select').value;
+  h.projectId=projectId||null;
+  saveState();
+  renderProjects();
+  toast(projectId?'프로젝트에 할당됨':'프로젝트 할당 제거됨');
+}
+
+function updateFileTags(){
+  if(currentHistoryIdx===null||currentHistoryIdx===undefined) return;
+  const h=state.history[currentHistoryIdx];
+  if(!h) return;
+  const tagsStr=document.getElementById('res-tags-input').value;
+  h.tags=tagsStr.split(',').map(t=>t.trim()).filter(t=>t);
+  saveState();
+  renderTags();
+  renderProjects();
+}
+
+function renderTags(){
+  const h=state.history[currentHistoryIdx];
+  if(!h) return;
+  const tagsHtml=h.tags.map(t=>`<span style="display:inline-block;background:var(--surface);padding:4px 10px;border-radius:6px;font-size:11px;color:var(--text)">${escHtml(t)}</span>`).join('');
+  document.getElementById('res-tags-display').innerHTML=tagsHtml;
 }
 
 // ═════════════════════════════════════════════════════════════════
