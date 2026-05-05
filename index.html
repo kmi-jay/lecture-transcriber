@@ -2853,7 +2853,7 @@ function _getOutputLang(){
   const sel=document.getElementById('pre-output-lang');
   return sel?sel.value:'ko';
 }
-function buildSummaryPrompts(transcriptText,lang,provider){
+function buildSummaryPrompts(transcriptText,lang,provider,forceProb){
   const outLang=_getOutputLang();
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
   const limit=_getLLMLimits(provider||'groq').inputChars;
@@ -2864,10 +2864,10 @@ function buildSummaryPrompts(transcriptText,lang,provider){
   const pointCount=isLong?Math.max(30,Math.round(lenMin/3))+'개 이상':'10~20개';
   const pointCountEn=isLong?Math.max(30,Math.round(lenMin/3))+'+ points':'10-20 points';
   const ctxNote=state.context?`[주제: ${state.context}]\n\n`:'';
-  // Detect problem-solving lecture patterns
+  // Detect problem-solving lecture patterns (forceProb overrides when pre-detected from original)
   const probPatterns=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④]|보기\s*[1-4])/g;
   const probMatches=(text.match(probPatterns)||[]).length;
-  const isProblemSolving=probMatches>=3;
+  const isProblemSolving=forceProb||probMatches>=3;
   const systemPrompt=useKorean
     ?`${ctxNote}당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요.
 
@@ -3008,20 +3008,36 @@ async function _runSummary(provider,transcriptText,lang){
   summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':''}</span>`;
 
   let finalText=transcriptText;
+  // Pre-detect problem-solving from ORIGINAL transcript (before chunking loses patterns)
+  const _probRx=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④]|보기\s*[1-4])/g;
+  const _probDetected=(transcriptText.match(_probRx)||[]).length>=3;
   // For very long transcripts that exceed provider limit: chunk → detailed extract → merge
   if(isLong){
     const outLang2=_getOutputLang();
     const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
     const sp=useK
-      ?'다음은 긴 강의 전사의 일부입니다. 이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'
-      :'This is a portion of a long lecture transcript. Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.';
+      ?`다음은 긴 강의 전사의 일부입니다. ${_probDetected?'⚠️ 이 강의는 문제풀이 강의입니다. 각 문제의 번호, 정답, 해설을 빠짐없이 추출하세요. ':''}이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.`
+      :`This is a portion of a long lecture transcript. ${_probDetected?'⚠️ This is a problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.`;
     const chunkMaxTok=limits.maxTokens;
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
     finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
+    // If merged chunks still exceed limit, re-chunk for 2nd pass
+    if(finalText.length>limits.inputChars){
+      const mergeChunkSize=Math.floor(limits.inputChars*0.8);
+      const mergeChunks=[];
+      for(let i=0;i<finalText.length;i+=mergeChunkSize) mergeChunks.push(finalText.slice(i,i+mergeChunkSize));
+      const useK2=(_getOutputLang()==='ko'||((_getOutputLang()==='same')&&(lang==='ko'||lang==='auto')));
+      const mergeSp=useK2
+        ?`다음은 이전 단계에서 추출한 요약의 일부입니다. ${_probDetected?'문제풀이 강의입니다. 문제 번호·정답·해설을 모두 보존하세요. ':''}이 구간의 핵심 포인트를 빠짐없이 압축하세요. 마크다운 형식.`
+        :`This is a portion of previously extracted summaries. ${_probDetected?'This is a problem-solving lecture. Preserve all problem numbers, answers, and explanations. ':''}Compress key points without omission. Use markdown.`;
+      const mergePartials=await _processChunks(provider,finalText,()=>mergeSp,summaryEl,label,limits.maxTokens);
+      finalText=mergePartials.join('\n\n');
+      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 최종 종합 요약 생성 중 (${label})...</span>`;
+    }
   }
 
-  const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
+  const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider,_probDetected);
   // Scale output tokens — long lectures need more output
   const scaledSumMaxTok=limits.maxTokens;
   const _sumTimer=_startLiveTimer(summaryEl,isLong?'2단계: 종합 요약 생성 중':'요약 생성 중',label);
