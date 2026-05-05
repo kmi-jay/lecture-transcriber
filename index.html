@@ -3011,29 +3011,100 @@ async function _runSummary(provider,transcriptText,lang){
   // Pre-detect problem-solving from ORIGINAL transcript (before chunking loses patterns)
   const _probRx=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④]|보기\s*[1-4])/g;
   const _probDetected=(transcriptText.match(_probRx)||[]).length>=3;
-  // For very long transcripts that exceed provider limit: chunk → detailed extract → merge
+  const outLang2=_getOutputLang();
+  const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
+
+  // For very long transcripts that exceed provider limit
   if(isLong){
-    const outLang2=_getOutputLang();
-    const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
-    const sp=useK
-      ?`다음은 긴 강의 전사의 일부입니다. ${_probDetected?'⚠️ 이 강의는 문제풀이 강의입니다. 각 문제의 번호, 정답, 해설을 빠짐없이 추출하세요. ':''}이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.`
-      :`This is a portion of a long lecture transcript. ${_probDetected?'⚠️ This is a problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.`;
     const chunkMaxTok=limits.maxTokens;
+    // Estimate chunk count to determine strategy
+    const outputCapChars=Math.floor(chunkMaxTok*1.5);
+    const chunkSize=Math.min(Math.floor(limits.inputChars*0.8),outputCapChars);
+    const estChunks=Math.ceil(transcriptText.length/chunkSize);
+    // Strategy: "very long" (5+ chunks, ~1h+) → section-by-section with exec brief (no lossy compression)
+    const isVeryLong=estChunks>=5;
+
+    const sp=useK
+      ?`다음은 긴 강의 전사의 일부(구간)입니다. ${_probDetected?'⚠️ 문제풀이 강의입니다. 각 문제의 번호·정답·해설을 빠짐없이 추출하세요. ':''}${isVeryLong
+        ?'이 구간의 핵심 내용을 빠짐없이 체계적으로 요약하세요. 각 포인트마다 2~3문장으로 무엇을, 왜, 어떻게를 설명. 핵심 키워드·정의·예시·수치를 반드시 포함. 마크다운 사용. 시간 정보가 있으면 포함.'
+        :'이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'}`
+      :`This is a portion of a long lecture transcript. ${_probDetected?'⚠️ Problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}${isVeryLong
+        ?'Summarize ALL key points of this section systematically. Each point in 2-3 sentences covering what, why, how. Include key terms, definitions, examples, figures. Use markdown.'
+        :'Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.'}`;
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
+
+    if(isVeryLong){
+      // ── "Very long" strategy: preserve ALL section summaries + add executive brief ──
+      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 최종 단계: 핵심 브리프 생성 중 (${label})...</span>`;
+      // Build section summaries (these are KEPT in full)
+      const sectionSummaries=partials.map((p,i)=>`## 구간 ${i+1}\n${p}`).join('\n\n---\n\n');
+      // Generate executive brief from first portion of section summaries
+      const briefInput=sectionSummaries.slice(0,limits.inputChars);
+      const lenMin=Math.round(transcriptText.length/500);
+      const briefSp=useK
+        ?`당신은 최고의 요약 전문가입니다. 아래 구간별 요약을 읽고 전체 강의(약 ${lenMin}분)의 **핵심 브리프**를 작성하세요.${_probDetected?' 문제풀이 강의입니다.':''}`
+        :`You are an expert summarizer. Read the section summaries below and write an **executive brief** for the entire lecture (~${lenMin} min).${_probDetected?' This is a problem-solving lecture.':''}`;
+      const briefUp=useK
+        ?`아래 구간별 요약을 읽고 다음을 작성하세요:
+
+## 전체 핵심 (30초 브리프)
+[5~8문장으로 전체 강의의 핵심 메시지, 결론, 가장 중요한 포인트 압축]
+
+## 핵심 키워드
+[가장 중요한 키워드 10~15개를 한 줄에 나열]
+
+${_probDetected?`## 정답 요약표\n| 번호 | 정답 | 핵심 개념 |\n|------|------|----------|\n(모든 문제를 표로 정리)\n\n`:''}## 시험/실무 핵심
+[절대 놓치면 안 되는 5~10개 포인트]
+
+---
+구간별 요약:
+${briefInput}`
+        :`Read the section summaries below and write:
+
+## Executive Brief (30-second overview)
+[5-8 sentences capturing the core message, conclusions, most important points]
+
+## Key Terms
+[10-15 most important keywords in one line]
+
+${_probDetected?`## Answer Summary Table\n| # | Answer | Key Concept |\n|---|--------|-------------|\n(All problems in table)\n\n`:''}## Must-Know Points
+[5-10 critical points]
+
+---
+Section summaries:
+${briefInput}`;
+      const _briefTimer=_startLiveTimer(summaryEl,'핵심 브리프 생성 중',label);
+      try{
+        const brief=await _callLLM(provider,briefSp,briefUp,limits.maxTokens);
+        clearInterval(_briefTimer);
+        // Final output: Executive brief on top + full section summaries below
+        const fullSummary=`${brief}\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
+        summaryEl.style.whiteSpace='normal';
+        summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullSummary)+'</div>';
+        if(state.history.length>0) state.history[0].summary=fullSummary;
+        await saveState();
+        toast(`요약 완료 — ${estChunks}구간 (${label})`);
+        summaryBtn.disabled=false;
+      }catch(e){
+        clearInterval(_briefTimer);
+        // Even if brief fails, still show section summaries (they're the real value)
+        const fallback=`> ⚠️ 핵심 브리프 생성 실패 (${e.message}). 구간별 요약은 아래에 있습니다.\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
+        summaryEl.style.whiteSpace='normal';
+        summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fallback)+'</div>';
+        if(state.history.length>0) state.history[0].summary=fallback;
+        await saveState();
+        toast(`구간별 요약 완료 (브리프 실패)`);
+        summaryBtn.disabled=false;
+      }
+      return; // Done — skip single-call path below
+    }
+
+    // ── "Medium long" strategy (2-4 chunks): merge into single coherent summary ──
     finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
-    // If merged chunks still exceed limit, re-chunk for 2nd pass
+    // If merged still exceeds limit, truncate with warning (rare for 2-4 chunks)
     if(finalText.length>limits.inputChars){
-      const mergeChunkSize=Math.floor(limits.inputChars*0.8);
-      const mergeChunks=[];
-      for(let i=0;i<finalText.length;i+=mergeChunkSize) mergeChunks.push(finalText.slice(i,i+mergeChunkSize));
-      const useK2=(_getOutputLang()==='ko'||((_getOutputLang()==='same')&&(lang==='ko'||lang==='auto')));
-      const mergeSp=useK2
-        ?`다음은 이전 단계에서 추출한 요약의 일부입니다. ${_probDetected?'문제풀이 강의입니다. 문제 번호·정답·해설을 모두 보존하세요. ':''}이 구간의 핵심 포인트를 빠짐없이 압축하세요. 마크다운 형식.`
-        :`This is a portion of previously extracted summaries. ${_probDetected?'This is a problem-solving lecture. Preserve all problem numbers, answers, and explanations. ':''}Compress key points without omission. Use markdown.`;
-      const mergePartials=await _processChunks(provider,finalText,()=>mergeSp,summaryEl,label,limits.maxTokens);
-      finalText=mergePartials.join('\n\n');
-      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 최종 종합 요약 생성 중 (${label})...</span>`;
+      finalText=finalText.slice(0,limits.inputChars);
     }
   }
 
@@ -3391,12 +3462,69 @@ async function generateNotesFromText(transcriptText,lang){
     // Scale output tokens: long chunks need long output
     const chunkMaxTok=limits.maxTokens;
     const partials=await _processChunks(provider,transcriptText,(ci)=>chunkSp,notesEl,label,chunkMaxTok);
+
+    // For very long (5+ chunks): add navigation header with TOC + key terms
+    const isVeryLong=partials.length>=5;
+    let header='';
+    if(isVeryLong){
+      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 목차 및 핵심 정리 생성 중 (${label})...</span>`;
+      // Extract first ~200 chars from each section for TOC generation
+      const tocInput=partials.map((p,i)=>`[구간${i+1}] ${p.slice(0,300)}`).join('\n');
+      const tocSp=useKorean
+        ?'전체 노트의 목차와 핵심 키워드를 정리하세요.'
+        :'Create a table of contents and key terms for the full notes.';
+      const lenMin=Math.round(transcriptText.length/500);
+      const tocUp=useKorean
+        ?`다음은 약 ${lenMin}분 강의 노트의 각 구간 시작 부분입니다. 아래를 작성하세요:
+
+# [강의 주제 추출]
+총 길이: 약 ${lenMin}분 | 구간: ${partials.length}개
+
+## 30초 핵심 브리프
+[전체 강의에서 가장 중요한 내용 5~8문장으로 압축]
+
+## 목차
+${partials.map((_,i)=>`${i+1}. [구간 ${i+1}의 주제 추출]`).join('\n')}
+
+## 핵심 키워드 (전체)
+[가장 중요한 용어 15~20개]
+
+---
+구간별 시작:
+${tocInput}`
+        :`The following are the beginnings of each section of a ~${lenMin}-min lecture notes. Create:
+
+# [Extract lecture topic]
+Length: ~${lenMin} min | Sections: ${partials.length}
+
+## 30-Second Brief
+[5-8 sentences capturing the most important content]
+
+## Table of Contents
+${partials.map((_,i)=>`${i+1}. [Extract topic of section ${i+1}]`).join('\n')}
+
+## Key Terms (Overall)
+[15-20 most important terms]
+
+---
+Section beginnings:
+${tocInput}`;
+      try{
+        header=await _callLLM(provider,tocSp,tocUp,Math.min(limits.maxTokens,4000));
+        header+='\n\n---\n\n';
+      }catch(e){
+        console.warn('TOC generation failed, continuing without header:',e);
+        header='';
+      }
+    }
+
     // Direct concatenation — no double-compression
-    const result=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
+    const sections=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
+    const result=header+sections;
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
     if(state.history.length>0) state.history[0].notes=result;
     await saveState();
-    toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
+    toast(`노트 생성 완료 — ${partials.length}구간 (${label} · ${templateNames[template]||'표준'})`);
     notesBtn.disabled=false;
     return;
   }
