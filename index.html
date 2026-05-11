@@ -305,6 +305,20 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ──── Error Log (모바일 디버깅용) ──── */
+.error-log{position:fixed;bottom:0;left:0;right:0;max-height:220px;overflow-y:auto;
+  background:var(--bg);border-top:1px solid #ff6b6b40;z-index:90;padding:8px 16px 12px;display:none}
+.error-log.has-errors{display:block}
+.error-log-item{background:var(--red-dim);border:1px solid #ff6b6b30;border-radius:var(--radius-xs);
+  padding:10px 12px;margin-bottom:6px;font-size:11px;font-family:var(--mono);color:var(--red);
+  word-break:break-all;line-height:1.5;position:relative}
+.error-log-item .err-time{color:var(--text3);font-size:10px}
+.error-log-item .err-provider{color:var(--amber);font-weight:600}
+.error-log-item .err-detail{color:var(--text2);margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto}
+.error-log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.error-log-header span{font-size:12px;font-weight:600;color:var(--red)}
+.error-log-header button{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;text-decoration:underline}
+
 /* ──── Modal ──── */
 .modal-overlay{position:fixed;inset:0;background:#00000080;z-index:100;
   display:none;align-items:flex-end;justify-content:center;
@@ -334,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.37</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.39</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -378,6 +392,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
   <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.webm,.mp4,.aac,.flac" style="display:none"
     onchange="handleFile(this.files[0])">
+
+  <div class="action-card" onclick="pickTextFile()">
+    <div class="action-icon" style="background:var(--green-dim)">📄</div>
+    <div>
+      <h3>전사본 불러오기</h3>
+      <p>이미 전사된 텍스트 파일을 불러와 후처리합니다</p>
+    </div>
+  </div>
+  <input type="file" id="text-file-input" accept=".txt,.srt,.vtt,.md,.text,.csv,.tsv" style="display:none"
+    onchange="handleTextFile(this.files[0])">
 
   <!-- PWA Install Banner -->
   <div id="install-banner" style="display:none;margin-top:14px">
@@ -624,6 +648,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
   <div class="progress-track"><div class="progress-bar" id="proc-progress" style="width:0%"></div></div>
   <div class="chunk-list" id="chunk-list"></div>
+</div>
+
+<!-- ═══════ Global Error Log (모바일 디버깅) ═══════ -->
+<div class="error-log" id="error-log">
+  <div class="error-log-header"><span>⚠️ 오류 로그</span><button onclick="clearErrorLog()">지우기</button></div>
+  <div id="error-log-items"></div>
 </div>
 
 <!-- ═══════ PAGE: Result ═══════ -->
@@ -1170,6 +1200,36 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'),2800);
 }
 
+// ── On-screen Error Log (모바일 디버깅용) ──
+function logError(provider,statusCode,detail,context){
+  const container=document.getElementById('error-log');
+  const items=document.getElementById('error-log-items');
+  if(!container||!items) return;
+  container.classList.add('has-errors');
+  const now=new Date();
+  const timeStr=now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const div=document.createElement('div');
+  div.className='error-log-item';
+  // Truncate detail for display (keep full in data attr)
+  const shortDetail=(detail||'').length>200?(detail.slice(0,200)+'…'):detail;
+  div.innerHTML=`<span class="err-time">${timeStr}</span> <span class="err-provider">[${provider}]</span> ${context?'<span style="color:var(--text2)">'+context+'</span> — ':''}<span style="color:var(--red)">HTTP ${statusCode||'ERR'}</span>`
+    +(shortDetail?`<div class="err-detail">${shortDetail}</div>`:'');
+  items.prepend(div);
+  // Keep max 20 entries
+  while(items.children.length>20) items.lastChild.remove();
+}
+function clearErrorLog(){
+  const container=document.getElementById('error-log');
+  const items=document.getElementById('error-log-items');
+  if(items) items.innerHTML='';
+  if(container) container.classList.remove('has-errors');
+}
+function _toastError(provider,msg,detail){
+  // Show both toast and log for errors
+  toast(`❌ ${provider}: ${msg}`);
+  logError(provider,null,detail||msg,msg);
+}
+
 // ═════════════════════════════════════════════════════════════════
 //  QUOTA
 // ═════════════════════════════════════════════════════════════════
@@ -1295,6 +1355,89 @@ async function onRecordingStop(){
 // ═════════════════════════════════════════════════════════════════
 function pickFile(){document.getElementById('file-input').click()}
 async function handleFile(file){if(!file)return;await prepareAudio(file)}
+function pickTextFile(){document.getElementById('text-file-input').click()}
+async function handleTextFile(file){
+  if(!file) return;
+  toast('전사본 읽는 중...');
+  try{
+    let text=await file.text();
+    // SRT/VTT → plain text 변환
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(ext==='srt'){
+      text=text.replace(/^\d+\s*\n/gm,'')                        // 시퀀스 번호
+        .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*\n?/g,'') // 타임코드
+        .replace(/\n{2,}/g,'\n').trim();
+    }else if(ext==='vtt'){
+      text=text.replace(/^WEBVTT.*\n/,'')
+        .replace(/\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}.*\n?/g,'')
+        .replace(/\n{2,}/g,'\n').trim();
+    }
+    if(!text||text.trim().length<10){
+      toast('파일 내용이 너무 짧거나 비어 있습니다');return;
+    }
+    // 결과 페이지로 직행
+    await _loadTranscriptText(file.name, text);
+  }catch(e){
+    toast('파일 읽기 실패: '+e.message);
+    logError('파일',null,e.message,'전사본 불러오기');
+  }
+  // Reset input so same file can be re-selected
+  document.getElementById('text-file-input').value='';
+}
+
+async function _loadTranscriptText(fileName, text){
+  const defaultTitle=fileName.replace(/\.[^.]+$/,'');
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
+
+  // 결과 페이지 세팅
+  document.getElementById('res-title').value=defaultTitle;
+  const charCount=text.length;
+  const estimatedMin=Math.round(charCount/200); // 대략 200자/분 기준 추정
+  document.getElementById('res-info').textContent=`${fileName} · ${charCount.toLocaleString()}자 · 외부 전사본`;
+  document.getElementById('res-full').textContent=text;
+  updateResultStats(text);
+  document.getElementById('res-provider-info').style.display='none';
+
+  // 요약 탭 초기화
+  const summaryEl=document.getElementById('res-summary');
+  const summaryBtn=document.getElementById('btn-generate-summary');
+  summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';
+  summaryBtn.style.display=hasLLM?'flex':'none';
+
+  // 노트 탭 초기화
+  const notesEl=document.getElementById('res-notes');
+  const notesBtn=document.getElementById('btn-generate-notes');
+  const notesTemplateRow=document.getElementById('notes-template-row');
+  notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 노트를 생성합니다.</span>';
+  notesBtn.style.display=hasLLM?'flex':'none';
+  if(notesTemplateRow) notesTemplateRow.style.display=hasLLM?'flex':'none';
+
+  // 정제 버튼
+  const refineBtn=document.getElementById('btn-refine-text');
+  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.textContent='🔧 텍스트 정제'}
+  const refineStatus=document.getElementById('refine-status');
+  if(refineStatus) refineStatus.style.display='none';
+
+  // LLM 프로바이더 선택기
+  _populateResultLLMSelect();
+
+  // Q&A 초기화
+  qaHistory=[];
+  document.getElementById('qa-messages').innerHTML='<div class="qa-system-msg">전사 내용에 대해 질문하세요. 텍스트를 기반으로 답변합니다.</div>';
+
+  // 히스토리 저장
+  if(state.qaHistoryMap){
+    const shifted={};
+    for(const k in state.qaHistoryMap){const ni=Number(k)+1;if(ni<10) shifted[ni]=state.qaHistoryMap[k]}
+    state.qaHistoryMap=shifted;
+  }
+  state.history.unshift({name:fileName,title:defaultTitle,date:fmtNow(),duration:estimatedMin*60,lang:'ko',text,projectId:null,tags:[],imported:true});
+  currentHistoryIdx=0;
+  await saveState();renderHistory();
+
+  showPage('result');
+  toast('✅ 전사본 불러오기 완료 — 후처리를 시작하세요');
+}
 async function prepareAudio(file){
   toast('파일 분석 중...');
   const duration=await getAudioDuration(file);
@@ -1501,6 +1644,7 @@ async function startTranscription(){
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
   _isProcessing=true;
+  clearErrorLog(); // 새 전사 시작 시 이전 오류 로그 초기화
 
   state.context=document.getElementById('pre-context')?.value?.trim()||'';
   state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
@@ -1671,9 +1815,11 @@ async function startTranscription(){
       ch.status='done';
     }catch(e){
       console.error(`Chunk ${i} error:`,e);
-      const errDetail=e instanceof LLMError?`HTTP ${e.status}${e.bodyText?' — '+e.bodyText.slice(0,80):''}`:
+      const errDetail=e instanceof LLMError?`HTTP ${e.status}${e.bodyText?' — '+e.bodyText.slice(0,200):''}`:
         (e instanceof Error?e.message:String(e));
       const errMsg=`${ch.api}: ${errDetail}`;
+      // On-screen error log for mobile debugging
+      logError(ch.api, e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, `청크 ${i+1}/${nChunks} 전사`);
 
       // Fallback logic for auto modes
       if(choice==='auto'||choice==='free-auto'||choice==='quality-auto'){
@@ -1810,7 +1956,10 @@ async function tryFallback(ch,error,lang,chunks,file){
       renderChunks(chunks); // refresh UI with updated models
       if(fb==='groq'){state.quota.usedSec+=ch.chunkDur;await saveState();updateQuotaUI()}
       return true;
-    }catch(e2){console.error(`Fallback ${fb} failed:`,e2)}
+    }catch(e2){
+      console.error(`Fallback ${fb} failed:`,e2);
+      logError(fb, e2 instanceof LLMError?e2.status:'ERR', e2 instanceof LLMError?(e2.bodyText||'').slice(0,300):e2.message, '폴백 전사');
+    }
   }
   return false;
 }
@@ -2081,7 +2230,8 @@ ${state.context ? `8. 이 오디오의 주제는 "${state.context}"입니다. �
 }
 
 // ═════════════════════════════════════════════════════════════════
-//  API: Google Cloud Speech-to-Text (Chirp 2)
+//  API: Google Cloud Speech-to-Text (latest_long, V1 API)
+//  Note: chirp_2 requires V2 API (Bearer token auth) — not suitable for client-side PWA
 // ═════════════════════════════════════════════════════════════════
 async function transcribeGoogleSTT(blob,lang){
   const base64=await blobToBase64(blob);
@@ -2112,7 +2262,7 @@ async function transcribeGoogleSTT(blob,lang){
   const config={
     encoding,
     languageCode:isAutoLang?'ko-KR':(langMap[lang]||'ko-KR'),
-    model:'chirp_2',
+    model:'latest_long',
     enableAutomaticPunctuation:true,
     enableWordTimeOffsets:true
   };
@@ -2808,7 +2958,7 @@ function showLLMErrorModal(err, retryFn){
 const PROVIDERS={
   groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:30000,  maxTokens:16000, canTranscribe:true,  canPostProcess:true},
   gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:800000, maxTokens:65536,canTranscribe:true,  canPostProcess:true},
-  google:{label:'Google (Chirp)',  costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
+  google:{label:'Google STT',      costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   claude:{label:'Claude',          costLabel:'~₩3~5/분', costPerMin:4,   free:false, inputChars:150000, maxTokens:16000,canTranscribe:false, canPostProcess:true},
   openai:{label:'OpenAI',          costLabel:'~₩1~2/분', costPerMin:1.5, free:false, inputChars:100000, maxTokens:16384,canTranscribe:true,  canPostProcess:true},
@@ -3013,6 +3163,7 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
           lastErr=e;
           clearInterval(_tickTimer);
           console.warn(`[Chunk ${ci+1}] ${prov} attempt ${attempt+1}:`,e);
+          logError(prov, e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, `${label} 구간 ${ci+1}`);
           const isTimeout=(e.name==='AbortError'||e.message?.includes('abort'));
           const isFatal=(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing'||e.status===413));
           // Timeout or fatal → don't retry same provider, try next in list
@@ -3323,6 +3474,7 @@ ${briefInput}`;
   }catch(e){
     clearInterval(_sumTimer);
     summaryBtn.disabled=false;
+    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '요약 생성');
     if(e instanceof LLMError){
       summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 한도 초과 또는 오류 발생. 선택지를 확인하세요.</span>`;
       showLLMErrorModal(e, (newProvider)=>{
@@ -3748,6 +3900,7 @@ ${tocInput}`;
     toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
   }catch(e){
     clearInterval(_notesTimer);
+    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '노트 생성');
     if(e instanceof LLMError){
       notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 설정을 확인하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
@@ -4061,6 +4214,7 @@ async function refineTranscript(){
 
   }catch(e){
     if(_refTimer) clearInterval(_refTimer);
+    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '텍스트 정제');
     // Error — show in statusEl, NOT in fullEl (preserve original transcript)
     const errDetail=e instanceof LLMError?` (HTTP ${e.status}${e.bodyText?': '+e.bodyText.slice(0,80):''})`
       :e.name==='AbortError'?' (90초 시간 초과)':` (${e.message})`;
@@ -4195,6 +4349,7 @@ ${contextText}`;
     }
   }catch(e){
     aiBub.className='qa-bubble qa-ai';
+    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, 'Q&A');
     if(e instanceof LLMError){
       aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ ${e.friendlyMessage}</span>`;
     }else if(e.name==='AbortError'||e.message?.includes('abort')){
