@@ -334,7 +334,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.35</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.36</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2954,66 +2954,81 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
 
     let result=null;
     let lastErr=null;
-    // Try current provider (up to 2 attempts)
-    for(let attempt=0;attempt<2;attempt++){
-      try{
-        result=await _callLLM(currentProv,chunkPromptFn(ci),chunks[ci],currentMaxTok);
-        break;
-      }catch(e){
-        lastErr=e;
-        clearInterval(_tickTimer);
-        console.warn(`[Chunk ${ci+1}/${chunks.length}] attempt ${attempt+1} ${currentProv} error:`,e);
-        // Rate limit / billing / 413 → try fallback providers instead of stopping
-        if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing'||e.status===413)){
-          break; // exit retry loop, will try fallback below
-        }
-        if(attempt===0){
-          const isTimeout=(e.name==='AbortError'||e.message?.includes('abort'));
-          statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} ${isTimeout?'시간 초과':'오류'} — 2초 후 재시도...</span>`;
-          await new Promise(r=>setTimeout(r,2000));
-          // Restart live timer for retry attempt so user sees progress
-          const retryStart=Date.now();
-          _tickTimer=setInterval(()=>{
-            const sec=Math.floor((Date.now()-retryStart)/1000);
-            const dots='.'.repeat((sec%3)+1);
-            statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1}/${chunks.length} 재시도 중${dots} (${currentLabel}) · ${sec}초 경과</span>`;
-          },1000);
-          statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1}/${chunks.length} 재시도 중... (${currentLabel})</span>`;
-        }
-      }
+
+    // Helper: start a live timer on statusEl
+    function _startChunkTimer(msgPrefix){
+      const t0=Date.now();
+      const tid=setInterval(()=>{
+        const sec=Math.floor((Date.now()-t0)/1000);
+        const dots='.'.repeat((sec%3)+1);
+        statusEl.innerHTML=`<span style="color:var(--text2)">${msgPrefix}${dots} · ${sec}초 경과</span>`;
+      },1000);
+      statusEl.innerHTML=`<span style="color:var(--text2)">${msgPrefix}...</span>`;
+      return tid;
     }
 
-    // If failed, try fallback providers
-    if(result===null){
-      const fallbacks=_getLLMFallbackChain(currentProv);
-      for(const fb of fallbacks){
+    // Build provider try-list: current first, then fallbacks
+    const tryList=[{prov:currentProv,label:currentLabel,maxTok:currentMaxTok}];
+    for(const fb of _getLLMFallbackChain(currentProv)){
+      const fbL=_getLLMLimits(fb);
+      tryList.push({prov:fb,label:_provLabel(fb),maxTok:fbL.maxTokens});
+    }
+
+    for(let ti=0;ti<tryList.length;ti++){
+      const {prov,label:provLabel,maxTok:provMaxTok}=tryList[ti];
+      const isRetry=ti>0;
+      clearInterval(_tickTimer);
+
+      if(isRetry){
+        // Switching provider — show clear message
+        toast(`${tryList[ti-1].label} 실패 → ${provLabel}로 전환`);
+        statusEl.innerHTML=`<span style="color:var(--amber)">🔄 ${provLabel}로 전환 중...</span>`;
+        await new Promise(r=>setTimeout(r,500));
+      }
+
+      // Up to 2 attempts per provider (but skip retry for timeouts — pointless)
+      const maxAttempts=isRetry?1:2;
+      for(let attempt=0;attempt<maxAttempts;attempt++){
+        const attemptLabel=attempt>0?'재시도':'처리';
+        const icon=attempt>0?'🔄':'⏳';
+        _tickTimer=_startChunkTimer(`${icon} 구간 ${ci+1}/${chunks.length} ${attemptLabel} 중 (${provLabel})`);
         try{
-          const fbLimits=_getLLMLimits(fb);
-          const fbMaxTok=fbLimits.maxTokens;
-          // Re-chunk this text for the new provider's limit if needed
-          const fbChunkText=chunks[ci].slice(0,fbLimits.inputChars);
-          statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${_provLabel(currentProv)} 한도 초과 → ${_provLabel(fb)}로 전환 중...</span>`;
-          toast(`${_provLabel(currentProv)} 실패 → ${_provLabel(fb)}로 전환`);
-          result=await _callLLM(fb,chunkPromptFn(ci),fbChunkText,fbMaxTok);
-          // Switch to this provider for all remaining chunks
-          currentProv=fb;
-          currentLabel=_provLabel(fb);
-          currentMaxTok=fbMaxTok;
-          providerSwitched=true;
-          // Re-chunk remaining text if new provider has different limits
-          const newChunkSize=Math.min(Math.floor(fbLimits.inputChars*0.8),Math.floor(fbMaxTok*1.5));
-          if(newChunkSize!==chunkSize&&ci<chunks.length-1){
-            // Recalculate remaining chunks with new size
-            const processedLen=(ci+1)*chunkSize;
-            const remainingText=transcriptText.slice(processedLen);
-            chunks.splice(ci+1); // remove old remaining chunks
-            for(let j=0;j<remainingText.length;j+=newChunkSize) chunks.push(remainingText.slice(j,j+newChunkSize));
+          const chunkText=chunks[ci].slice(0,_getLLMLimits(prov).inputChars);
+          result=await _callLLM(prov,chunkPromptFn(ci),chunkText,provMaxTok);
+          // Success — switch to this provider for remaining chunks
+          if(isRetry){
+            currentProv=prov;currentLabel=provLabel;currentMaxTok=provMaxTok;
+            providerSwitched=true;
+            const newLimits=_getLLMLimits(prov);
+            const newChunkSize=Math.min(Math.floor(newLimits.inputChars*0.8),Math.floor(provMaxTok*1.5));
+            if(newChunkSize!==chunkSize&&ci<chunks.length-1){
+              const processedLen=(ci+1)*chunkSize;
+              const remainingText=transcriptText.slice(processedLen);
+              chunks.splice(ci+1);
+              for(let j=0;j<remainingText.length;j+=newChunkSize) chunks.push(remainingText.slice(j,j+newChunkSize));
+            }
           }
           break;
-        }catch(fbErr){
-          console.warn(`Fallback ${fb} also failed:`,fbErr);
+        }catch(e){
+          lastErr=e;
+          clearInterval(_tickTimer);
+          console.warn(`[Chunk ${ci+1}] ${prov} attempt ${attempt+1}:`,e);
+          const isTimeout=(e.name==='AbortError'||e.message?.includes('abort'));
+          const isFatal=(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing'||e.status===413));
+          // Timeout or fatal → don't retry same provider, try next in list
+          if(isTimeout||isFatal){
+            statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${provLabel} ${isTimeout?'응답 시간 초과':'오류'} — ${ti<tryList.length-1?'다른 AI로 전환합니다':'대안 없음'}</span>`;
+            await new Promise(r=>setTimeout(r,1500));
+            break; // exit attempt loop → try next provider
+          }
+          // Transient error → retry once after 2s
+          if(attempt===0){
+            statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} 일시 오류 — 2초 후 재시도</span>`;
+            await new Promise(r=>setTimeout(r,2000));
+          }
         }
       }
+      if(result!==null) break; // success — exit provider loop
     }
 
     clearInterval(_tickTimer);
