@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.39</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.40</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -473,17 +473,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
 <!-- ═══════ PAGE: Pre-check ═══════ -->
 <div id="page-precheck" class="page">
-  <div class="card-label">전사 준비</div>
+  <div class="card-label" id="precheck-title">전사 준비</div>
 
   <div class="file-badge">
-    <div class="icon">🎵</div>
+    <div class="icon" id="pre-file-icon">🎵</div>
     <div class="info">
       <div class="name" id="pre-filename"></div>
       <div class="meta" id="pre-filemeta"></div>
     </div>
   </div>
 
-  <div class="stat-grid">
+  <div class="stat-grid" id="pre-stat-grid">
     <div class="stat-item">
       <div class="val" id="pre-dur-val">0</div>
       <div class="lbl">분</div>
@@ -508,7 +508,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <span id="pre-cost-text"></span>
   </div>
 
-  <div class="field">
+  <div class="field" id="precheck-api-row">
     <div class="field-label">전사 방법 (음성→텍스트)</div>
     <select id="pre-api-choice">
       <optgroup label="🤖 자동 모드">
@@ -539,7 +539,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </details>
   </div>
 
-  <div class="field">
+  <div class="field" id="precheck-chunk-row">
     <div class="field-label">청크 분할</div>
     <select id="pre-chunk-min">
       <option value="0">분할 없음 (전체를 한 번에)</option>
@@ -636,7 +636,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
   <div style="display:flex;gap:10px;margin-top:8px">
     <button class="btn btn-ghost" onclick="showPage('home')" style="flex:1">취소</button>
-    <button class="btn btn-primary" onclick="startTranscription()" style="flex:2">전사 시작</button>
+    <button class="btn btn-primary" id="precheck-start-btn" onclick="startTranscription()" style="flex:2">전사 시작</button>
   </div>
 </div>
 
@@ -1355,6 +1355,8 @@ async function onRecordingStop(){
 // ═════════════════════════════════════════════════════════════════
 function pickFile(){document.getElementById('file-input').click()}
 async function handleFile(file){if(!file)return;await prepareAudio(file)}
+let _pendingTextImport=null; // {fileName, text} — 텍스트 임포트 대기
+
 function pickTextFile(){document.getElementById('text-file-input').click()}
 async function handleTextFile(file){
   if(!file) return;
@@ -1364,8 +1366,8 @@ async function handleTextFile(file){
     // SRT/VTT → plain text 변환
     const ext=file.name.split('.').pop().toLowerCase();
     if(ext==='srt'){
-      text=text.replace(/^\d+\s*\n/gm,'')                        // 시퀀스 번호
-        .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*\n?/g,'') // 타임코드
+      text=text.replace(/^\d+\s*\n/gm,'')
+        .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*\n?/g,'')
         .replace(/\n{2,}/g,'\n').trim();
     }else if(ext==='vtt'){
       text=text.replace(/^WEBVTT.*\n/,'')
@@ -1375,25 +1377,105 @@ async function handleTextFile(file){
     if(!text||text.trim().length<10){
       toast('파일 내용이 너무 짧거나 비어 있습니다');return;
     }
-    // 결과 페이지로 직행
-    await _loadTranscriptText(file.name, text);
+    _pendingTextImport={fileName:file.name, text};
+    showTextImportPrecheck(file.name, text);
   }catch(e){
     toast('파일 읽기 실패: '+e.message);
     logError('파일',null,e.message,'전사본 불러오기');
   }
-  // Reset input so same file can be re-selected
   document.getElementById('text-file-input').value='';
 }
 
-async function _loadTranscriptText(fileName, text){
+function showTextImportPrecheck(fileName, text){
+  const charCount=text.length;
+  const sizeMB=(new Blob([text]).size/1024/1024).toFixed(1);
+
+  // 헤더·파일 정보 변경
+  document.getElementById('precheck-title').textContent='후처리 준비';
+  document.getElementById('pre-file-icon').textContent='📄';
+  document.getElementById('pre-filename').textContent=fileName;
+  document.getElementById('pre-filemeta').textContent=`${charCount.toLocaleString()}자 · ${sizeMB} MB`;
+
+  // 통계 변경 (분/청크/MB → 글자수/문단수/MB)
+  const statGrid=document.getElementById('pre-stat-grid');
+  const paragraphs=text.split(/\n\s*\n/).filter(p=>p.trim()).length;
+  statGrid.children[0].querySelector('.val').textContent=charCount.toLocaleString();
+  statGrid.children[0].querySelector('.lbl').textContent='자';
+  statGrid.children[1].querySelector('.val').textContent=paragraphs;
+  statGrid.children[1].querySelector('.lbl').textContent='문단';
+  statGrid.children[2].querySelector('.val').textContent=sizeMB;
+  statGrid.children[2].querySelector('.lbl').textContent='MB';
+
+  // 전사 전용 필드 숨김
+  document.getElementById('precheck-api-row').style.display='none';
+  document.getElementById('precheck-chunk-row').style.display='none';
+  document.getElementById('pre-warn').style.display='none';
+  document.getElementById('pre-cost-alert').style.display='none';
+  document.getElementById('diarization-row').style.display='none';
+  document.getElementById('llm-toggle-row').style.display='none';
+
+  // 후처리 관련 필드 표시
+  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
+  document.getElementById('precheck-llm-row').style.display=hasLLM?'block':'none';
+  document.getElementById('precheck-autorefine-row').style.display=hasLLM?'block':'none';
+
+  // 시작 버튼 변경
+  const startBtn=document.getElementById('precheck-start-btn');
+  startBtn.textContent='후처리 시작';
+  startBtn.onclick=()=>startTextImport();
+
+  showPage('precheck');
+}
+
+async function startTextImport(){
+  if(!_pendingTextImport) return;
+  const {fileName, text}=_pendingTextImport;
+  _pendingTextImport=null;
+
+  // 설정 읽기
+  state.context=document.getElementById('pre-context')?.value?.trim()||'';
+  state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
+  state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
+  const lang=document.getElementById('pre-language')?.value||'ko';
+
+  await _loadTranscriptText(fileName, text, lang);
+
+  // 자동 정제
+  if(state.autoRefine){
+    const llmProv=_pickLLMProvider();
+    if(llmProv){
+      await sleep(500);
+      await refineTranscript();
+    }
+  }
+}
+
+// Precheck를 오디오 모드로 되돌리기
+function _resetPrecheckToAudioMode(){
+  document.getElementById('precheck-title').textContent='전사 준비';
+  document.getElementById('pre-file-icon').textContent='🎵';
+  document.getElementById('precheck-api-row').style.display='';
+  document.getElementById('precheck-chunk-row').style.display='';
+  const statGrid=document.getElementById('pre-stat-grid');
+  statGrid.children[0].querySelector('.lbl').textContent='분';
+  statGrid.children[1].querySelector('.lbl').textContent='청크';
+  statGrid.children[2].querySelector('.lbl').textContent='MB';
+  const startBtn=document.getElementById('precheck-start-btn');
+  startBtn.textContent='전사 시작';
+  startBtn.onclick=()=>startTranscription();
+}
+
+async function _loadTranscriptText(fileName, text, lang){
+  lang=lang||'ko';
   const defaultTitle=fileName.replace(/\.[^.]+$/,'');
   const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
 
   // 결과 페이지 세팅
   document.getElementById('res-title').value=defaultTitle;
   const charCount=text.length;
-  const estimatedMin=Math.round(charCount/200); // 대략 200자/분 기준 추정
-  document.getElementById('res-info').textContent=`${fileName} · ${charCount.toLocaleString()}자 · 외부 전사본`;
+  const estimatedMin=Math.round(charCount/200);
+  const contextLabel=state.context?` · ${state.context}`:'';
+  document.getElementById('res-info').textContent=`${fileName} · ${charCount.toLocaleString()}자 · 외부 전사본${contextLabel}`;
   document.getElementById('res-full').textContent=text;
   updateResultStats(text);
   document.getElementById('res-provider-info').style.display='none';
@@ -1431,7 +1513,7 @@ async function _loadTranscriptText(fileName, text){
     for(const k in state.qaHistoryMap){const ni=Number(k)+1;if(ni<10) shifted[ni]=state.qaHistoryMap[k]}
     state.qaHistoryMap=shifted;
   }
-  state.history.unshift({name:fileName,title:defaultTitle,date:fmtNow(),duration:estimatedMin*60,lang:'ko',text,projectId:null,tags:[],imported:true});
+  state.history.unshift({name:fileName,title:defaultTitle,date:fmtNow(),duration:estimatedMin*60,lang,text,projectId:null,tags:[],imported:true});
   currentHistoryIdx=0;
   await saveState();renderHistory();
 
@@ -1456,6 +1538,7 @@ function getAudioDuration(file){
 //  PRE-CHECK
 // ═════════════════════════════════════════════════════════════════
 function showPrecheck(){
+  _resetPrecheckToAudioMode(); // 텍스트 임포트 모드에서 돌아왔을 수 있으므로 리셋
   const{file,duration}=currentAudio;
   const durMin=(duration/60).toFixed(1);
   const chunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
