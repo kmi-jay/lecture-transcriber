@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.40</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.42</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1377,6 +1377,8 @@ async function handleTextFile(file){
     if(!text||text.trim().length<10){
       toast('파일 내용이 너무 짧거나 비어 있습니다');return;
     }
+    // 환각 필터 적용 (Whisper 전사본의 반복/환각 패턴 제거)
+    text=_removeHallucinations(cleanHallucinations(text));
     _pendingTextImport={fileName:file.name, text};
     showTextImportPrecheck(file.name, text);
   }catch(e){
@@ -2546,15 +2548,53 @@ function cleanHallucinations(text){
     return m;
   });
 
-  // 4. Repeated phrase cleanup
+  // 4. Remove number sequence hallucinations (e.g., "5, 9, 10, 11, 12..." or "81, 81, 81, 81...")
+  cleaned = cleaned.split('\n').map(line=>{
+    // Detect lines that are mostly comma-separated numbers (>60% of content)
+    const numMatches=line.match(/\b\d{1,3}\b/g);
+    const commaMatches=line.match(/,/g);
+    if(numMatches&&numMatches.length>=8&&commaMatches&&commaMatches.length>=6){
+      // Check if numbers dominate the line
+      const numChars=numMatches.join('').length+commaMatches.length;
+      const lineChars=line.replace(/[\s\[\]:\d,]/g,'').length;
+      if(numChars>lineChars) return ''; // mostly numbers → hallucination
+    }
+    return line;
+  }).filter(l=>l.trim()).join('\n');
+
+  // 5. Remove lines with same short phrase repeated 3+ times separated by commas
+  cleaned = cleaned.split('\n').map(line=>{
+    const parts=line.split(/[,，、]\s*/);
+    if(parts.length>=3){
+      const freq={};
+      for(const p of parts){const k=p.trim();if(k) freq[k]=(freq[k]||0)+1}
+      const maxFreq=Math.max(...Object.values(freq));
+      if(maxFreq>=3&&maxFreq/parts.length>0.4) return ''; // dominant repetition
+    }
+    return line;
+  }).filter(l=>l.trim()).join('\n');
+
+  // 6. Consecutive sentence deduplication + intra-sentence repeat cleanup
+  // Splits by sentence boundaries, then:
+  //   (a) removes consecutive identical/near-identical sentences (fixes "X. X. X. X." hallucination)
+  //   (b) cleans intra-sentence repeated phrases
   const sentences = cleaned.split(/(?<=[.!?。])\s+|(?<=\n)/);
-  const deduped = sentences.map(s=>{
-    if(_detectRepeat(s)) return _cleanRepeat(s);
-    return s;
-  });
+  const deduped = [];
+  for(let i=0;i<sentences.length;i++){
+    const s=sentences[i].trim();
+    if(!s) continue;
+    // (a) Skip if same as previous sentence (exact or ≥85% similar)
+    if(deduped.length>0){
+      const prev=deduped[deduped.length-1].trim();
+      if(s===prev||(s.length>15&&prev.length>15&&_simRatio(s,prev)>0.85)) continue;
+    }
+    // (b) Clean intra-sentence repeats
+    if(_detectRepeat(s)) deduped.push(_cleanRepeat(s));
+    else deduped.push(s);
+  }
   cleaned = deduped.join(' ').replace(/\s{2,}/g,' ').trim();
 
-  // 5. Paragraph-level repeat check
+  // 7. Paragraph-level repeat check
   if(_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
 
   return cleaned;
@@ -2762,6 +2802,16 @@ function _removeHallucinations(text){
       const stripped=core.replace(halluFragRx,'').replace(/[.\s,!?·…]+/g,' ').trim();
       if(stripped.length<10){halluRemoved++;continue}
     }
+    // Strip hallucination fragments from lines that have substantial real content
+    // e.g., "다음 영상에서 만나요. 특히나 장애가..." → "특히나 장애가..."
+    if(halluFragRx.test(core)&&core.length>60){
+      halluFragRx.lastIndex=0;
+      const cleaned=core.replace(halluFragRx,'').replace(/^[.\s,!?·…]+/,'').replace(/[.\s,!?·…]+$/,'').replace(/\s{2,}/g,' ').trim();
+      if(cleaned.length>20){
+        pass4.push(line.replace(core,cleaned));
+        continue;
+      }
+    }
     pass4.push(line);
   }
 
@@ -2872,9 +2922,31 @@ function _removeHallucinations(text){
     shortRun.forEach(r=>pass6.push(r.line));
   }
 
-  let result=pass6.join('\n\n').replace(/\n{3,}/g,'\n\n').trim();
+  // ── Pass 7: Duplicate timestamp-block detection ──
+  // Same or near-identical content appearing at different timestamps → keep first, remove rest
+  const pass7=[];
+  const seenCores=new Map(); // core → index in pass7
+  for(const line of pass6){
+    const core=_extractCore(line);
+    if(!core||core.length<15){pass7.push(line);continue}
+    // Normalize: collapse whitespace, remove punctuation for comparison
+    const norm=core.replace(/[\s.,!?·…'"()\[\]]+/g,' ').trim().toLowerCase();
+    if(norm.length<10){pass7.push(line);continue}
+    let isDup=false;
+    for(const [prevNorm] of seenCores){
+      if(norm===prevNorm||(norm.length>20&&prevNorm.length>20&&_simRatio(norm,prevNorm)>0.85)){
+        isDup=true;halluRemoved++;break;
+      }
+    }
+    if(!isDup){
+      seenCores.set(norm,pass7.length);
+      pass7.push(line);
+    }
+  }
 
-  if(halluRemoved>0) console.log(`[Hallucination filter v3] Removed ${halluRemoved} segments`);
+  let result=pass7.join('\n\n').replace(/\n{3,}/g,'\n\n').trim();
+
+  if(halluRemoved>0) console.log(`[Hallucination filter v4] Removed ${halluRemoved} segments`);
   return result;
 }
 
@@ -4158,8 +4230,13 @@ Whisper는 한국어 전문 용어를 발음이 유사한 다른 단어로 치�
    → 가장 정확하고 완전한 버전 1회만 유지하고 나머지 제거
    예: "직무 분리가 이루어지지 않용자. 그래서 직무 분리가 이루어지지 않았다." → 두 번째만 유지
 
-3. **환각(hallucination)** — 침묵 구간에서 생성된 무관한 텍스트 → 완전 제거
-   (예: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you", "텍스트를 생성하지 마세요" 등)
+3. **환각(hallucination) — 침묵/무음 구간에서 Whisper가 생성한 가짜 텍스트 → 해당 타임스탬프 블록 전체 제거**
+   유형별 예시:
+   - 동일 문장 반복: "강의가 시작되면, 강의가 시작되면, 강의가 시작되면..." → 전체 제거
+   - 숫자 나열: "5, 9, 10, 11, 12, 13, 14, 15..." 또는 "81, 81, 81, 81..." → 전체 제거
+   - 무관한 짧은 문장: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you" → 제거
+   - 이전 내용과 완전히 동일한 문장이 다른 타임스탬프에서 반복 → 중복 제거
+   핵심: 같은 구절이 3회 이상 반복되면 환각이므로 해당 블록 전체를 삭제하세요
 
 4. **영어 음차(transliteration) 복원** — 학술/업무 맥락에서 영어 원문이 통용되는 용어는 영어로 복원
    (예: "오디트"→"audit", "컴플라이언스"→"compliance", "프레임워크"→"framework", "에스크로"→"escrow")
@@ -4203,7 +4280,8 @@ For every sentence, ask: "Does this word make sense in context?"
 
 2. **Sentence-level duplication** — same content repeated 2-3 times with slight variation → keep only the most accurate version
 
-3. **Hallucination** — irrelevant text during silence → remove entirely
+3. **Hallucination — fake text generated during silence/low-audio → delete the ENTIRE timestamp block**
+   Types: repeated phrases ("강의가 시작되면, 강의가 시작되면..."), number sequences ("5, 9, 10, 11..." or "81, 81, 81..."), duplicate sentences at different timestamps. If a phrase repeats 3+ times, it's hallucination — remove the whole block.
 
 4. **Korean transliteration** → restore to original English (e.g., "오디트"→"audit")
 
