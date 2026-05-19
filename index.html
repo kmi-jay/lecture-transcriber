@@ -1377,8 +1377,10 @@ async function handleTextFile(file){
     if(!text||text.trim().length<10){
       toast('파일 내용이 너무 짧거나 비어 있습니다');return;
     }
-    // 환각 필터 적용 (Whisper 전사본의 반복/환각 패턴 제거)
-    text=_removeHallucinations(cleanHallucinations(text));
+    // 환각 필터 적용 — cleanHallucinations만 (반복 패턴·가비지 제거)
+    // _removeHallucinations는 타임스탬프 기반 Whisper 출력 전용이므로 텍스트 임포트 시 스킵
+    // (대용량 텍스트에서 O(n²) 프리즈 방지)
+    text=cleanHallucinations(text);
     _pendingTextImport={fileName:file.name, text};
     showTextImportPrecheck(file.name, text);
   }catch(e){
@@ -2474,6 +2476,8 @@ const RX_GARBAGE_SCRIPTS = /[\u0600-\u06FF\u0590-\u05FF\u0900-\u097F\u0E00-\u0E7
 const RX_INJECTED_EN = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g; // Proper-noun pairs e.g. "Aqua Bleumer"
 // Repeated short phrase detector
 function _detectRepeat(text, minRepeats=3){
+  // Safety: skip very large texts to prevent O(n²) freeze on main thread
+  if(text.length>10000) return false;
   // Check space-separated word n-grams
   const words = text.split(/\s+/);
   for(let len=2; len<=8; len++){
@@ -2602,8 +2606,8 @@ function cleanHallucinations(text){
   }
   cleaned = deduped.join(' ').replace(/\s{2,}/g,' ').trim();
 
-  // 7. Paragraph-level repeat check
-  if(_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
+  // 7. Paragraph-level repeat check (skip for large texts — O(n²) on full text causes freeze)
+  if(cleaned.length<10000&&_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
 
   return cleaned;
 }
@@ -2932,22 +2936,29 @@ function _removeHallucinations(text){
 
   // ── Pass 7: Duplicate timestamp-block detection ──
   // Same or near-identical content appearing at different timestamps → keep first, remove rest
+  // Uses exact-match Set for O(1) lookup + limited fuzzy check to avoid O(n²) freeze
   const pass7=[];
-  const seenCores=new Map(); // core → index in pass7
+  const seenExact=new Set(); // exact normalized strings for O(1) dedup
+  const seenFuzzy=[]; // limited array for fuzzy matching (max 200 entries)
+  const FUZZY_LIMIT=200; // prevent O(n²) on large transcripts
   for(const line of pass6){
     const core=_extractCore(line);
     if(!core||core.length<15){pass7.push(line);continue}
-    // Normalize: collapse whitespace, remove punctuation for comparison
     const norm=core.replace(/[\s.,!?·…'"()\[\]]+/g,' ').trim().toLowerCase();
     if(norm.length<10){pass7.push(line);continue}
+    // Fast exact-match check (O(1))
+    if(seenExact.has(norm)){halluRemoved++;continue}
+    // Fuzzy check only against recent entries (bounded)
     let isDup=false;
-    for(const [prevNorm] of seenCores){
-      if(norm===prevNorm||(norm.length>20&&prevNorm.length>20&&_simRatio(norm,prevNorm)>0.85)){
-        isDup=true;halluRemoved++;break;
+    if(norm.length>20){
+      for(let fi=seenFuzzy.length-1;fi>=0&&fi>=seenFuzzy.length-FUZZY_LIMIT;fi--){
+        const prev=seenFuzzy[fi];
+        if(prev.length>20&&_simRatio(norm,prev)>0.85){isDup=true;halluRemoved++;break}
       }
     }
     if(!isDup){
-      seenCores.set(norm,pass7.length);
+      seenExact.add(norm);
+      if(seenFuzzy.length<FUZZY_LIMIT) seenFuzzy.push(norm);
       pass7.push(line);
     }
   }
