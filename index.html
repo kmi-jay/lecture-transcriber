@@ -2644,19 +2644,21 @@ function cleanHallucinations(text){
   }).filter(l=>l.trim()).join('\n');
 
   // 6. Consecutive sentence deduplication + intra-sentence repeat cleanup
-  // Splits by sentence boundaries, then:
-  //   (a) removes consecutive identical/near-identical sentences (fixes "X. X. X. X." hallucination)
-  //   (b) cleans intra-sentence repeated phrases
-  const sentences = cleaned.split(/(?<=[.!?。])\s+|(?<=\n)/);
+  // Splits by sentence boundaries including Korean endings (~니다, ~세요, ~습니다 etc.)
+  const sentSplitRx=/(?<=[.!?。])\s+|(?<=\n)|(?<=(?:니다|세요|어요|습니다|입니다|겠습니다|합니다|됩니다|있습니다|같습니다|바랍니다|십시오|주세요))\s+(?=[가-힣A-Z])/;
+  const sentences = cleaned.split(sentSplitRx);
   const deduped = [];
   for(let i=0;i<sentences.length;i++){
     const s=sentences[i].trim();
     if(!s) continue;
-    // (a) Skip if same as previous sentence (exact or ≥85% similar)
-    if(deduped.length>0){
-      const prev=deduped[deduped.length-1].trim();
-      if(s===prev||(s.length>15&&prev.length>15&&_simRatio(s,prev)>0.85)) continue;
+    // (a) Skip if same as any of the last 3 sentences (exact or ≥80% similar)
+    let isDup=false;
+    const checkBack=Math.min(3,deduped.length);
+    for(let j=1;j<=checkBack;j++){
+      const prev=deduped[deduped.length-j].trim();
+      if(s===prev||(s.length>12&&prev.length>12&&_simRatio(s,prev)>0.80)){isDup=true;break}
     }
+    if(isDup) continue;
     // (b) Clean intra-sentence repeats
     if(_detectRepeat(s)) deduped.push(_cleanRepeat(s));
     else deduped.push(s);
@@ -3041,7 +3043,52 @@ function _simRatio(a,b){
 // Deduplicate repeated phrases within a single line
 function _deduplicatePhrasesInLine(text){
   if(text.length<30) return text;
-  // Try phrase lengths from long to short
+
+  // Phase A: Sentence-level dedup (Korean: ~다/~요/~죠/~니다 endings, or .!?)
+  // Split on sentence boundaries including Korean sentence endings
+  const sentRx=/(?<=[.!?。])\s+|(?<=(?:니다|세요|어요|습니다|입니다|겠습니다|드리겠습니다|합니다|됩니다|있습니다|같습니다|바랍니다|십시오|주세요))\s+/;
+  const sents=text.split(sentRx).filter(s=>s.trim());
+  if(sents.length>=3){
+    const freq={};
+    for(const s of sents) freq[s.trim().toLowerCase()]=(freq[s.trim().toLowerCase()]||0)+1;
+    let changed=false;
+    for(const k in freq){
+      if(freq[k]>=2&&k.length>10){
+        // Keep first occurrence only
+        const deduped=[];
+        let seen=0;
+        for(const s of sents){
+          if(s.trim().toLowerCase()===k){
+            seen++;
+            if(seen<=1) deduped.push(s);
+            else changed=true;
+          } else deduped.push(s);
+        }
+        if(changed){
+          text=deduped.join(' ').replace(/\s{2,}/g,' ').trim();
+          // Re-split for further passes
+        }
+      }
+    }
+    // Also handle near-identical sentence repetition (fuzzy)
+    if(sents.length>=3){
+      const deduped2=[sents[0]];
+      for(let i=1;i<sents.length;i++){
+        const cur=sents[i].trim();
+        const prev=deduped2[deduped2.length-1].trim();
+        if(cur.length>10&&prev.length>10&&_simRatio(cur,prev)>0.8) continue;
+        deduped2.push(sents[i]);
+      }
+      if(deduped2.length<sents.length){
+        text=deduped2.join(' ').replace(/\s{2,}/g,' ').trim();
+      }
+    }
+  }
+
+  // Phase B: Regex-based short pattern dedup (2~30 chars repeated 3+ times)
+  text=text.replace(/(.{3,30}?)\1{2,}/g,'$1');
+
+  // Phase C: Substring phrase dedup (original approach, lowered threshold to 3)
   for(let pLen=Math.min(50,Math.floor(text.length/3));pLen>=5;pLen--){
     for(let start=0;start<=text.length-pLen*3;start++){
       const phrase=text.slice(start,start+pLen).trim();
@@ -3049,8 +3096,7 @@ function _deduplicatePhrasesInLine(text){
       const escaped=phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const rx=new RegExp(escaped,'g');
       const matches=(text.match(rx)||[]).length;
-      if(matches>=4){
-        // Keep first occurrence, remove subsequent
+      if(matches>=3){
         const first=text.indexOf(phrase);
         const before=text.slice(0,first+phrase.length);
         const after=text.slice(first+phrase.length).replace(new RegExp('\\s*'+escaped,'g'),'');
