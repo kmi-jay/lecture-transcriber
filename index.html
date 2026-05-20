@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.43</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.44</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -2478,57 +2478,114 @@ const RX_INJECTED_EN = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g; // Proper-noun pairs e.g.
 function _detectRepeat(text, minRepeats=3){
   // Safety: skip very large texts to prevent O(n²) freeze on main thread
   if(text.length>10000) return false;
-  // Check space-separated word n-grams
   const words = text.split(/\s+/);
-  for(let len=2; len<=8; len++){
-    for(let i=0; i<=words.length-len*minRepeats; i++){
-      const phrase = words.slice(i,i+len).join(' ');
-      if(!phrase.trim()||phrase.length<4) continue;
-      let count=0, pos=0;
-      while((pos=text.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
-      if(count>=minRepeats) return true;
+  if(words.length<4) return false;
+
+  // 1. Space-separated word n-grams
+  for(let len=1; len<=6; len++){
+    if(len>words.length) break;
+    const phrase = words.slice(0,len).join(' ');
+    if(!phrase.trim()||phrase.length<2) continue;
+    let count=0, pos=0;
+    while((pos=text.toLowerCase().indexOf(phrase.toLowerCase(),pos))!==-1){count++;pos+=phrase.length}
+    if(count>=minRepeats){
+      const coverage=(count*phrase.length)/text.length;
+      if(coverage>0.4) return true;
     }
   }
-  // Check comma/separator-delimited repetitions: "X, X, X, X"
+
+  // 2. Comma/separator-delimited repetitions: "X, X, X, X"
   const parts=text.split(/[,،、]\s*/);
   if(parts.length>=minRepeats){
     const freq={};
-    for(const p of parts){const k=p.trim();if(k.length>=2){freq[k]=(freq[k]||0)+1}}
-    for(const k in freq){if(freq[k]>=minRepeats) return true}
+    for(const p of parts){const k=p.trim().toLowerCase();if(k.length>=1){freq[k]=(freq[k]||0)+1}}
+    for(const k in freq){
+      if(freq[k]>=Math.max(minRepeats,4)){
+        const coverage=(freq[k]*k.length)/text.replace(/\s/g,'').length;
+        if(coverage>0.3) return true;
+      }
+    }
+  }
+
+  // 3. Consecutive identical words ("더 더 더 더 더 더")
+  if(words.length>=6){
+    let maxRun=1,curRun=1;
+    for(let i=1;i<words.length;i++){
+      if(words[i].toLowerCase()===words[i-1].toLowerCase()){curRun++;maxRun=Math.max(maxRun,curRun)}
+      else curRun=1;
+    }
+    if(maxRun>=6) return true;
+  }
+
+  // 4. Regex — short pattern (2~20 chars) repeated 4+ times consecutively
+  const m=text.match(/(.{2,20}?)\1{3,}/);
+  if(m&&m[0].length/text.length>0.3) return true;
+
+  // 5. Sentence-level repetition
+  const sents=text.split(/[.!?。]+/).map(s=>s.trim()).filter(s=>s);
+  if(sents.length>=minRepeats){
+    const freq={};
+    for(const s of sents) freq[s.toLowerCase()]=(freq[s.toLowerCase()]||0)+1;
+    for(const k in freq){
+      if(freq[k]>=minRepeats&&freq[k]/sents.length>0.4) return true;
+    }
   }
   return false;
 }
 function _cleanRepeat(text){
-  // First handle comma-separated repetitions: "X, X, X, X" → "X"
+  // Pass 1: Regex — short pattern repeated 4+ times → 1 copy
+  text=text.replace(/(.{2,30}?)\1{3,}/g,'$1');
+
+  // Pass 2: Consecutive identical words 6+ → 1 copy ("더 더 더 더 더 더" → "더")
+  const words=text.split(/\s+/);
+  if(words.length>=6){
+    const deduped=[words[0]];
+    let run=1;
+    for(let i=1;i<words.length;i++){
+      if(words[i].toLowerCase()===words[i-1].toLowerCase()){
+        run++;
+        if(run<=1) deduped.push(words[i]);
+      } else {
+        run=1;
+        deduped.push(words[i]);
+      }
+    }
+    text=deduped.join(' ');
+  }
+
+  // Pass 3: Comma-separated repetitions: "X, X, X, X" → "X"
   const commaParts=text.split(/[,،、]\s*/);
-  if(commaParts.length>=3){
+  if(commaParts.length>=4){
     const freq={};
-    for(const p of commaParts){const k=p.trim();if(k.length>=2){freq[k]=(freq[k]||0)+1}}
+    for(const p of commaParts){const k=p.trim().toLowerCase();if(k) freq[k]=(freq[k]||0)+1}
     for(const k in freq){
-      if(freq[k]>=3){
-        // Replace all repeated comma-delimited phrases, keep just one
+      if(freq[k]>=4){
         const esc=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-        const rx=new RegExp('('+esc+')[,،、\\s]*((?:'+esc+'[,،、\\s]*){2,})','g');
+        const rx=new RegExp('('+esc+')[,،、\\s]*((?:'+esc+'[,،、\\s]*){2,})','gi');
         text=text.replace(rx,'$1');
       }
     }
   }
-  // Then handle space-separated word n-gram repetitions
-  const words = text.split(/\s+/);
-  for(let len=2; len<=8; len++){
-    for(let i=0; i<=words.length-len*3; i++){
-      const phrase = words.slice(i,i+len).join(' ');
-      if(!phrase.trim()||phrase.length<4) continue;
-      let count=0, pos=0;
-      while((pos=text.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
-      if(count>=3){
-        const first = text.indexOf(phrase);
-        const after = text.slice(first+phrase.length);
-        const cleaned = after.replace(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[,،、\\s]*','g'),'');
-        return text.slice(0,first+phrase.length)+' '+cleaned.trim();
+
+  // Pass 4: Sentence-level repetition → keep 1 copy
+  const sents=text.split(/(?<=[.!?。])\s+/);
+  if(sents.length>=3){
+    const freq={};
+    for(const s of sents) freq[s.trim().toLowerCase()]=(freq[s.trim().toLowerCase()]||0)+1;
+    const topKey=Object.keys(freq).reduce((a,b)=>freq[a]>freq[b]?a:b,'');
+    if(freq[topKey]>=3){
+      const cleaned=[];
+      let seen=0;
+      for(const s of sents){
+        if(s.trim().toLowerCase()===topKey){
+          seen++;
+          if(seen<=1) cleaned.push(s);
+        } else cleaned.push(s);
       }
+      text=cleaned.join(' ');
     }
   }
+
   return text.replace(/\s{2,}/g,' ').trim();
 }
 
@@ -2831,7 +2888,7 @@ function _removeHallucinations(text){
   // Whisper sometimes outputs the prompt text itself as hallucinated content
   // Also catches instruction-like text that shouldn't appear in transcription
   const pass4b=[];
-  const promptLeakRx=/텍스트(?:를|가)?\s*(?:를\s*)?(?:생성|완성)|침묵\s*구간|자막\s*제공|번역\s*제공|전문\s*용어를?\s*(?:정확하게\s*)?인식/;
+  const promptLeakRx=/텍스트(?:를|가)?\s*(?:를\s*)?(?:생성|완성)|침묵\s*구간|자막\s*제공|번역\s*제공|전문\s*용어를?\s*(?:정확하게\s*)?인식|한국어로만?\s*전사|강의는?\s*한국어로|이\s*강의는\s*.*강의입니다|발화자는?\s*전문/;
   for(const line of pass4){
     const core=_extractCore(line);
     if(!core){pass4b.push(line);continue}
