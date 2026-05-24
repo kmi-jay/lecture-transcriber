@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.56</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.57</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3650,6 +3650,137 @@ ${text}`);
   return{systemPrompt,userPrompt};
 }
 
+// ─── Parse merged transcript into independent sections ───────────────
+// Returns [{idx, title, text}] split on executeMerge's '\n\n---\n\n' separator.
+// Returns null if text is not a properly merged multi-file transcript.
+function _parseMergedSections(mergedText){
+  const parts=mergedText.split(/\n\n---\n\n/);
+  if(parts.length<=1) return null;
+  const sections=parts.map((s,i)=>{
+    const t=s.trim();
+    const firstLine=t.split('\n')[0]||'';
+    const m=firstLine.match(/^##\s*(.+)/);
+    const title=m?m[1].trim():`${i+1}번 파일`;
+    return{idx:i+1,title,text:t};
+  }).filter(s=>s.text.length>200);
+  return sections.length>=2?sections:null;
+}
+
+// ─── Per-section summary: guaranteed full coverage for merged files ──
+async function _runMergedSummarySections(provider,sections,lang,summaryEl,summaryBtn,label){
+  const limits=_getLLMLimits(provider);
+  const outLang2=_getOutputLang();
+  const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
+  const chunkMaxTok=limits.maxTokens;
+  const sectionResults=[];
+
+  try{
+    for(let i=0;i<sections.length;i++){
+      const sec=sections[i];
+      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ [${i+1}/${sections.length}번 강의 파일] 요약 생성 중 (${label})… "${sec.title}"</span>`;
+      const probRx=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④])/g;
+      const probDetected=(sec.text.match(probRx)||[]).length>=3;
+      const secSp=useK
+        ?`당신은 전문 강의 요약 전문가입니다. 이것은 총 ${sections.length}개 파일로 구성된 통합 강의 중 ${i+1}번째 파일("${sec.title}")의 전사입니다. 이 파일의 모든 핵심 내용을 빠짐없이 요약하세요.${probDetected?' ⚠️ 문제풀이 강의 — 문제 번호·정답·해설 반드시 추출.':''} 각 항목마다 3~5문장으로 내용·맥락·이유·실무 적용을 설명하고, 핵심 키워드·정의·예시·수치를 반드시 포함하세요. 마크다운 사용. 타임스탬프 포함. 절대 간략히 쓰지 마세요.`
+        :`You are an expert lecture summarizer. This is file ${i+1} of ${sections.length} ("${sec.title}") in a merged lecture. Summarize ALL key content without omission.${probDetected?' ⚠️ Problem-solving content — extract every problem, answer, and explanation.':''} Each item in 3-5 sentences covering content, context, reasoning, practical application. Include key terms, definitions, examples, figures. Use markdown. Include timestamps.`;
+      const partials=await _processChunks(provider,sec.text,()=>secSp,summaryEl,label,chunkMaxTok);
+      sectionResults.push({idx:sec.idx,title:sec.title,summary:partials.join('\n\n')});
+    }
+
+    // Synthesis: integrated overview across all sections
+    summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 최종 단계: 전체 통합 요약 생성 중 (${label})…</span>`;
+    const maxPerSec=Math.max(2000,Math.floor((limits.inputChars-500)/sections.length));
+    const synthInput=sectionResults.map(r=>`## ${r.idx}번 강의: ${r.title}\n${r.summary.slice(0,maxPerSec)}`).join('\n\n---\n\n');
+    const synthSp=useK
+      ?`당신은 전문 강의 요약 전문가입니다. 아래는 총 ${sections.length}개 강의 파일의 개별 요약입니다. 다음을 작성하세요:\n1) 전체 핵심 브리프(3~5문장)\n2) 강의별 핵심 요점(각 5~10개, 마크다운 리스트)\n3) 핵심 키워드 목록\n4) 시험·실무 핵심 포인트\n모든 강의 내용을 균등하게 다루세요. 어느 파일도 빠뜨리지 마세요.`
+      :`You are an expert summarizer. Below are summaries of ${sections.length} lecture files. Write: 1) Executive brief (3-5 sentences), 2) Key points per lecture (5-10 each, markdown list), 3) Key terms list, 4) Must-know exam/practice points. Cover ALL files equally — do not skip any.`;
+    const _synthTimer=_startLiveTimer(summaryEl,'통합 요약 생성 중',label);
+    let synthesis;
+    try{
+      synthesis=await _callLLM(provider,synthSp,synthInput,chunkMaxTok);
+      clearInterval(_synthTimer);
+    }catch(se){
+      clearInterval(_synthTimer);
+      synthesis=`> ⚠️ 통합 요약 생성 실패 (${se.message}). 아래 강의별 요약을 참조하세요.`;
+    }
+
+    // Final output: synthesis + full per-section summaries
+    const sectionBlock=sectionResults.map(r=>`## 📚 ${r.idx}번 강의 상세 요약: ${r.title}\n\n${r.summary}`).join('\n\n---\n\n');
+    const fullSummary=synthesis+'\n\n---\n\n# 강의별 상세 요약\n\n'+sectionBlock;
+    summaryEl.style.whiteSpace='normal';
+    summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullSummary)+'</div>';
+    {const _h=_curHist();if(_h) _h.summary=fullSummary;}
+    await saveState();
+    toast(`통합 요약 완료 — ${sections.length}개 강의 파일 (${label})`);
+  }catch(e){
+    logError(provider||'LLM',e instanceof LLMError?e.status:'ERR',e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message,'통합 요약');
+    if(sectionResults.length>0){
+      // Save whatever we have so far
+      const partial=sectionResults.map(r=>`## 📚 ${r.idx}번 강의 (부분 완료): ${r.title}\n\n${r.summary}`).join('\n\n---\n\n');
+      const partialFull=`> ⚠️ 처리 중 오류 — ${sectionResults.length}/${sections.length}번 강의까지 처리됨.\n\n`+partial;
+      summaryEl.style.whiteSpace='normal';
+      summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(partialFull)+'</div>';
+      {const _h=_curHist();if(_h) _h.summary=partialFull;}
+      await saveState();
+    }
+    if(e instanceof LLMError){
+      if(!sectionResults.length) summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 오류 발생. 다른 프로바이더를 시도하세요.</span>`;
+      showLLMErrorModal(e,(newProvider)=>{_runSummary(newProvider,transcriptText,lang);});
+    }else if(e.name==='AbortError'){
+      summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (3분).</span>`;
+    }
+  }finally{
+    summaryBtn.disabled=false;
+  }
+}
+
+// ─── Per-section notes: guaranteed full coverage for merged files ────
+async function _runMergedNotesSections(provider,sections,lang,notesEl,notesBtn,label){
+  const limits=_getLLMLimits(provider);
+  const outLang=_getOutputLang();
+  const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
+  const template=document.getElementById('notes-template')?.value||'standard';
+  const templateNames={standard:'표준',exam:'시험 집중',meeting:'회의록',interview:'인터뷰',concept:'개념 정리',qa_format:'Q&A',compare:'비교·대조'};
+  const baseSystemPrompt=NOTE_TEMPLATES[template]||NOTE_TEMPLATES.standard;
+  const sectionNotes=[];
+
+  try{
+    for(let i=0;i<sections.length;i++){
+      const sec=sections[i];
+      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ [${i+1}/${sections.length}번 강의 파일] 노트 생성 중 (${label})… "${sec.title}"</span>`;
+      const chunkSp=useKorean
+        ?baseSystemPrompt+`\n\n중요: 이것은 총 ${sections.length}개 강의 중 ${i+1}번째 파일("${sec.title}")입니다. 이 파일의 모든 핵심 내용을 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 설명하고 정의·예시·논거·실무 적용을 포함하세요. 간략히 쓰지 마세요.`
+        :baseSystemPrompt+`\n\nIMPORTANT: This is file ${i+1} of ${sections.length} ("${sec.title}"). Write comprehensive notes covering ALL key content — every point with 3-5 sentences including definitions, examples, arguments, and practical applications. Be thorough.`;
+      const partials=await _processChunks(provider,sec.text,()=>chunkSp,notesEl,label,limits.maxTokens);
+      const secNotes=partials.length>1
+        ?partials.map((p,j)=>j===0?p:`\n---\n**[이어서 ${j+1}구간]**\n${p}`).join('\n\n')
+        :partials[0]||'';
+      sectionNotes.push({idx:sec.idx,title:sec.title,notes:secNotes});
+    }
+    const fullNotes=sectionNotes.map(s=>`# 📚 ${s.idx}번 강의 노트: ${s.title}\n\n${s.notes}`).join('\n\n---\n\n');
+    notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullNotes)+'</div>';
+    {const _h=_curHist();if(_h) _h.notes=fullNotes;}
+    await saveState();
+    toast(`통합 노트 완료 — ${sections.length}개 강의 파일 (${label} · ${templateNames[template]||'표준'})`);
+  }catch(e){
+    logError(provider||'LLM',e instanceof LLMError?e.status:'ERR',e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message,'통합 노트');
+    if(sectionNotes.length>0){
+      const partial=sectionNotes.map(s=>`# 📚 ${s.idx}번 강의 노트 (부분): ${s.title}\n\n${s.notes}`).join('\n\n---\n\n');
+      notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(`> ⚠️ ${sectionNotes.length}/${sections.length}번까지 처리됨.\n\n`+partial)+'</div>';
+      {const _h=_curHist();if(_h) _h.notes=partial;}
+      await saveState();
+    }
+    if(e instanceof LLMError){
+      if(!sectionNotes.length) notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 오류 발생.</span>`;
+      showLLMErrorModal(e,(p)=>{_runNotesWithProvider(p,transcriptText,lang);});
+    }else if(e.name==='AbortError'){
+      notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 응답 시간 초과 (3분).</span>`;
+    }
+  }finally{
+    notesBtn.disabled=false;
+  }
+}
+
 // ── Main summary entry point ──
 async function generateSummaryFromText(transcriptText,lang){
   const provider=_pickLLMProvider();
@@ -3683,6 +3814,16 @@ async function _runSummary(provider,transcriptText,lang){
   const mergedCtxEn=_isMerged
     ?'⚠️ This is a merged transcript from multiple lecture files in order. Each file is separated by "## Lecture N: Title" sections. Timestamps within each section are relative to that file (starting from 0). Summarize each lecture section in order, then provide an integrated overview.\n\n'
     :'';
+
+  // ── Merged file: per-section processing (guarantees all files covered) ──
+  if(_isMerged){
+    const _sections=_parseMergedSections(transcriptText);
+    if(_sections&&_sections.length>=2){
+      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 통합 파일 감지 — ${_sections.length}개 강의 파일을 순서대로 처리합니다 (${label})…</span>`;
+      await _runMergedSummarySections(provider,_sections,lang,summaryEl,summaryBtn,label);
+      return;
+    }
+  }
 
   // For very long transcripts that exceed provider limit
   if(isLong){
@@ -4132,6 +4273,16 @@ async function generateNotesFromText(transcriptText,lang){
     ?'⚠️ This is a merged transcript from multiple lecture files in order. Each file is separated by "## Lecture N: Title" sections. Timestamps within each section are relative to that file (starting from 0). Write notes per section and include an integrated overview.\n\n'
     :'';
 
+  // ── Merged file: per-section processing (guarantees all files covered) ──
+  if(_isMergedN){
+    const _noteSections=_parseMergedSections(transcriptText);
+    if(_noteSections&&_noteSections.length>=2){
+      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 통합 파일 감지 — ${_noteSections.length}개 강의 파일을 순서대로 처리합니다 (${label})…</span>`;
+      await _runMergedNotesSections(provider,_noteSections,lang,notesEl,notesBtn,label);
+      return;
+    }
+  }
+
   const langInstruction=useKorean
     ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 긴 강의일수록 더 상세하고 빠짐없이 노트를 작성하세요.'
     :'\n\nIMPORTANT: Write entirely in English. For long lectures, be thorough and comprehensive.';
@@ -4439,7 +4590,8 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
 6) ${ctxRule}
 7) [타임스탬프 구조 검증] 새 타임스탬프 생성 절대 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 단, 규칙 3에 따라 환각 블록을 제거할 경우 해당 타임스탬프는 함께 제거되므로 개수가 줄어들 수 있습니다(이는 정상). 각 [HH:MM:SS]는 반드시 새 줄에서 시작해야 합니다.
 8) 내용 요약·축약 절대 금지 — 오류 교정만 수행
-9) 교정된 본문만 출력 — 설명·주석 없이`
+9) 교정된 본문만 출력 — 설명·주석 없이
+10) [구조 마커 보존] 전사 본문 중 "## N번 강의:", "---", "> 📍" 로 시작하는 줄은 파일 병합 구조 정보입니다. 교정 대상이 아니므로 원문 그대로 유지하세요. 삭제하거나 수정하지 마세요.`
     :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
 ${ctx?`\n[Topic] ${ctx}\n`:''}
 [Core Principle — Semantic Correction]
@@ -4480,7 +4632,8 @@ If not → infer the correct word from context and restore it.
 6) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
 7) Preserve [HH:MM:SS] timestamps — do NOT add new timestamps at any point. Each [HH:MM:SS] must start on a new line.
 8) Don't summarize or shorten — only correct errors
-9) Output corrected text only, no explanations`;
+9) Output corrected text only, no explanations
+10) [Preserve structure markers] Lines starting with "## N번 강의:", "---", or "> 📍" are file-merge structural markers — keep them exactly as-is. Do NOT remove, rewrite, or relocate them.`;
 }
 
 async function refineTranscript(){
