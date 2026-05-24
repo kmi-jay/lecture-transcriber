@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.55</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.56</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3269,7 +3269,7 @@ function showLLMErrorModal(err, retryFn){
 // ── API call functions with structured errors ──
 // ── Provider registry — single source of truth for labels, costs, limits ──
 const PROVIDERS={
-  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:30000,  maxTokens:16000, canTranscribe:true,  canPostProcess:true},
+  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:20000,  maxTokens:6000,  canTranscribe:true,  canPostProcess:true},
   gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:800000, maxTokens:65536,canTranscribe:true,  canPostProcess:true},
   google:{label:'Google STT',      costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
@@ -3675,6 +3675,15 @@ async function _runSummary(provider,transcriptText,lang){
   const outLang2=_getOutputLang();
   const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
 
+  // Detect merged multi-file transcript and add structural context
+  const _isMerged=!!_curHist()?.merged;
+  const mergedCtxKo=_isMerged
+    ?'⚠️ 이 전사는 여러 강의 파일을 순서대로 합친 통합본입니다. 각 파일은 "## N번 강의: 제목" 섹션으로 구분되며, 각 파일의 타임스탬프는 해당 파일 내부 기준(0분부터 시작)입니다. 전체 순서는 1번→2번→... 입니다. 요약 시 각 강의 섹션의 내용을 순서대로 다루고, 전체를 통합한 요약도 포함하세요.\n\n'
+    :'';
+  const mergedCtxEn=_isMerged
+    ?'⚠️ This is a merged transcript from multiple lecture files in order. Each file is separated by "## Lecture N: Title" sections. Timestamps within each section are relative to that file (starting from 0). Summarize each lecture section in order, then provide an integrated overview.\n\n'
+    :'';
+
   // For very long transcripts that exceed provider limit
   if(isLong){
     const chunkMaxTok=limits.maxTokens;
@@ -3686,10 +3695,10 @@ async function _runSummary(provider,transcriptText,lang){
     const isVeryLong=estChunks>=5;
 
     const sp=useK
-      ?`다음은 긴 강의 전사의 일부(구간)입니다. ${_probDetected?'⚠️ 문제풀이 강의입니다. 각 문제의 번호·정답·해설을 빠짐없이 추출하세요. ':''}${isVeryLong
+      ?`${mergedCtxKo}다음은 긴 강의 전사의 일부(구간)입니다. ${_probDetected?'⚠️ 문제풀이 강의입니다. 각 문제의 번호·정답·해설을 빠짐없이 추출하세요. ':''}${isVeryLong
         ?'이 구간의 핵심 내용을 빠짐없이 체계적으로 요약하세요. 각 포인트마다 2~3문장으로 무엇을, 왜, 어떻게를 설명. 핵심 키워드·정의·예시·수치를 반드시 포함. 마크다운 사용. 시간 정보가 있으면 포함.'
         :'이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'}`
-      :`This is a portion of a long lecture transcript. ${_probDetected?'⚠️ Problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}${isVeryLong
+      :`${mergedCtxEn}This is a portion of a long lecture transcript. ${_probDetected?'⚠️ Problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}${isVeryLong
         ?'Summarize ALL key points of this section systematically. Each point in 2-3 sentences covering what, why, how. Include key terms, definitions, examples, figures. Use markdown.'
         :'Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.'}`;
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
@@ -4113,6 +4122,16 @@ async function generateNotesFromText(transcriptText,lang){
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
   const limits=_getLLMLimits(provider);
   const isLong=transcriptText.length>limits.inputChars;
+
+  // Detect merged multi-file transcript and add structural context
+  const _isMergedN=!!_curHist()?.merged;
+  const mergedCtxNotesKo=_isMergedN
+    ?'⚠️ 이 전사는 여러 강의 파일을 순서대로 합친 통합본입니다. 각 파일은 "## N번 강의: 제목" 섹션으로 구분되며, 각 파일의 타임스탬프는 해당 파일 내부 기준(0분부터 시작)입니다. 노트 작성 시 각 강의 섹션별로 구분하여 작성하고, 전체 통합 노트도 포함하세요.\n\n'
+    :'';
+  const mergedCtxNotesEn=_isMergedN
+    ?'⚠️ This is a merged transcript from multiple lecture files in order. Each file is separated by "## Lecture N: Title" sections. Timestamps within each section are relative to that file (starting from 0). Write notes per section and include an integrated overview.\n\n'
+    :'';
+
   const langInstruction=useKorean
     ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 긴 강의일수록 더 상세하고 빠짐없이 노트를 작성하세요.'
     :'\n\nIMPORTANT: Write entirely in English. For long lectures, be thorough and comprehensive.';
@@ -4122,8 +4141,8 @@ async function generateNotesFromText(transcriptText,lang){
   // For very long transcripts: each chunk gets the FULL template prompt → concatenate directly (no lossy merge)
   if(isLong){
     const chunkSp=useKorean
-      ?systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거, 비교, 실무 포인트를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 충분히 설명하세요. "왜 중요한지", "어떻게 작동하는지", "실무/시험에서 어떻게 나오는지"를 반드시 포함하세요. 간략히 쓰지 마세요. 최대한 길고 상세하게 작성하세요.'
-      :systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, argument, comparison, and practical point. Each point must be 3-5 sentences with full explanation including WHY it matters and HOW it works. Be as thorough and detailed as possible. Do NOT abbreviate.';
+      ?(mergedCtxNotesKo?mergedCtxNotesKo:'')+(systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거, 비교, 실무 포인트를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 충분히 설명하세요. "왜 중요한지", "어떻게 작동하는지", "실무/시험에서 어떻게 나오는지"를 반드시 포함하세요. 간략히 쓰지 마세요. 최대한 길고 상세하게 작성하세요.')
+      :(mergedCtxNotesEn?mergedCtxNotesEn:'')+(systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, argument, comparison, and practical point. Each point must be 3-5 sentences with full explanation including WHY it matters and HOW it works. Be as thorough and detailed as possible. Do NOT abbreviate.');
     // Scale output tokens: long chunks need long output
     const chunkMaxTok=limits.maxTokens;
     const partials=await _processChunks(provider,transcriptText,(ci)=>chunkSp,notesEl,label,chunkMaxTok);
@@ -4200,8 +4219,8 @@ ${tocInput}`;
 
   // Short text — single call
   const userPrompt=useKorean
-    ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요. 모든 핵심 내용을 빠짐없이 포함하고, 각 포인트를 2~4문장으로 충분히 설명하세요.\n\n${transcriptText.slice(0,limits.inputChars)}`
-    :`Analyze the following transcript and write notes in the format above, in English. Include ALL key insights — each point with 2-4 sentences of explanation.\n\n${transcriptText.slice(0,limits.inputChars)}`;
+    ?`${mergedCtxNotesKo}다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요. 모든 핵심 내용을 빠짐없이 포함하고, 각 포인트를 2~4문장으로 충분히 설명하세요.\n\n${transcriptText.slice(0,limits.inputChars)}`
+    :`${mergedCtxNotesEn}Analyze the following transcript and write notes in the format above, in English. Include ALL key insights — each point with 2-4 sentences of explanation.\n\n${transcriptText.slice(0,limits.inputChars)}`;
   // Scale output tokens with input length
   const scaledMaxTok=limits.maxTokens;
   const _notesTimer=_startLiveTimer(notesEl,`노트 생성 중 (${templateNames[template]||'표준'})`,label);
@@ -4231,9 +4250,10 @@ async function _runNotesWithProvider(provider,text,lang){
   // Re-run with specific provider (used by error modal callback)
   const notesEl=document.getElementById('res-notes');
   notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 재시도 중...</span>`;
-  // Delegate to generateNotesFromText but override provider
+  // IMPORTANT: must use '<provider>-only' format so _pickLLMProvider() correctly selects it
+  // Setting to plain 'gemini' would fall through to 'auto' order (groq first) — causing same 413 loop
   const origPref=state.llmProvider;
-  state.llmProvider=provider;
+  state.llmProvider=provider+'-only';
   await generateNotesFromText(text,lang);
   state.llmProvider=origPref;
 }
@@ -4585,10 +4605,20 @@ async function askQuestion(){
   msgBox.appendChild(aiBub);
   msgBox.scrollTop=msgBox.scrollHeight;
 
-  // Build context
-  const transcript=document.getElementById('res-full').textContent;
-  const notes=document.getElementById('res-notes')?.textContent||'';
-  const contextText=transcript.slice(0,10000)+(notes?'\n\n[노트]\n'+notes.slice(0,3000):'');
+  // Build context — use history data (not DOM) so full text is available
+  const _qaHist=_curHist();
+  const _isMergedQA=!!_qaHist?.merged;
+  // Provider-aware context limit: Gemini can handle larger context; Groq/others keep it tighter
+  const _qaProvider=_pickLLMProvider();
+  const _qaMaxCtx=(_qaProvider==='gemini')?40000:(_qaProvider==='claude'?30000:15000);
+  const _qaTranscript=_qaHist?(_qaHist.refined||_qaHist.text||''):document.getElementById('res-full').textContent;
+  const _qaNotes=_qaHist?.notes||document.getElementById('res-notes')?.textContent||'';
+  // For merged files: trim notes more aggressively to leave more room for the transcript
+  const _qaNoteSlice=_isMergedQA?1000:3000;
+  const contextText=_qaTranscript.slice(0,_qaMaxCtx-_qaNoteSlice-200)+(_qaNotes?'\n\n[노트]\n'+_qaNotes.slice(0,_qaNoteSlice):'');
+
+  const _mergedQAHintKo=_isMergedQA?'\n\n⚠️ 이 전사는 여러 강의 파일을 합친 통합본입니다. 각 섹션("## N번 강의")의 타임스탬프는 해당 파일 내부 기준(0분부터 시작)이므로 "N번 강의 00:XX:XX" 형태로 참조하세요.':'';
+  const _mergedQAHintEn=_isMergedQA?'\n\n⚠️ This is a merged transcript from multiple lecture files. Timestamps in each section ("## Lecture N") are relative to that file (starting from 0) — reference them as "Lecture N 00:XX:XX".':'';
 
   qaHistory.push({role:'user',content:q});
 
@@ -4596,7 +4626,7 @@ async function askQuestion(){
   const qaLang=document.getElementById('pre-language')?.value||'ko';
   const useKoreanQA=(outLang==='ko'||(outLang==='same'&&(qaLang==='ko'||qaLang==='auto')));
   const systemPrompt=useKoreanQA
-    ?`당신은 전사 내용 분석 전문가입니다. 아래 전사 텍스트를 기반으로 사용자의 질문에 정확하고 이해하기 쉽게 한국어로 답변합니다.
+    ?`당신은 전사 내용 분석 전문가입니다. 아래 전사 텍스트를 기반으로 사용자의 질문에 정확하고 이해하기 쉽게 한국어로 답변합니다.${_mergedQAHintKo}
 
 규칙:
 - 전사 텍스트에 있는 내용만으로 답변 (없는 내용은 "전사 내용에서 확인되지 않습니다"로 안내)
@@ -4609,7 +4639,7 @@ async function askQuestion(){
 
 [전사 텍스트 및 노트]
 ${contextText}`
-    :`You are a transcript analysis expert. Answer user questions based on the transcript below, accurately and clearly in English.
+    :`You are a transcript analysis expert. Answer user questions based on the transcript below, accurately and clearly in English.${_mergedQAHintEn}
 
 Rules:
 - Only answer based on transcript content (if not found, say "Not found in transcript")
@@ -5312,9 +5342,18 @@ function executeMerge(){
   const projName=proj?proj.name:'통합';
 
   // 선택 순서대로 전문 합치기 (정제본 우선, 없으면 원본)
-  const mergedText=files.map(h=>{
+  // 각 파일 헤더에 전체 강의 내 누적 시간 위치를 명시 — LLM이 시간 순서를 올바르게 파악하도록
+  let cumSec=0;
+  const mergedText=files.map((h,i)=>{
     const body=h.refined||h.text||'';
-    return `## ${h.title||h.name}\n\n${body}`;
+    const startMin=Math.round(cumSec/60);
+    const dur=h.duration||0;
+    const endMin=Math.round((cumSec+dur)/60);
+    const timeNote=files.length>1
+      ?`\n> 📍 전체 강의 기준 위치: ${startMin}분~${endMin}분 (이 파일 내 타임스탬프는 0분부터 시작)`
+      :'';
+    cumSec+=dur;
+    return `## ${i+1}번 강의: ${h.title||h.name}${timeNote}\n\n${body}`;
   }).join('\n\n---\n\n');
 
   const mergedTitle=`[통합] ${projName} (${files.length}개 파일)`;
