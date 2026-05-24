@@ -305,20 +305,6 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ──── Error Log (모바일 디버깅용) ──── */
-.error-log{position:fixed;bottom:0;left:0;right:0;max-height:220px;overflow-y:auto;
-  background:var(--bg);border-top:1px solid #ff6b6b40;z-index:90;padding:8px 16px 12px;display:none}
-.error-log.has-errors{display:block}
-.error-log-item{background:var(--red-dim);border:1px solid #ff6b6b30;border-radius:var(--radius-xs);
-  padding:10px 12px;margin-bottom:6px;font-size:11px;font-family:var(--mono);color:var(--red);
-  word-break:break-all;line-height:1.5;position:relative}
-.error-log-item .err-time{color:var(--text3);font-size:10px}
-.error-log-item .err-provider{color:var(--amber);font-weight:600}
-.error-log-item .err-detail{color:var(--text2);margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto}
-.error-log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.error-log-header span{font-size:12px;font-weight:600;color:var(--red)}
-.error-log-header button{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;text-decoration:underline}
-
 /* ──── Modal ──── */
 .modal-overlay{position:fixed;inset:0;background:#00000080;z-index:100;
   display:none;align-items:flex-end;justify-content:center;
@@ -345,10 +331,10 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
 <!-- Top Bar -->
 <div class="topbar">
-  <div class="logo" onclick="showPage('home')" style="cursor:pointer">
+  <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.52</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.18</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -390,18 +376,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <p>녹음된 오디오·회의 파일을 불러옵니다</p>
     </div>
   </div>
-  <input type="file" id="file-input" accept="audio/*,video/*,.mp3,.m4a,.wav,.ogg,.webm,.mp4,.aac,.flac" style="display:none"
+  <input type="file" id="file-input" accept="audio/*" style="display:none"
     onchange="handleFile(this.files[0])">
-
-  <div class="action-card" onclick="pickTextFile()">
-    <div class="action-icon" style="background:var(--green-dim)">📄</div>
-    <div>
-      <h3>전사본 불러오기</h3>
-      <p>이미 전사된 텍스트 파일을 불러와 후처리합니다</p>
-    </div>
-  </div>
-  <input type="file" id="text-file-input" accept=".txt,.srt,.vtt,.md,.text,.csv,.tsv" style="display:none"
-    onchange="handleTextFile(this.files[0])">
 
   <!-- PWA Install Banner -->
   <div id="install-banner" style="display:none;margin-top:14px">
@@ -429,28 +405,11 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
-  <!-- Search -->
-  <div id="home-search-wrap" style="margin-top:16px;display:none">
-    <div style="position:relative">
-      <input type="text" id="home-search" placeholder="파일명, 태그, 프로젝트 검색..."
-        oninput="filterHomeList(this.value)"
-        style="width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
-      <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-    </div>
-  </div>
-
-  <!-- Projects Section -->
-  <div id="projects-section" style="margin-top:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="card-label">프로젝트</div>
-      <button onclick="createNewProject()" style="background:none;border:none;color:var(--primary);font-size:20px;cursor:pointer;padding:4px" title="새 프로젝트">+</button>
-    </div>
-    <div id="projects-list"></div>
-    <div id="unclassified-section" style="margin-top:16px">
-      <div class="card-label">미분류</div>
-      <div class="card" style="padding:4px 16px">
-        <div id="unclassified-list"></div>
-      </div>
+  <!-- History -->
+  <div id="history-section" style="display:none;margin-top:20px">
+    <div class="card-label">최근 기록</div>
+    <div class="card" style="padding:4px 16px">
+      <div id="history-list"></div>
     </div>
   </div>
 </div>
@@ -473,17 +432,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
 <!-- ═══════ PAGE: Pre-check ═══════ -->
 <div id="page-precheck" class="page">
-  <div class="card-label" id="precheck-title">전사 준비</div>
+  <div class="card-label">전사 준비</div>
 
   <div class="file-badge">
-    <div class="icon" id="pre-file-icon">🎵</div>
+    <div class="icon">🎵</div>
     <div class="info">
       <div class="name" id="pre-filename"></div>
       <div class="meta" id="pre-filemeta"></div>
     </div>
   </div>
 
-  <div class="stat-grid" id="pre-stat-grid">
+  <div class="stat-grid">
     <div class="stat-item">
       <div class="val" id="pre-dur-val">0</div>
       <div class="lbl">분</div>
@@ -508,21 +467,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <span id="pre-cost-text"></span>
   </div>
 
-  <div class="field" id="precheck-api-row">
+  <div class="field">
     <div class="field-label">전사 방법 (음성→텍스트)</div>
     <select id="pre-api-choice">
-      <optgroup label="🤖 자동 모드">
-        <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
-        <option value="quality-auto">품질 우선 (Google → OpenAI → AssemblyAI → Groq)</option>
-        <option value="free-auto">무료만 (Groq → AssemblyAI → Gemini)</option>
-      </optgroup>
-      <optgroup label="📌 직접 선택">
-        <option value="google-only">Google (Chirp 2, 유료) — Plaud 동일 엔진</option>
-        <option value="openai-only">OpenAI Whisper (유료)</option>
-        <option value="assemblyai-only">AssemblyAI (무료 크레딧)</option>
-        <option value="groq-only">Groq Whisper (무료, 한도 있음)</option>
-        <option value="gemini-only">Gemini 멀티모달 (무료)</option>
-      </optgroup>
+      <option value="auto">자동 (Groq → AssemblyAI → Gemini → Google → OpenAI)</option>
+      <option value="free-auto">무료만 (Groq → AssemblyAI → Gemini)</option>
+      <option value="groq-only">Groq만 (한도 내에서만, 무료)</option>
+      <option value="assemblyai-only">AssemblyAI만 (무료 크레딧)</option>
+      <option value="gemini-only">Gemini만 (무료)</option>
+      <option value="google-only">Google (Chirp 2, 유료)</option>
+      <option value="openai-only">OpenAI만 (유료)</option>
     </select>
     <p style="font-size:11px;color:var(--text3);margin-top:4px">Groq·AssemblyAI·Google·OpenAI = 전용 음성인식 | Gemini = AI 멀티모달 전사 | Claude = 음성 미지원</p>
     <details style="margin-top:6px;font-size:11px;color:var(--text3)">
@@ -537,18 +491,6 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
         <b>💡 권장:</b> 한영 혼합 강의는 <b>다국어</b> 모드 + <b>정제(LLM)</b> 후처리를 함께 사용하면 음차→영어 복원 등 품질이 크게 향상됩니다.<br><b>📝 강의 주제 입력:</b> 주제를 입력하면 전사·정제·요약 모든 단계에서 해당 분야의 전문 용어 인식률이 향상됩니다.
       </div>
     </details>
-  </div>
-
-  <div class="field" id="precheck-chunk-row">
-    <div class="field-label">청크 분할</div>
-    <select id="pre-chunk-min">
-      <option value="0">분할 없음 (전체를 한 번에)</option>
-      <option value="3">3분 단위 (Google STT 최대)</option>
-      <option value="5">5분 단위</option>
-      <option value="10">10분 단위</option>
-      <option value="12">12분 단위 (Groq/OpenAI 최대)</option>
-    </select>
-    <p id="pre-chunk-hint" style="font-size:11px;color:var(--text3);margin-top:4px"></p>
   </div>
 
   <div class="field">
@@ -590,17 +532,16 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="field" id="precheck-llm-row" style="display:none">
     <div class="field-label">AI 후처리 (노트·요약·정제)</div>
     <select id="pre-llm-choice">
-      <optgroup label="🤖 자동 모드">
-        <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
-        <option value="quality-llm">품질 우선 (Claude → OpenAI → Gemini → Groq)</option>
-        <option value="free-only">무료만 (Groq → Gemini)</option>
-      </optgroup>
-      <optgroup label="📌 직접 선택">
-        <option value="claude-only">Claude (유료, 최고 품질)</option>
-        <option value="openai-only">OpenAI GPT-4o-mini (유료)</option>
-        <option value="gemini-only">Gemini (무료, 대용량)</option>
-        <option value="groq-only">Groq Llama (무료, 빠름)</option>
-      </optgroup>
+      <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
+      <option value="free-only">무료만 (Groq → Gemini)</option>
+      <option value="groq-first">Groq 우선 → Gemini → Claude → OpenAI</option>
+      <option value="gemini-first">Gemini 우선 → Groq → Claude → OpenAI</option>
+      <option value="claude-first">Claude 우선 → Groq → Gemini → OpenAI</option>
+      <option value="openai-first">OpenAI 우선 → Groq → Gemini → Claude</option>
+      <option value="groq-only">Groq만 (Llama, 무료)</option>
+      <option value="gemini-only">Gemini만 (무료)</option>
+      <option value="claude-only">Claude만 (유료)</option>
+      <option value="openai-only">OpenAI만 (GPT-4o-mini, 유료)</option>
     </select>
     <p style="font-size:12px;color:var(--text3);margin-top:4px">노트 생성, 요약, 텍스트 정제에 사용할 AI를 선택합니다</p>
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
@@ -636,7 +577,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
   <div style="display:flex;gap:10px;margin-top:8px">
     <button class="btn btn-ghost" onclick="showPage('home')" style="flex:1">취소</button>
-    <button class="btn btn-primary" id="precheck-start-btn" onclick="startTranscription()" style="flex:2">전사 시작</button>
+    <button class="btn btn-primary" onclick="startTranscription()" style="flex:2">전사 시작</button>
   </div>
 </div>
 
@@ -650,35 +591,12 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="chunk-list" id="chunk-list"></div>
 </div>
 
-<!-- ═══════ Global Error Log (모바일 디버깅) ═══════ -->
-<div class="error-log" id="error-log">
-  <div class="error-log-header"><span>⚠️ 오류 로그</span><button onclick="clearErrorLog()">지우기</button></div>
-  <div id="error-log-items"></div>
-</div>
-
 <!-- ═══════ PAGE: Result ═══════ -->
 <div id="page-result" class="page">
-  <div style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <input id="res-title" type="text" placeholder="제목을 입력하세요" style="flex:1;font-size:15px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:4px 0;outline:none" onchange="_saveTitle(this.value)">
-      <button class="btn btn-ghost" onclick="_editTitle()" style="padding:4px 8px;font-size:11px">✏️</button>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="flex:1;min-width:0">
+      <p id="res-info" style="font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></p>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <p id="res-info" style="font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0"></p>
-      <p id="res-provider-info" style="font-size:11px;color:var(--text3);margin:0;display:none"></p>
-    </div>
-
-    <!-- Project and Tags Assignment -->
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
-      <select id="res-project-select" onchange="assignToProject()"
-        style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer;flex:1;min-width:150px">
-        <option value="">프로젝트 선택...</option>
-      </select>
-      <input id="res-tags-input" type="text" placeholder="태그 (쉼표로 구분)"
-        style="flex:1;min-width:150px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none"
-        onchange="updateFileTags()" onkeydown="if(event.key==='Enter') updateFileTags()">
-    </div>
-    <div id="res-tags-display" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
   </div>
 
   <div class="result-tabs" id="result-tabs">
@@ -769,53 +687,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <button class="btn btn-ghost" onclick="downloadResult()" style="flex:1">💾 TXT</button>
     <button class="btn btn-ghost" onclick="downloadMarkdown()" style="flex:1">📄 MD</button>
   </div>
-  <button class="btn btn-ghost" onclick="_goBackFromResult()" style="margin-top:8px">← 뒤로</button>
-</div>
-
-<!-- ═══════ PAGE: Project Detail ═══════ -->
-<div id="page-project" class="page">
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-    <button class="nav-btn" onclick="showPage('home');renderProjects()" style="width:36px;height:36px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    </button>
-    <input id="proj-title" type="text" placeholder="프로젝트명"
-      style="flex:1;font-size:18px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:4px 0;outline:none"
-      onchange="updateProjectTitle()">
-    <button onclick="deleteProject()" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:8px" title="프로젝트 삭제">🗑️</button>
-  </div>
-
-  <div class="field">
-    <div class="field-label">태그</div>
-    <input id="proj-tags" type="text" placeholder="쉼표로 구분 (예: 수학, 2학기)"
-      style="width:100%;padding:10px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;color:var(--text);outline:none"
-      onchange="updateProjectTags()">
-  </div>
-
-  <div style="margin-top:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="card-label" style="margin:0">파일 목록</div>
-        <span id="proj-file-count" style="font-size:12px;color:var(--text3)"></span>
-      </div>
-      <label id="proj-select-all-wrap" style="display:none;align-items:center;gap:4px;font-size:11px;color:var(--text3);cursor:pointer">
-        <input type="checkbox" id="proj-select-all" onchange="toggleSelectAll(this.checked)" style="width:16px;height:16px;cursor:pointer"> 전체 선택
-      </label>
-    </div>
-    <div id="proj-action-bar" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;gap:8px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:12px;color:var(--text2)" id="proj-sel-count"></span>
-      <div style="flex:1"></div>
-      <button onclick="mergeSelectedFiles('text')" class="btn btn-ghost" style="font-size:12px;padding:6px 12px">📄 통합 전문</button>
-      <button onclick="mergeSelectedFiles('summary')" class="btn btn-ghost" style="font-size:12px;padding:6px 12px">📊 통합 요약</button>
-      <button onclick="mergeSelectedFiles('notes')" class="btn btn-ghost" style="font-size:12px;padding:6px 12px">📝 통합 노트</button>
-      <button onclick="mergeSelectedFiles('qa')" class="btn btn-ghost" style="font-size:12px;padding:6px 12px">💬 통합 Q&A</button>
-      <button onclick="removeFromProject()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;color:var(--amber)">📤 프로젝트에서 제거</button>
-    </div>
-    <div id="proj-files-list" style="display:flex;flex-direction:column;gap:4px"></div>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button onclick="showAddFileDialog()" class="btn btn-ghost" style="flex:1;font-size:13px;padding:10px">+ 미분류 파일 추가</button>
-      <button onclick="exportProject()" class="btn btn-ghost" style="font-size:13px;padding:10px;white-space:nowrap">📥 전체 내보내기</button>
-    </div>
-  </div>
+  <button class="btn btn-ghost" onclick="showPage('home')" style="margin-top:8px">← 홈으로</button>
 </div>
 
 <!-- ═══════ PAGE: Settings ═══════ -->
@@ -993,17 +865,14 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="field" style="margin-bottom:0">
         <div class="field-label">기본 LLM 선택</div>
         <select id="set-llm-provider">
-          <optgroup label="🤖 자동 모드">
-            <option value="auto">비용 절약 (무료 우선 → 유료 대체)</option>
-            <option value="quality-llm">품질 우선 (Claude → OpenAI → Gemini → Groq)</option>
-            <option value="free-only">무료만 (Groq → Gemini)</option>
-          </optgroup>
-          <optgroup label="📌 직접 선택">
-            <option value="claude-only">Claude Sonnet 4.6 (유료, 최고 품질)</option>
-            <option value="openai-only">OpenAI GPT-4o-mini (유료)</option>
-            <option value="gemini-only">Gemini 2.0 Flash (무료, 대용량)</option>
-            <option value="groq-only">Groq Llama 3.3 70B (무료, 빠름)</option>
-          </optgroup>
+          <option value="auto">자동 (Groq → Gemini → Claude → OpenAI)</option>
+          <option value="free-only">무료만 (Groq → Gemini)</option>
+          <option value="groq-first">Groq 우선 → Gemini → Claude</option>
+          <option value="gemini-first">Gemini 우선 → Groq → Claude</option>
+          <option value="claude-first">Claude 우선 → Groq → Gemini</option>
+          <option value="groq-only">Groq만 (Llama 3.3 70B)</option>
+          <option value="gemini-only">Gemini만 (2.0 Flash)</option>
+          <option value="claude-only">Claude만 (Sonnet 4.6)</option>
         </select>
       </div>
       <p style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6">
@@ -1020,15 +889,15 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="field" style="margin-bottom:0">
         <div class="field-label">청크 길이</div>
         <select id="set-chunk-min">
-          <option value="3">3분 (Google STT 최대)</option>
-          <option value="5">5분</option>
-          <option value="10" selected>10분 (권장)</option>
-          <option value="12">12분 (Groq/OpenAI 최대)</option>
+          <option value="10">10분</option>
+          <option value="15">15분</option>
+          <option value="20">20분</option>
+          <option value="25" selected>25분 (권장)</option>
           <option value="0">분할 없음 (전체)</option>
         </select>
       </div>
       <p style="font-size:12px;color:var(--text3);margin-top:8px">
-        청크가 클수록 전사 품질이 높아집니다. Google STT는 3분, Groq/OpenAI는 12분 제한.
+        청크가 클수록 전사 품질이 높아집니다. Groq/OpenAI는 25MB(~25분) 제한.
         AssemblyAI·Gemini는 분할 없이도 가능합니다.
       </p>
     </div>
@@ -1093,8 +962,7 @@ let state = {
   autoRefine:false,
   quota:{ date:'', usedSec:0 },
   history:[],
-  qaHistoryMap:{}, // per-history-index Q&A persistence
-  projects:[] // [{id, name, createdAt, tags:[]}]
+  qaHistoryMap:{} // per-history-index Q&A persistence
 };
 
 let currentAudio = null;
@@ -1103,12 +971,6 @@ let recordChunks = [];
 let recStartTime = null;
 let recTimerInterval = null;
 let transcriptionAborted = false;
-let _isProcessing = false;
-
-// Prevent accidental page close during processing
-window.addEventListener('beforeunload', e => {
-  if(_isProcessing){e.preventDefault();e.returnValue=''}
-});
 
 // ═════════════════════════════════════════════════════════════════
 //  Wake Lock — prevent screen/CPU sleep during transcription
@@ -1186,49 +1048,10 @@ window.addEventListener('popstate', e=>{
     showPage('home', true);
   }
 });
-function _goBackFromResult(){
-  // Go back to project detail if we came from there, otherwise home
-  const h=_pageHistory.length>=2?_pageHistory[_pageHistory.length-2]:null;
-  if(h==='project'&&currentProjectId){
-    openProjectDetail(currentProjectId);
-  }else{
-    showPage('home');
-  }
-}
 function toast(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2800);
-}
-
-// ── On-screen Error Log (모바일 디버깅용) ──
-function logError(provider,statusCode,detail,context){
-  const container=document.getElementById('error-log');
-  const items=document.getElementById('error-log-items');
-  if(!container||!items) return;
-  container.classList.add('has-errors');
-  const now=new Date();
-  const timeStr=now.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const div=document.createElement('div');
-  div.className='error-log-item';
-  // Truncate detail for display (keep full in data attr)
-  const shortDetail=(detail||'').length>200?(detail.slice(0,200)+'…'):detail;
-  div.innerHTML=`<span class="err-time">${timeStr}</span> <span class="err-provider">[${provider}]</span> ${context?'<span style="color:var(--text2)">'+context+'</span> — ':''}<span style="color:var(--red)">HTTP ${statusCode||'ERR'}</span>`
-    +(shortDetail?`<div class="err-detail">${shortDetail}</div>`:'');
-  items.prepend(div);
-  // Keep max 20 entries
-  while(items.children.length>20) items.lastChild.remove();
-}
-function clearErrorLog(){
-  const container=document.getElementById('error-log');
-  const items=document.getElementById('error-log-items');
-  if(items) items.innerHTML='';
-  if(container) container.classList.remove('has-errors');
-}
-function _toastError(provider,msg,detail){
-  // Show both toast and log for errors
-  toast(`❌ ${provider}: ${msg}`);
-  logError(provider,null,detail||msg,msg);
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1356,197 +1179,6 @@ async function onRecordingStop(){
 // ═════════════════════════════════════════════════════════════════
 function pickFile(){document.getElementById('file-input').click()}
 async function handleFile(file){if(!file)return;await prepareAudio(file)}
-let _pendingTextImport=null; // {fileName, text} — 텍스트 임포트 대기
-
-function pickTextFile(){document.getElementById('text-file-input').click()}
-async function handleTextFile(file){
-  if(!file) return;
-
-  // ── 파일 유효성 검증 ──
-  const ext=file.name.split('.').pop().toLowerCase();
-  const textExts=['txt','srt','vtt','csv','tsv','md','json','xml','html','log'];
-  const audioExts=['wav','mp3','m4a','ogg','flac','aac','wma','webm','mp4','mov','avi','mkv'];
-  if(audioExts.includes(ext)){
-    toast('⚠️ 오디오/영상 파일은 "전사본 불러오기"가 아닌 "오디오 전사"로 불러와 주세요.','warning');return;
-  }
-  if(!textExts.includes(ext)){
-    toast('⚠️ 지원하지 않는 형식입니다. 텍스트 파일(.txt, .srt, .vtt 등)을 선택해 주세요.','warning');return;
-  }
-  // 파일 크기 제한 (10MB 이상이면 브라우저 멈출 수 있음)
-  if(file.size>10*1024*1024){
-    toast('⚠️ 파일이 너무 큽니다 ('+((file.size/1024/1024).toFixed(1))+'MB). 10MB 이하의 텍스트 파일만 지원합니다.','warning');return;
-  }
-
-  toast('전사본 읽는 중...');
-  try{
-    let text=await file.text();
-    if(ext==='srt'){
-      text=text.replace(/^\d+\s*\n/gm,'')
-        .replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*\n?/g,'')
-        .replace(/\n{2,}/g,'\n').trim();
-    }else if(ext==='vtt'){
-      text=text.replace(/^WEBVTT.*\n/,'')
-        .replace(/\d{2}:\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}\.\d{3}.*\n?/g,'')
-        .replace(/\n{2,}/g,'\n').trim();
-    }
-    if(!text||text.trim().length<10){
-      toast('파일 내용이 너무 짧거나 비어 있습니다');return;
-    }
-    // 환각 필터 적용 — cleanHallucinations만 (반복 패턴·가비지 제거)
-    // _removeHallucinations는 타임스탬프 기반 Whisper 출력 전용이므로 텍스트 임포트 시 스킵
-    // (대용량 텍스트에서 O(n²) 프리즈 방지)
-    text=cleanHallucinations(text);
-    _pendingTextImport={fileName:file.name, text};
-    showTextImportPrecheck(file.name, text);
-  }catch(e){
-    toast('파일 읽기 실패: '+e.message);
-    logError('파일',null,e.message,'전사본 불러오기');
-  }
-  document.getElementById('text-file-input').value='';
-}
-
-function showTextImportPrecheck(fileName, text){
-  const charCount=text.length;
-  const sizeMB=(new Blob([text]).size/1024/1024).toFixed(1);
-
-  // 헤더·파일 정보 변경
-  document.getElementById('precheck-title').textContent='후처리 준비';
-  document.getElementById('pre-file-icon').textContent='📄';
-  document.getElementById('pre-filename').textContent=fileName;
-  document.getElementById('pre-filemeta').textContent=`${charCount.toLocaleString()}자 · ${sizeMB} MB`;
-
-  // 통계 변경 (분/청크/MB → 글자수/문단수/MB)
-  const statGrid=document.getElementById('pre-stat-grid');
-  const paragraphs=text.split(/\n\s*\n/).filter(p=>p.trim()).length;
-  statGrid.children[0].querySelector('.val').textContent=charCount.toLocaleString();
-  statGrid.children[0].querySelector('.lbl').textContent='자';
-  statGrid.children[1].querySelector('.val').textContent=paragraphs;
-  statGrid.children[1].querySelector('.lbl').textContent='문단';
-  statGrid.children[2].querySelector('.val').textContent=sizeMB;
-  statGrid.children[2].querySelector('.lbl').textContent='MB';
-
-  // 전사 전용 필드 숨김
-  document.getElementById('precheck-api-row').style.display='none';
-  document.getElementById('precheck-chunk-row').style.display='none';
-  document.getElementById('pre-warn').style.display='none';
-  document.getElementById('pre-cost-alert').style.display='none';
-  document.getElementById('diarization-row').style.display='none';
-  document.getElementById('llm-toggle-row').style.display='none';
-
-  // 후처리 관련 필드 표시
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
-  document.getElementById('precheck-llm-row').style.display=hasLLM?'block':'none';
-  document.getElementById('precheck-autorefine-row').style.display=hasLLM?'block':'none';
-
-  // 시작 버튼 변경
-  const startBtn=document.getElementById('precheck-start-btn');
-  startBtn.textContent='후처리 시작';
-  startBtn.onclick=()=>startTextImport();
-
-  showPage('precheck');
-}
-
-async function startTextImport(){
-  if(!_pendingTextImport){toast('불러올 파일이 없습니다. 다시 선택해 주세요.');return}
-  const {fileName, text}=_pendingTextImport;
-
-  // 설정 읽기
-  state.context=document.getElementById('pre-context')?.value?.trim()||'';
-  state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
-  state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
-  const lang=document.getElementById('pre-language')?.value||'ko';
-
-  try{
-    await _loadTranscriptText(fileName, text, lang);
-    _pendingTextImport=null; // 성공 후에만 클리어
-
-    // 자동 정제
-    if(state.autoRefine){
-      const llmProv=_pickLLMProvider();
-      if(llmProv){
-        await sleep(500);
-        await refineTranscript();
-      }
-    }
-  }catch(e){
-    toast('후처리 시작 실패: '+e.message);
-    logError('텍스트 임포트',null,e.message,'startTextImport');
-    console.error('[Lispen] startTextImport error:',e);
-  }
-}
-
-// Precheck를 오디오 모드로 되돌리기
-function _resetPrecheckToAudioMode(){
-  document.getElementById('precheck-title').textContent='전사 준비';
-  document.getElementById('pre-file-icon').textContent='🎵';
-  document.getElementById('precheck-api-row').style.display='';
-  document.getElementById('precheck-chunk-row').style.display='';
-  const statGrid=document.getElementById('pre-stat-grid');
-  statGrid.children[0].querySelector('.lbl').textContent='분';
-  statGrid.children[1].querySelector('.lbl').textContent='청크';
-  statGrid.children[2].querySelector('.lbl').textContent='MB';
-  const startBtn=document.getElementById('precheck-start-btn');
-  startBtn.textContent='전사 시작';
-  startBtn.onclick=()=>startTranscription();
-}
-
-async function _loadTranscriptText(fileName, text, lang){
-  lang=lang||'ko';
-  const defaultTitle=fileName.replace(/\.[^.]+$/,'');
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
-
-  // 결과 페이지 세팅
-  document.getElementById('res-title').value=defaultTitle;
-  const charCount=text.length;
-  const estimatedMin=Math.round(charCount/200);
-  const contextLabel=state.context?` · ${state.context}`:'';
-  document.getElementById('res-info').textContent=`${fileName} · ${charCount.toLocaleString()}자 · 외부 전사본${contextLabel}`;
-  document.getElementById('res-full').textContent=text;
-  updateResultStats(text);
-  document.getElementById('res-provider-info').style.display='none';
-
-  // 요약 탭 초기화
-  const summaryEl=document.getElementById('res-summary');
-  const summaryBtn=document.getElementById('btn-generate-summary');
-  summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';
-  summaryBtn.style.display=hasLLM?'flex':'none';
-  summaryBtn.disabled=false;
-
-  // 노트 탭 초기화
-  const notesEl=document.getElementById('res-notes');
-  const notesBtn=document.getElementById('btn-generate-notes');
-  const notesTemplateRow=document.getElementById('notes-template-row');
-  notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 노트를 생성합니다.</span>';
-  notesBtn.style.display=hasLLM?'flex':'none';
-  notesBtn.disabled=false;
-  if(notesTemplateRow) notesTemplateRow.style.display=hasLLM?'flex':'none';
-
-  // 정제 버튼
-  const refineBtn=document.getElementById('btn-refine-text');
-  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.disabled=false;refineBtn.textContent='🔧 텍스트 정제'}
-  const refineStatus=document.getElementById('refine-status');
-  if(refineStatus) refineStatus.style.display='none';
-
-  // LLM 프로바이더 선택기
-  _populateResultLLMSelect();
-
-  // Q&A 초기화
-  qaHistory=[];
-  document.getElementById('qa-messages').innerHTML='<div class="qa-system-msg">전사 내용에 대해 질문하세요. 텍스트를 기반으로 답변합니다.</div>';
-
-  // 히스토리 저장
-  if(state.qaHistoryMap){
-    const shifted={};
-    for(const k in state.qaHistoryMap){const ni=Number(k)+1;if(ni<10) shifted[ni]=state.qaHistoryMap[k]}
-    state.qaHistoryMap=shifted;
-  }
-  state.history.unshift({name:fileName,title:defaultTitle,date:fmtNow(),duration:estimatedMin*60,lang,text,projectId:null,tags:[],imported:true});
-  currentHistoryIdx=0;
-  await saveState();renderHistory();
-
-  showPage('result');
-  toast('✅ 전사본 불러오기 완료 — 후처리를 시작하세요');
-}
 async function prepareAudio(file){
   toast('파일 분석 중...');
   const duration=await getAudioDuration(file);
@@ -1565,7 +1197,6 @@ function getAudioDuration(file){
 //  PRE-CHECK
 // ═════════════════════════════════════════════════════════════════
 function showPrecheck(){
-  _resetPrecheckToAudioMode(); // 텍스트 임포트 모드에서 돌아왔을 수 있으므로 리셋
   const{file,duration}=currentAudio;
   const durMin=(duration/60).toFixed(1);
   const chunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
@@ -1612,118 +1243,36 @@ function showPrecheck(){
   const autoRefineEl=document.getElementById('pre-auto-refine');
   if(autoRefineEl) autoRefineEl.checked=state.autoRefine||false;
 
-  // Chunk selector initialization
-  const preChunkSel=document.getElementById('pre-chunk-min');
-  preChunkSel.value=String(state.chunkMin!==undefined&&state.chunkMin!==null?state.chunkMin:25);
-  function updateChunkHint(){
-    const api=sel.value;
-    const hint=document.getElementById('pre-chunk-hint');
-    const dur=currentAudio.duration;
-    // Force chunk limit for APIs with size restrictions
-    const apiLimits={google:3,groq:12,openai:12,gemini:8,assemblyai:60};
-    if(api==='google-only'||api==='quality-auto'){
-      const curVal=parseInt(preChunkSel.value);
-      if(curVal===0||curVal>3) preChunkSel.value='3';
-    }else if(api==='groq-only'||api==='openai-only'){
-      const curVal=parseInt(preChunkSel.value);
-      if(curVal===0||curVal>12) preChunkSel.value='10';
-    }else if(api==='gemini-only'){
-      const curVal=parseInt(preChunkSel.value);
-      if(curVal===0||curVal>8) preChunkSel.value='5';
-    }
-    const chunkVal=parseInt(preChunkSel.value);
-    const n=chunkVal===0?1:Math.ceil(dur/(chunkVal*60));
-    document.getElementById('pre-chunk-val').textContent=n;
-    if(api==='google-only'||api==='quality-auto'){
-      hint.textContent='Google STT는 청크당 3분 이하 필수 (base64 용량 제한). 자동 조정됨.';
-      hint.style.color='var(--amber)';
-    }else if(api==='gemini-only'){
-      hint.textContent='Gemini는 청크당 8분 이하 권장 (인라인 오디오 용량 제한). 자동 조정됨.';
-      hint.style.color='var(--text3)';
-    }else if(api==='assemblyai-only'){
-      hint.textContent='AssemblyAI는 최대 60분/청크 (장시간 녹음에 최적). 분할 불필요.';
-      hint.style.color='var(--text3)';
-    }else if(api==='groq-only'||api==='openai-only'){
-      hint.textContent='Groq/OpenAI는 최대 12분(25MB). 자동 조정됨.';
-      hint.style.color='var(--text3)';
-    }else{
-      hint.textContent=`${n}개 청크로 분할됩니다. 청크가 클수록 문맥 유지에 유리합니다.`;
-      hint.style.color='var(--text3)';
-    }
-  }
-  preChunkSel.onchange=updateChunkHint;
-
-  sel.onchange=()=>{updateCostEstimate();updateChunkHint()};
+  sel.onchange=updateCostEstimate;
   updateCostEstimate();
-  updateChunkHint();
   showPage('precheck');
 }
 
 function updateCostEstimate(){
-  try{
   const choice=document.getElementById('pre-api-choice').value;
-  const dur=currentAudio?.duration||0;
+  const dur=currentAudio.duration;
   const remainSec=getGroqRemainSec();
   const costDiv=document.getElementById('pre-cost-alert');
   const costText=document.getElementById('pre-cost-text');
-  if(!costDiv||!costText) return;
   const RATE=0.006,KRW=1400;
 
-  const durMin=Math.round(dur/60*10)/10; // 소수 1자리 분
-  function _costLine(provId,minutes){
-    const p=PROVIDERS[provId];
-    if(!p||p.free) return `${p?p.label:provId} — 무료`;
-    const total=Math.round(p.costPerMin*minutes);
-    return `${p.label} — 분당 ${_provCost(provId)}, ${minutes.toFixed(1)}분 ≈ ₩${total.toLocaleString()}`;
-  }
-
-  if(choice==='groq-only'||choice==='assemblyai-only'||choice==='gemini-only'){
-    costDiv.style.display='flex';
-    costText.textContent=`${_provLabel(choice.replace('-only',''))} — 무료`;
-  }else if(choice==='free-auto'){
-    costDiv.style.display='flex';
-    costText.textContent='무료 API만 사용 (비용 없음)';
+  if(choice==='groq-only'||choice==='assemblyai-only'){
+    costDiv.style.display='none';
   }else if(choice==='openai-only'){
+    const cost=(dur/60)*RATE;
     costDiv.style.display='flex';
-    costText.textContent=_costLine('openai',durMin);
-  }else if(choice==='google-only'){
-    costDiv.style.display='flex';
-    costText.textContent=_costLine('google',durMin);
-  }else if(choice==='quality-auto'){
-    // Quality mode: show which provider will be used + cost breakdown
-    if(state.googleSttKey){
-      costDiv.style.display='flex';
-      costText.textContent=`품질 우선 → ${_costLine('google',durMin)}`;
-    }else if(state.openaiKey){
-      costDiv.style.display='flex';
-      costText.textContent=`품질 우선 → ${_costLine('openai',durMin)}`;
-    }else if(state.assemblyaiKey){
-      costDiv.style.display='flex';
-      costText.textContent='품질 우선 → AssemblyAI — 무료 크레딧';
-    }else{
-      costDiv.style.display='flex';
-      costText.textContent='품질 우선: 유료 API 키 미등록 → 무료 API로 대체';
-    }
+    costText.textContent=`예상 비용: $${cost.toFixed(3)} (≈ ₩${Math.round(cost*KRW)})`;
   }else{
-    // auto (cost-saving): free first → paid fallback
-    if(state.groqKey||state.assemblyaiKey||state.geminiKey){
-      const freeNames=[];
-      if(state.groqKey) freeNames.push('Groq');
-      if(state.assemblyaiKey) freeNames.push('AssemblyAI');
-      if(state.geminiKey) freeNames.push('Gemini');
+    // auto: Groq free → AssemblyAI free → OpenAI only if both exhausted
+    const openaiSec=Math.max(0,dur-remainSec);
+    if(openaiSec>0&&!state.assemblyaiKey){
+      const cost=(openaiSec/60)*RATE;
       costDiv.style.display='flex';
-      costText.textContent=`비용 절약 → ${freeNames.join(' → ')} (무료)${state.googleSttKey||state.openaiKey?' → 실패 시 유료 대체':''}`;
-    }else if(state.googleSttKey){
-      costDiv.style.display='flex';
-      costText.textContent=`무료 API 없음 → ${_costLine('google',durMin)}`;
-    }else if(state.openaiKey){
-      costDiv.style.display='flex';
-      costText.textContent=`무료 API 없음 → ${_costLine('openai',durMin)}`;
+      costText.textContent=`${_provLabel('groq')} ${remainSec>0?Math.round(remainSec/60)+'분 무료 + ':''}${_provLabel('assemblyai')} 키 미등록 시 ${_provLabel('openai')} 전환 가능 ($${cost.toFixed(3)} ≈ ₩${Math.round(cost*KRW)})`;
     }else{
       costDiv.style.display='none';
     }
   }
-  }catch(e){console.warn('updateCostEstimate error:',e)}
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -1753,25 +1302,17 @@ async function startTranscription(){
   const lang=document.getElementById('pre-language').value;
   state.llmProvider=document.getElementById('pre-llm-choice')?.value||state.llmProvider;
   transcriptionAborted=false;
-  _isProcessing=true;
-  clearErrorLog(); // 새 전사 시작 시 이전 오류 로그 초기화
 
   state.context=document.getElementById('pre-context')?.value?.trim()||'';
   state.autoRefine=document.getElementById('pre-auto-refine')?.checked||false;
-  // Read chunk setting from precheck page (overrides settings page value)
-  const preChunkEl=document.getElementById('pre-chunk-min');
-  if(preChunkEl) state.chunkMin=parseInt(preChunkEl.value)||0;
   await saveState();
 
   // Keep device awake during transcription
   await acquireWakeLock();
 
-  // Force AssemblyAI when diarization is enabled — but only in cost-saving/free auto modes
-  // In quality-auto, google-only, or other explicit selections, respect user choice
+  // Force AssemblyAI when diarization is enabled
   const diarizeEnabled=document.getElementById('pre-diarization')?.checked;
-  if(diarizeEnabled&&state.assemblyaiKey&&(choice==='auto'||choice==='free-auto')){
-    choice='assemblyai-only';
-  }
+  if(diarizeEnabled&&state.assemblyaiKey) choice='assemblyai-only';
 
   // Validate keys
   if(choice==='groq-only'&&!state.groqKey){toast('설정에서 Groq API 키를 입력하세요');return}
@@ -1779,7 +1320,7 @@ async function startTranscription(){
   if(choice==='gemini-only'&&!state.geminiKey){toast('설정에서 Gemini API 키를 입력하세요');return}
   if(choice==='google-only'&&!state.googleSttKey){toast('설정에서 Google Cloud STT API 키를 입력하세요');return}
   if(choice==='openai-only'&&!state.openaiKey){toast('설정에서 OpenAI API 키를 입력하세요');return}
-  if((choice==='auto'||choice==='free-auto'||choice==='quality-auto')&&!state.groqKey&&!state.assemblyaiKey&&!state.geminiKey&&!state.googleSttKey&&!state.openaiKey){
+  if((choice==='auto'||choice==='free-auto')&&!state.groqKey&&!state.assemblyaiKey&&!state.geminiKey&&!state.googleSttKey&&!state.openaiKey){
     toast('설정에서 최소 1개 API 키를 입력하세요');return;
   }
 
@@ -1788,59 +1329,23 @@ async function startTranscription(){
   const{file,duration}=currentAudio;
   // chunkMin=0 means no splitting; otherwise clamp by API limits
   // Groq/OpenAI Whisper: ~25MB → ~25min WAV; AssemblyAI/Gemini: no limit
-  // Google STT inline base64 has ~10MB limit → ~10min for compressed audio
-  // WAV 16kHz mono = ~1.9MB/min raw, ~2.5MB/min base64
-  // Groq/OpenAI: 25MB file limit ≈ 12min WAV
-  // Google inline: 10MB request limit → 3min WAV (3min×2.5MB=7.5MB < 10MB)
-  // Chunk limits per API (seconds):
-  // - Groq/OpenAI: 25MB WAV file limit ≈ 12min
-  // - Google: 10MB inline base64 limit ≈ 3min WAV
-  // - AssemblyAI: no hard limit but 60min chunks optimal for accuracy & polling
-  // - Gemini: inline base64 practical limit ~20MB ≈ 8min WAV (4min×1.9MB raw×1.33 base64 = ~10MB)
-  //   Gemini 2.0 Flash audio input via inline_data: tested up to ~20MB base64 reliably
-  const apiChunkLimits={groq:12*60, openai:12*60, assemblyai:60*60, gemini:8*60, google:3*60};
+  const apiChunkLimits={groq:25*60, openai:25*60, assemblyai:Infinity, gemini:Infinity, google:Infinity};
   const userChunkSec=state.chunkMin===0?Infinity:(state.chunkMin*60);
   // Determine effective chunk size per chosen API
   function _effectiveChunkSec(api){
     const limit=apiChunkLimits[api]||25*60;
     return Math.min(userChunkSec,limit);
   }
-  // Determine the primary API to calculate chunk sizes
-  let primaryApi='groq';
-  if(choice==='openai-only') primaryApi='openai';
-  else if(choice==='google-only') primaryApi='google';
-  else if(choice==='assemblyai-only') primaryApi='assemblyai';
-  else if(choice==='gemini-only') primaryApi='gemini';
-  else if(choice==='groq-only') primaryApi='groq';
-  else if(choice==='quality-auto'){
-    if(state.googleSttKey) primaryApi='google';
-    else if(state.openaiKey) primaryApi='openai';
-    else if(state.assemblyaiKey) primaryApi='assemblyai';
-    else if(state.groqKey) primaryApi='groq';
-    else primaryApi='gemini';
-  }else if(choice==='free-auto'){
-    if(state.groqKey) primaryApi='groq';
-    else if(state.assemblyaiKey) primaryApi='assemblyai';
-    else primaryApi='gemini';
-  }else{
-    if(state.groqKey) primaryApi='groq';
-    else if(state.assemblyaiKey) primaryApi='assemblyai';
-    else if(state.geminiKey) primaryApi='gemini';
-    else if(state.googleSttKey) primaryApi='google';
-    else primaryApi='openai';
-  }
-  const defaultChunkSec=_effectiveChunkSec(primaryApi);
-  // Even if user selects "no split", respect API limits for files that exceed them
-  const effectiveSec=(userChunkSec===Infinity)?apiChunkLimits[primaryApi]:defaultChunkSec;
-  const nChunks=(duration<=effectiveSec)?1:Math.ceil(duration/effectiveSec);
+  const defaultChunkSec=Math.min(userChunkSec,25*60); // conservative default
+  const nChunks=userChunkSec===Infinity?1:Math.ceil(duration/defaultChunkSec);
 
   // Build chunk plan
   const chunks=[];
   let remainGroq=getGroqRemainSec();
 
   for(let i=0;i<nChunks;i++){
-    const startSec=nChunks===1?0:Math.max(0,i*effectiveSec-(i>0?OVERLAP_SEC:0));
-    const endSec=nChunks===1?duration:Math.min(duration,(i+1)*effectiveSec);
+    const startSec=Math.max(0,i*defaultChunkSec-(i>0?OVERLAP_SEC:0));
+    const endSec=userChunkSec===Infinity?duration:Math.min(duration,(i+1)*defaultChunkSec);
     const chunkDur=endSec-startSec;
 
     let api;
@@ -1855,16 +1360,8 @@ async function startTranscription(){
       else if(state.assemblyaiKey){api='assemblyai'}
       else if(state.geminiKey){api='gemini'}
       else{api='skip'}
-    }else if(choice==='quality-auto'){
-      // Quality first: Google → OpenAI → AssemblyAI → Groq → Gemini
-      if(state.googleSttKey){api='google'}
-      else if(state.openaiKey){api='openai'}
-      else if(state.assemblyaiKey){api='assemblyai'}
-      else if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
-      else if(state.geminiKey){api='gemini'}
-      else{api='skip'}
     }else{
-      // auto (cost-saving): Groq → AssemblyAI → Gemini → Google → OpenAI
+      // auto: Groq → AssemblyAI → Gemini → Google → OpenAI
       if(state.groqKey&&remainGroq>=chunkDur){api='groq';remainGroq-=chunkDur}
       else if(state.assemblyaiKey){api='assemblyai'}
       else if(state.geminiKey){api='gemini'}
@@ -1872,7 +1369,7 @@ async function startTranscription(){
       else if(state.openaiKey){api='openai'}
       else{api='skip'}
     }
-    if(api==='groq'&&choice!=='auto'&&choice!=='free-auto'&&choice!=='quality-auto') remainGroq-=chunkDur;
+    if(api==='groq'&&choice!=='auto'&&choice!=='free-auto') remainGroq-=chunkDur;
 
     chunks.push({index:i,startSec,endSec,chunkDur,api,status:api==='skip'?'skipped':'pending',text:''});
   }
@@ -1889,16 +1386,6 @@ async function startTranscription(){
     renderChunks(chunks);
     updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — ${ch.api.toUpperCase()}`);
 
-    // Retry wrapper: 1 automatic retry on transient errors (network abort, 5xx, 429)
-    const _isRetryable=(e)=>{
-      if(!(e instanceof LLMError)) return true; // network/abort errors → retry
-      const s=e.status;
-      if(s===413||s===400) return false; // file too large or bad request (e.g. expired key) → no retry
-      if(s>=500||s===429) return true;   // server error or rate limit → retry
-      return false;
-    };
-
-    for(let _retry=0;_retry<2;_retry++){
     try{
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let result;
@@ -1933,27 +1420,12 @@ async function startTranscription(){
       ch.text=cleanHallucinations(result.text);
       ch.segments=result.segments||[];
       ch.status='done';
-      break; // success — exit retry loop
     }catch(e){
-      // On first attempt, retry if error is transient
-      if(_retry===0&&_isRetryable(e)){
-        console.warn(`[Chunk ${i}] ${ch.api}: error, retrying in 3s...`,e.message||e);
-        logError(ch.api, e instanceof LLMError?e.status:'ERR', `재시도 예정 — ${e instanceof LLMError?(e.bodyText||'').slice(0,150):e.message}`, `청크 ${i+1}/${nChunks} 전사`);
-        updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — 오류 발생, 3초 후 재시도...`);
-        ch.status='processing';
-        renderChunks(chunks);
-        await sleep(3000);
-        continue;
-      }
       console.error(`Chunk ${i} error:`,e);
-      const errDetail=e instanceof LLMError?`HTTP ${e.status}${e.bodyText?' — '+e.bodyText.slice(0,200):''}`:
-        (e instanceof Error?e.message:String(e));
-      const errMsg=`${ch.api}: ${errDetail}`;
-      // On-screen error log for mobile debugging
-      logError(ch.api, e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, `청크 ${i+1}/${nChunks} 전사`);
+      const errMsg=`${ch.api}: ${e.message||e}`;
 
-      // Fallback logic for auto modes
-      if(choice==='auto'||choice==='free-auto'||choice==='quality-auto'){
+      // Fallback logic for auto/free-auto mode
+      if(choice==='auto'||choice==='free-auto'){
         const switched=await tryFallback(ch,e,lang,chunks,file);
         if(!switched){
           ch.status='error';ch.text=`[오류: ${errMsg}]`;ch.errorMsg=errMsg;
@@ -1962,12 +1434,8 @@ async function startTranscription(){
         ch.status='error';ch.text=`[오류: ${errMsg}]`;ch.errorMsg=errMsg;
       }
     }
-    } // end retry loop
     renderChunks(chunks);
   }
-
-  // Release decoded audio cache to free memory (critical for 2h+ files)
-  releaseDecodedCache();
 
   // Merge + hallucination filter
   updateProgress(nChunks,nChunks,'결과 병합 중...');
@@ -1978,13 +1446,8 @@ async function startTranscription(){
     .replace(/\n{3,}/g,'\n\n').trim();
   const langName=document.getElementById('pre-language').selectedOptions[0].text;
   document.getElementById('res-info').textContent=`${file.name} · ${(duration/60).toFixed(1)}분 · ${langName}`;
-  // Set editable title (default: filename without extension)
-  const defaultTitle=file.name.replace(/\.[^.]+$/,'');
-  document.getElementById('res-title').value=defaultTitle;
   document.getElementById('res-full').textContent=fullText;
   updateResultStats(fullText);
-  // Show provider info if multiple providers were used (fallback occurred)
-  _showProviderInfo(chunks);
 
   // Save history — shift qaHistoryMap keys so old Q&A maps correctly after unshift
   if(state.qaHistoryMap){
@@ -1992,8 +1455,8 @@ async function startTranscription(){
     for(const k in state.qaHistoryMap){const ni=Number(k)+1;if(ni<10) shifted[ni]=state.qaHistoryMap[k]}
     state.qaHistoryMap=shifted;
   }
-  const _title=document.getElementById('res-title').value||file.name.replace(/\.[^.]+$/,'');
-  state.history.unshift({name:file.name,title:_title,date:fmtNow(),duration:Math.round(duration),lang,text:fullText,projectId:null,tags:[]});
+  state.history.unshift({name:file.name,date:fmtNow(),duration:Math.round(duration),lang,text:fullText});
+  if(state.history.length>10) state.history.pop();
   await saveState();renderHistory();
 
   // Prepare tabs
@@ -2038,40 +1501,37 @@ async function startTranscription(){
     }
   }
 
-  // Note: auto-run removed — user should manually trigger notes/summary
-  // to avoid double cost (auto-run ignores template selection)
+  // Auto-run if checkbox was ticked
+  if(wantLLM&&hasLLM){
+    await generateNotesFromText(fullText,lang);
+    await generateSummaryFromText(fullText,lang);
+  }
 
   // Release wake lock after all processing is done
-  _isProcessing=false;
   releaseWakeLock();
 }
 
 async function tryFallback(ch,error,lang,chunks,file){
-  // Fallback chain varies by mode
-  const choice=document.getElementById('pre-api-choice').value;
-  const costChain=['groq','assemblyai','gemini','google','openai'];
-  const qualityChain=['google','openai','assemblyai','groq','gemini'];
-  const freeChain=['groq','assemblyai','gemini'];
-  const allAPIs=choice==='quality-auto'?qualityChain:choice==='free-auto'?freeChain:costChain;
-  const keyMap={groq:'groqKey',assemblyai:'assemblyaiKey',gemini:'geminiKey',google:'googleSttKey',openai:'openaiKey'};
+  // Fallback chain: Groq → AssemblyAI → Gemini → Google → OpenAI
   const fallbackAPIs=[];
-  for(const fb of allAPIs){
-    if(fb===ch.api) continue;
+  const allAPIs=['groq','assemblyai','gemini','google','openai'];
+  const keyMap={groq:'groqKey',assemblyai:'assemblyaiKey',gemini:'geminiKey',google:'googleSttKey',openai:'openaiKey'};
+  const idx=allAPIs.indexOf(ch.api);
+  for(let i=0;i<allAPIs.length;i++){
+    if(i===idx) continue;
+    const fb=allAPIs[i];
     if(state[keyMap[fb]]) fallbackAPIs.push(fb);
   }
 
   for(const fb of fallbackAPIs){
-    // In quality-auto, user already chose paid APIs — no permission needed
-    // In cost-saving/free modes, ask before switching to paid APIs
-    if(choice!=='quality-auto'&&(fb==='openai'||fb==='google')){
-      const approved=await askPaidFallback(ch,fb);
+    if(fb==='openai'){
+      // Ask user permission for paid API
+      const approved=await askUserForOpenAI(ch);
       if(!approved) continue;
     }
     try{
-      const failedApi=ch.api; // save original before overwriting
-      toast(`${failedApi.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
+      toast(`${ch.api.toUpperCase()} 실패 → ${fb.toUpperCase()}로 전환`);
       ch.api=fb;
-      renderChunks(chunks); // update UI immediately to show new model
       const chunkBlob=await extractChunk(file,ch.startSec,ch.endSec);
       let result;
       if(fb==='groq') result=await transcribeGroq(chunkBlob,lang);
@@ -2083,28 +1543,22 @@ async function tryFallback(ch,error,lang,chunks,file){
       ch.segments=result.segments||[];
       ch.status='done';
 
-      // Switch remaining pending chunks too (use saved failedApi, not ch.api which is already fb)
-      chunks.filter(c=>c.status==='pending'&&c.api===failedApi).forEach(c=>c.api=fb);
-      renderChunks(chunks); // refresh UI with updated models
+      // Switch remaining pending chunks too
+      chunks.filter(c=>c.status==='pending'&&c.api===ch.api).forEach(c=>c.api=fb);
       if(fb==='groq'){state.quota.usedSec+=ch.chunkDur;await saveState();updateQuotaUI()}
       return true;
-    }catch(e2){
-      console.error(`Fallback ${fb} failed:`,e2);
-      logError(fb, e2 instanceof LLMError?e2.status:'ERR', e2 instanceof LLMError?(e2.bodyText||'').slice(0,300):e2.message, '폴백 전사');
-    }
+    }catch(e2){console.error(`Fallback ${fb} failed:`,e2)}
   }
   return false;
 }
 
-function askPaidFallback(ch,apiId){
+function askUserForOpenAI(ch){
   return new Promise(resolve=>{
     const durMin=(ch.chunkDur/60).toFixed(1);
-    const costPerMin=PROVIDERS[apiId]?.costPerMin||1;
-    const costKRW=Math.round(ch.chunkDur/60*costPerMin);
-    const label=_provLabel(apiId);
+    const cost=(ch.chunkDur/60*0.006).toFixed(3);
     showModal('유료 API 전환',
-      `무료 API가 모두 실패했습니다.<br><br>남은 청크를 ${label}로 처리할까요?<br>이 청크: ${durMin}분 ≈ ₩${costKRW}`,
-      [{label:`${label}로 계속`,primary:true,fn:()=>resolve(true)},
+      `무료 API가 모두 실패했습니다.<br><br>남은 청크를 OpenAI로 처리할까요?<br>이 청크: ${durMin}분 ≈ $${cost} (≈ ₩${Math.round(ch.chunkDur/60*0.006*1400)})`,
+      [{label:'OpenAI로 계속',primary:true,fn:()=>resolve(true)},
        {label:'건너뛰기',primary:false,fn:()=>resolve(false)}]);
   });
 }
@@ -2112,56 +1566,38 @@ function askPaidFallback(ch,apiId){
 // ═════════════════════════════════════════════════════════════════
 //  AUDIO CHUNK EXTRACTION
 // ═════════════════════════════════════════════════════════════════
-// ── Audio decode cache: decode ONCE, reuse for all chunks ──
-let _decodedCache={fileRef:null, decoded:null, sampleRate:0};
-
-async function _getDecoded(file){
-  // Return cached if same file (avoids re-decoding 460MB for each of 20+ chunks)
-  if(_decodedCache.fileRef===file&&_decodedCache.decoded) return _decodedCache.decoded;
-  const arrayBuf=await file.arrayBuffer();
-  const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  try{
-    const decoded=await audioCtx.decodeAudioData(arrayBuf.slice(0));
-    audioCtx.close();
-    _decodedCache={fileRef:file, decoded, sampleRate:decoded.sampleRate};
-    return decoded;
-  }catch(decErr){
-    audioCtx.close();
-    console.warn('decodeAudioData failed:',decErr);
-    return null;
-  }
-}
-
-function releaseDecodedCache(){
-  // Free memory after transcription completes
-  _decodedCache={fileRef:null, decoded:null, sampleRate:0};
-}
-
 async function extractChunk(file,startSec,endSec){
   try{
-    const decoded=await _getDecoded(file);
-    if(!decoded) return file; // fallback: send original
-
+    const arrayBuf=await file.arrayBuffer();
+    const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    let decoded;
+    try{
+      decoded=await audioCtx.decodeAudioData(arrayBuf.slice(0));
+    }catch(decErr){
+      audioCtx.close();
+      // decodeAudioData failed — return original file as-is (API can handle most formats)
+      console.warn('decodeAudioData failed, sending original file:',decErr);
+      return file;
+    }
     const sampleRate=16000;
     const startSample=Math.floor(startSec*decoded.sampleRate);
     const endSample=Math.min(Math.floor(endSec*decoded.sampleRate),decoded.length);
     const length=endSample-startSample;
-    if(length<=0) return file;
-
+    if(length<=0){audioCtx.close();return file;}
     const offlineCtx=new OfflineAudioContext(1,Math.ceil(length*sampleRate/decoded.sampleRate),sampleRate);
     const source=offlineCtx.createBufferSource();
-    const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
     const chunkBuf=audioCtx.createBuffer(decoded.numberOfChannels,length,decoded.sampleRate);
     for(let c=0;c<decoded.numberOfChannels;c++){
       const src=decoded.getChannelData(c),dst=chunkBuf.getChannelData(c);
       for(let i=0;i<length;i++) dst[i]=src[startSample+i];
     }
-    audioCtx.close();
     source.buffer=chunkBuf;source.connect(offlineCtx.destination);source.start();
     const rendered=await offlineCtx.startRendering();
+    audioCtx.close();
     return encodeWAV(rendered);
   }catch(e){
     console.error('extractChunk error:',e);
+    // Last resort: send original file directly
     return file;
   }
 }
@@ -2187,9 +1623,6 @@ function encodeWAV(buf){
 //  API: Groq
 // ═════════════════════════════════════════════════════════════════
 async function transcribeGroq(blob,lang){
-  // Groq Whisper: 25MB file limit
-  const sizeMB=blob.size/1024/1024;
-  if(sizeMB>25) throw new LLMError('groq',413,`파일 크기 ${sizeMB.toFixed(1)}MB — Groq 한도 25MB 초과. 청크 크기를 줄여주세요.`,null);
   const form=new FormData();
   const fname=blob.name||('chunk.'+(blob.type?.includes('wav')?'wav':blob.type?.includes('mp4')?'m4a':blob.type?.includes('webm')?'webm':'wav'));
   form.append('file',blob,fname);
@@ -2218,11 +1651,9 @@ async function transcribeAssemblyAI(blob,lang){
   const headers={'Authorization':state.assemblyaiKey};
 
   // Step 1: Upload
-  // Timeout scales with file size: ~60s per 20MB, minimum 180s
-  const uploadTimeoutMs=Math.max(180000,Math.ceil(blob.size/(20*1024*1024))*60000);
   const uploadRes=await _fetchWithTimeout('https://api.assemblyai.com/v2/upload',{
     method:'POST',headers:{...headers,'Content-Type':'application/octet-stream'},
-    body:blob},uploadTimeoutMs);
+    body:blob},180000);
   if(!uploadRes.ok) throw new LLMError('assemblyai',uploadRes.status,await uploadRes.text(),null);
   const{upload_url}=await uploadRes.json();
 
@@ -2256,10 +1687,8 @@ async function transcribeAssemblyAI(blob,lang){
   const{id}=await submitRes.json();
 
   // Step 3: Poll for completion
-  // Scale polling: ~1min processing per 5min audio, minimum 10min, max 30min for 60min chunks
   let attempts=0;
-  const estMinutes=Math.max(10,Math.ceil((blob.size/(1.9*1024*1024))/5));
-  const maxAttempts=Math.min(360,estMinutes*12); // 5s intervals
+  const maxAttempts=120; // 10 minutes max (5s intervals)
   while(attempts<maxAttempts){
     await sleep(5000);
     const pollRes=await _fetchWithTimeout(`https://api.assemblyai.com/v2/transcript/${id}`,{headers},15000);
@@ -2286,9 +1715,6 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 //  API: OpenAI
 // ═════════════════════════════════════════════════════════════════
 async function transcribeOpenAI(blob,lang){
-  // OpenAI Whisper: 25MB file limit
-  const sizeMB=blob.size/1024/1024;
-  if(sizeMB>25) throw new LLMError('openai',413,`파일 크기 ${sizeMB.toFixed(1)}MB — OpenAI 한도 25MB 초과. 청크 크기를 줄여주세요.`,null);
   const form=new FormData();
   const fname=blob.name||('chunk.'+(blob.type?.includes('wav')?'wav':blob.type?.includes('mp4')?'m4a':blob.type?.includes('webm')?'webm':'wav'));
   form.append('file',blob,fname);
@@ -2312,9 +1738,6 @@ async function transcribeOpenAI(blob,lang){
 //  API: Gemini (audio transcription via multimodal)
 // ═════════════════════════════════════════════════════════════════
 async function transcribeGemini(blob,lang){
-  // Gemini inline_data limit: ~20MB base64 (15MB raw audio)
-  const sizeMB=blob.size/1024/1024;
-  if(sizeMB>15) throw new LLMError('gemini',413,`파일 크기 ${sizeMB.toFixed(1)}MB — Gemini 인라인 한도 ~15MB 초과. 청크 크기를 줄여주세요.`,null);
   const base64=await blobToBase64(blob);
   const langName={ko:'한국어',en:'English',ja:'日本語',zh:'中文',es:'Español',fr:'Français',de:'Deutsch',it:'Italiano',hi:'Hindi',ar:'العربية',ru:'Русский',auto:'(자동 감지)',multi:'다국어'}[lang]||lang;
   const isMulti=(lang==='multi'||lang==='auto');
@@ -2342,7 +1765,7 @@ ${state.context ? `9. 이 오디오의 주제는 "${state.context}"입니다. �
 6. 사람의 말소리가 없는 구간은 아무것도 출력하지 마세요.
 7. 타임스탬프 없이 텍스트만 출력하세요.
 ${state.context ? `8. 이 오디오의 주제는 "${state.context}"입니다. 이 분야의 전문 용어를 정확하게 전사하세요.` : ''}`;
-  const model='gemini-2.5-flash';
+  const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
   const res=await _fetchWithTimeout(url,{
     method:'POST',
@@ -2362,8 +1785,7 @@ ${state.context ? `8. 이 오디오의 주제는 "${state.context}"입니다. �
 }
 
 // ═════════════════════════════════════════════════════════════════
-//  API: Google Cloud Speech-to-Text (latest_long, V1 API)
-//  Note: chirp_2 requires V2 API (Bearer token auth) — not suitable for client-side PWA
+//  API: Google Cloud Speech-to-Text (Chirp 2)
 // ═════════════════════════════════════════════════════════════════
 async function transcribeGoogleSTT(blob,lang){
   const base64=await blobToBase64(blob);
@@ -2373,33 +1795,25 @@ async function transcribeGoogleSTT(blob,lang){
   const isAutoLang=(!lang||lang==='auto'||lang==='multi');
 
   // Detect encoding from blob type
-  // extractChunk() normally outputs WAV 16kHz mono via encodeWAV()
-  // But if decodeAudioData fails, it returns the original file as-is
   let encoding='LINEAR16';
-  let sampleRate=16000; // extractChunk encodes at 16kHz
+  let sampleRate=16000;
   const blobType=blob.type||'';
-  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=0;}
-  else if(blobType.includes('ogg')) {encoding='OGG_OPUS';sampleRate=0;}
+  if(blobType.includes('webm')) {encoding='WEBM_OPUS';sampleRate=48000;}
+  else if(blobType.includes('ogg')) {encoding='OGG_OPUS';sampleRate=48000;}
   else if(blobType.includes('mp3')||blobType.includes('mpeg')) {encoding='MP3';sampleRate=0;}
   else if(blobType.includes('wav')) {encoding='LINEAR16';sampleRate=16000;}
   else if(blobType.includes('flac')) {encoding='FLAC';sampleRate=0;}
   else if(blobType.includes('mp4')||blobType.includes('m4a')) {encoding='MP3';sampleRate=0;}
 
-  // Check base64 string size — Google request payload limit is ~10MB
-  const base64StringMB=base64.length/1024/1024;
-  if(base64StringMB>9.5){
-    throw new LLMError('google',413,`base64 크기 ${base64StringMB.toFixed(1)}MB — Google 요청 한도 ~10MB 초과. 청크 크기를 줄여주세요.`,null);
-  }
-
   const config={
     encoding,
+    sampleRateHertz:sampleRate,
     languageCode:isAutoLang?'ko-KR':(langMap[lang]||'ko-KR'),
-    model:'latest_long',
+    model:'chirp_2',
     enableAutomaticPunctuation:true,
-    enableWordTimeOffsets:true
+    enableWordTimeOffsets:true,
+    enableWordConfidence:true
   };
-  // Only set sampleRateHertz for raw PCM formats; self-describing formats auto-detect
-  if(sampleRate>0) config.sampleRateHertz=sampleRate;
 
   if(isAutoLang){
     config.alternativeLanguageCodes=['en-US','ja-JP','zh-CN'];
@@ -2414,7 +1828,7 @@ async function transcribeGoogleSTT(blob,lang){
       config,
       audio:{content:base64}
     })
-  },180000); // 3 min — large base64 uploads need time
+  },30000);
 
   if(!res.ok) throw new LLMError('google',res.status,await res.text(),null);
   const opData=await res.json();
@@ -2498,7 +1912,7 @@ function blobToBase64(blob){
   return new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=()=>resolve(reader.result.split(',')[1]);
-    reader.onerror=()=>reject(new Error(`FileReader 오류: 파일 읽기 실패 (${(blob.size/1024/1024).toFixed(1)}MB)`));
+    reader.onerror=reject;
     reader.readAsDataURL(blob);
   });
 }
@@ -2513,116 +1927,57 @@ const RX_GARBAGE_SCRIPTS = /[\u0600-\u06FF\u0590-\u05FF\u0900-\u097F\u0E00-\u0E7
 const RX_INJECTED_EN = /\b[A-Z][a-z]+ [A-Z][a-z]+\b/g; // Proper-noun pairs e.g. "Aqua Bleumer"
 // Repeated short phrase detector
 function _detectRepeat(text, minRepeats=3){
-  // Safety: skip very large texts to prevent O(n²) freeze on main thread
-  if(text.length>10000) return false;
+  // Check space-separated word n-grams
   const words = text.split(/\s+/);
-  if(words.length<4) return false;
-
-  // 1. Space-separated word n-grams
-  for(let len=1; len<=6; len++){
-    if(len>words.length) break;
-    const phrase = words.slice(0,len).join(' ');
-    if(!phrase.trim()||phrase.length<2) continue;
-    let count=0, pos=0;
-    while((pos=text.toLowerCase().indexOf(phrase.toLowerCase(),pos))!==-1){count++;pos+=phrase.length}
-    if(count>=minRepeats){
-      const coverage=(count*phrase.length)/text.length;
-      if(coverage>0.4) return true;
+  for(let len=2; len<=8; len++){
+    for(let i=0; i<=words.length-len*minRepeats; i++){
+      const phrase = words.slice(i,i+len).join(' ');
+      if(!phrase.trim()||phrase.length<4) continue;
+      let count=0, pos=0;
+      while((pos=text.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
+      if(count>=minRepeats) return true;
     }
   }
-
-  // 2. Comma/separator-delimited repetitions: "X, X, X, X"
+  // Check comma/separator-delimited repetitions: "X, X, X, X"
   const parts=text.split(/[,،、]\s*/);
   if(parts.length>=minRepeats){
     const freq={};
-    for(const p of parts){const k=p.trim().toLowerCase();if(k.length>=1){freq[k]=(freq[k]||0)+1}}
-    for(const k in freq){
-      if(freq[k]>=Math.max(minRepeats,4)){
-        const coverage=(freq[k]*k.length)/text.replace(/\s/g,'').length;
-        if(coverage>0.3) return true;
-      }
-    }
-  }
-
-  // 3. Consecutive identical words ("더 더 더 더 더 더")
-  if(words.length>=6){
-    let maxRun=1,curRun=1;
-    for(let i=1;i<words.length;i++){
-      if(words[i].toLowerCase()===words[i-1].toLowerCase()){curRun++;maxRun=Math.max(maxRun,curRun)}
-      else curRun=1;
-    }
-    if(maxRun>=6) return true;
-  }
-
-  // 4. Regex — short pattern (2~20 chars) repeated 4+ times consecutively
-  const m=text.match(/(.{2,20}?)\1{3,}/);
-  if(m&&m[0].length/text.length>0.3) return true;
-
-  // 5. Sentence-level repetition
-  const sents=text.split(/[.!?。]+/).map(s=>s.trim()).filter(s=>s);
-  if(sents.length>=minRepeats){
-    const freq={};
-    for(const s of sents) freq[s.toLowerCase()]=(freq[s.toLowerCase()]||0)+1;
-    for(const k in freq){
-      if(freq[k]>=minRepeats&&freq[k]/sents.length>0.4) return true;
-    }
+    for(const p of parts){const k=p.trim();if(k.length>=2){freq[k]=(freq[k]||0)+1}}
+    for(const k in freq){if(freq[k]>=minRepeats) return true}
   }
   return false;
 }
 function _cleanRepeat(text){
-  // Pass 1: Regex — short pattern repeated 4+ times → 1 copy
-  text=text.replace(/(.{2,30}?)\1{3,}/g,'$1');
-
-  // Pass 2: Consecutive identical words 6+ → 1 copy ("더 더 더 더 더 더" → "더")
-  const words=text.split(/\s+/);
-  if(words.length>=6){
-    const deduped=[words[0]];
-    let run=1;
-    for(let i=1;i<words.length;i++){
-      if(words[i].toLowerCase()===words[i-1].toLowerCase()){
-        run++;
-        if(run<=1) deduped.push(words[i]);
-      } else {
-        run=1;
-        deduped.push(words[i]);
-      }
-    }
-    text=deduped.join(' ');
-  }
-
-  // Pass 3: Comma-separated repetitions: "X, X, X, X" → "X"
+  // First handle comma-separated repetitions: "X, X, X, X" → "X"
   const commaParts=text.split(/[,،、]\s*/);
-  if(commaParts.length>=4){
+  if(commaParts.length>=3){
     const freq={};
-    for(const p of commaParts){const k=p.trim().toLowerCase();if(k) freq[k]=(freq[k]||0)+1}
+    for(const p of commaParts){const k=p.trim();if(k.length>=2){freq[k]=(freq[k]||0)+1}}
     for(const k in freq){
-      if(freq[k]>=4){
+      if(freq[k]>=3){
+        // Replace all repeated comma-delimited phrases, keep just one
         const esc=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-        const rx=new RegExp('('+esc+')[,،、\\s]*((?:'+esc+'[,،、\\s]*){2,})','gi');
+        const rx=new RegExp('('+esc+')[,،、\\s]*((?:'+esc+'[,،、\\s]*){2,})','g');
         text=text.replace(rx,'$1');
       }
     }
   }
-
-  // Pass 4: Sentence-level repetition → keep 1 copy
-  const sents=text.split(/(?<=[.!?。])\s+/);
-  if(sents.length>=3){
-    const freq={};
-    for(const s of sents) freq[s.trim().toLowerCase()]=(freq[s.trim().toLowerCase()]||0)+1;
-    const topKey=Object.keys(freq).reduce((a,b)=>freq[a]>freq[b]?a:b,'');
-    if(freq[topKey]>=3){
-      const cleaned=[];
-      let seen=0;
-      for(const s of sents){
-        if(s.trim().toLowerCase()===topKey){
-          seen++;
-          if(seen<=1) cleaned.push(s);
-        } else cleaned.push(s);
+  // Then handle space-separated word n-gram repetitions
+  const words = text.split(/\s+/);
+  for(let len=2; len<=8; len++){
+    for(let i=0; i<=words.length-len*3; i++){
+      const phrase = words.slice(i,i+len).join(' ');
+      if(!phrase.trim()||phrase.length<4) continue;
+      let count=0, pos=0;
+      while((pos=text.indexOf(phrase,pos))!==-1){count++;pos+=phrase.length}
+      if(count>=3){
+        const first = text.indexOf(phrase);
+        const after = text.slice(first+phrase.length);
+        const cleaned = after.replace(new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'[,،、\\s]*','g'),'');
+        return text.slice(0,first+phrase.length)+' '+cleaned.trim();
       }
-      text=cleaned.join(' ');
     }
   }
-
   return text.replace(/\s{2,}/g,' ').trim();
 }
 
@@ -2654,56 +2009,16 @@ function cleanHallucinations(text){
     return m;
   });
 
-  // 4. Remove number sequence hallucinations (e.g., "5, 9, 10, 11, 12..." or "81, 81, 81, 81...")
-  cleaned = cleaned.split('\n').map(line=>{
-    // Detect lines that are mostly comma-separated numbers (>60% of content)
-    const numMatches=line.match(/\b\d{1,3}\b/g);
-    const commaMatches=line.match(/,/g);
-    if(numMatches&&numMatches.length>=8&&commaMatches&&commaMatches.length>=6){
-      // Check if numbers dominate the line
-      const numChars=numMatches.join('').length+commaMatches.length;
-      const lineChars=line.replace(/[\s\[\]:\d,]/g,'').length;
-      if(numChars>lineChars) return ''; // mostly numbers → hallucination
-    }
-    return line;
-  }).filter(l=>l.trim()).join('\n');
-
-  // 5. Remove lines with same short phrase repeated 3+ times separated by commas
-  cleaned = cleaned.split('\n').map(line=>{
-    const parts=line.split(/[,，、]\s*/);
-    if(parts.length>=3){
-      const freq={};
-      for(const p of parts){const k=p.trim();if(k) freq[k]=(freq[k]||0)+1}
-      const maxFreq=Math.max(...Object.values(freq));
-      if(maxFreq>=3&&maxFreq/parts.length>0.4) return ''; // dominant repetition
-    }
-    return line;
-  }).filter(l=>l.trim()).join('\n');
-
-  // 6. Consecutive sentence deduplication + intra-sentence repeat cleanup
-  // Splits by sentence boundaries including Korean endings (~니다, ~세요, ~습니다 etc.)
-  const sentSplitRx=/(?<=[.!?。])\s+|(?<=\n)|(?<=(?:니다|세요|어요|습니다|입니다|겠습니다|합니다|됩니다|있습니다|같습니다|바랍니다|십시오|주세요))\s+(?=[가-힣A-Z])/;
-  const sentences = cleaned.split(sentSplitRx);
-  const deduped = [];
-  for(let i=0;i<sentences.length;i++){
-    const s=sentences[i].trim();
-    if(!s) continue;
-    // (a) Skip if same as any of the last 3 sentences (exact or ≥80% similar)
-    let isDup=false;
-    const checkBack=Math.min(3,deduped.length);
-    for(let j=1;j<=checkBack;j++){
-      const prev=deduped[deduped.length-j].trim();
-      if(s===prev||(s.length>12&&prev.length>12&&_simRatio(s,prev)>0.80)){isDup=true;break}
-    }
-    if(isDup) continue;
-    // (b) Clean intra-sentence repeats
-    if(_detectRepeat(s)) deduped.push(_cleanRepeat(s));
-    else deduped.push(s);
-  }
+  // 4. Repeated phrase cleanup
+  const sentences = cleaned.split(/(?<=[.!?。])\s+|(?<=\n)/);
+  const deduped = sentences.map(s=>{
+    if(_detectRepeat(s)) return _cleanRepeat(s);
+    return s;
+  });
   cleaned = deduped.join(' ').replace(/\s{2,}/g,' ').trim();
 
-  // 7. Paragraph-level repeat check (skip for large texts — O(n²) on full text causes freeze)
-  if(cleaned.length<10000&&_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
+  // 5. Paragraph-level repeat check
+  if(_detectRepeat(cleaned)) cleaned = _cleanRepeat(cleaned);
 
   return cleaned;
 }
@@ -2910,16 +2225,6 @@ function _removeHallucinations(text){
       const stripped=core.replace(halluFragRx,'').replace(/[.\s,!?·…]+/g,' ').trim();
       if(stripped.length<10){halluRemoved++;continue}
     }
-    // Strip hallucination fragments from lines that have substantial real content
-    // e.g., "다음 영상에서 만나요. 특히나 장애가..." → "특히나 장애가..."
-    if(halluFragRx.test(core)&&core.length>60){
-      halluFragRx.lastIndex=0;
-      const cleaned=core.replace(halluFragRx,'').replace(/^[.\s,!?·…]+/,'').replace(/[.\s,!?·…]+$/,'').replace(/\s{2,}/g,' ').trim();
-      if(cleaned.length>20){
-        pass4.push(line.replace(core,cleaned));
-        continue;
-      }
-    }
     pass4.push(line);
   }
 
@@ -2927,7 +2232,7 @@ function _removeHallucinations(text){
   // Whisper sometimes outputs the prompt text itself as hallucinated content
   // Also catches instruction-like text that shouldn't appear in transcription
   const pass4b=[];
-  const promptLeakRx=/텍스트(?:를|가)?\s*(?:를\s*)?(?:생성|완성)|침묵\s*구간|자막\s*제공|번역\s*제공|전문\s*용어를?\s*(?:정확하게\s*)?인식|한국어로만?\s*전사|강의는?\s*한국어로|이\s*강의는\s*.*강의입니다|발화자는?\s*전문/;
+  const promptLeakRx=/텍스트(?:를|가)?\s*(?:를\s*)?(?:생성|완성)|침묵\s*구간|자막\s*제공|번역\s*제공|전문\s*용어를?\s*(?:정확하게\s*)?인식/;
   for(const line of pass4){
     const core=_extractCore(line);
     if(!core){pass4b.push(line);continue}
@@ -3030,38 +2335,9 @@ function _removeHallucinations(text){
     shortRun.forEach(r=>pass6.push(r.line));
   }
 
-  // ── Pass 7: Duplicate timestamp-block detection ──
-  // Same or near-identical content appearing at different timestamps → keep first, remove rest
-  // Uses exact-match Set for O(1) lookup + limited fuzzy check to avoid O(n²) freeze
-  const pass7=[];
-  const seenExact=new Set(); // exact normalized strings for O(1) dedup
-  const seenFuzzy=[]; // limited array for fuzzy matching (max 200 entries)
-  const FUZZY_LIMIT=200; // prevent O(n²) on large transcripts
-  for(const line of pass6){
-    const core=_extractCore(line);
-    if(!core||core.length<15){pass7.push(line);continue}
-    const norm=core.replace(/[\s.,!?·…'"()\[\]]+/g,' ').trim().toLowerCase();
-    if(norm.length<10){pass7.push(line);continue}
-    // Fast exact-match check (O(1))
-    if(seenExact.has(norm)){halluRemoved++;continue}
-    // Fuzzy check only against recent entries (bounded)
-    let isDup=false;
-    if(norm.length>20){
-      for(let fi=seenFuzzy.length-1;fi>=0&&fi>=seenFuzzy.length-FUZZY_LIMIT;fi--){
-        const prev=seenFuzzy[fi];
-        if(prev.length>20&&_simRatio(norm,prev)>0.85){isDup=true;halluRemoved++;break}
-      }
-    }
-    if(!isDup){
-      seenExact.add(norm);
-      if(seenFuzzy.length<FUZZY_LIMIT) seenFuzzy.push(norm);
-      pass7.push(line);
-    }
-  }
+  let result=pass6.join('\n\n').replace(/\n{3,}/g,'\n\n').trim();
 
-  let result=pass7.join('\n\n').replace(/\n{3,}/g,'\n\n').trim();
-
-  if(halluRemoved>0) console.log(`[Hallucination filter v4] Removed ${halluRemoved} segments`);
+  if(halluRemoved>0) console.log(`[Hallucination filter v3] Removed ${halluRemoved} segments`);
   return result;
 }
 
@@ -3080,52 +2356,7 @@ function _simRatio(a,b){
 // Deduplicate repeated phrases within a single line
 function _deduplicatePhrasesInLine(text){
   if(text.length<30) return text;
-
-  // Phase A: Sentence-level dedup (Korean: ~다/~요/~죠/~니다 endings, or .!?)
-  // Split on sentence boundaries including Korean sentence endings
-  const sentRx=/(?<=[.!?。])\s+|(?<=(?:니다|세요|어요|습니다|입니다|겠습니다|드리겠습니다|합니다|됩니다|있습니다|같습니다|바랍니다|십시오|주세요))\s+/;
-  const sents=text.split(sentRx).filter(s=>s.trim());
-  if(sents.length>=3){
-    const freq={};
-    for(const s of sents) freq[s.trim().toLowerCase()]=(freq[s.trim().toLowerCase()]||0)+1;
-    let changed=false;
-    for(const k in freq){
-      if(freq[k]>=2&&k.length>10){
-        // Keep first occurrence only
-        const deduped=[];
-        let seen=0;
-        for(const s of sents){
-          if(s.trim().toLowerCase()===k){
-            seen++;
-            if(seen<=1) deduped.push(s);
-            else changed=true;
-          } else deduped.push(s);
-        }
-        if(changed){
-          text=deduped.join(' ').replace(/\s{2,}/g,' ').trim();
-          // Re-split for further passes
-        }
-      }
-    }
-    // Also handle near-identical sentence repetition (fuzzy)
-    if(sents.length>=3){
-      const deduped2=[sents[0]];
-      for(let i=1;i<sents.length;i++){
-        const cur=sents[i].trim();
-        const prev=deduped2[deduped2.length-1].trim();
-        if(cur.length>10&&prev.length>10&&_simRatio(cur,prev)>0.8) continue;
-        deduped2.push(sents[i]);
-      }
-      if(deduped2.length<sents.length){
-        text=deduped2.join(' ').replace(/\s{2,}/g,' ').trim();
-      }
-    }
-  }
-
-  // Phase B: Regex-based short pattern dedup (2~30 chars repeated 3+ times)
-  text=text.replace(/(.{3,30}?)\1{2,}/g,'$1');
-
-  // Phase C: Substring phrase dedup (original approach, lowered threshold to 3)
+  // Try phrase lengths from long to short
   for(let pLen=Math.min(50,Math.floor(text.length/3));pLen>=5;pLen--){
     for(let start=0;start<=text.length-pLen*3;start++){
       const phrase=text.slice(start,start+pLen).trim();
@@ -3133,7 +2364,8 @@ function _deduplicatePhrasesInLine(text){
       const escaped=phrase.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const rx=new RegExp(escaped,'g');
       const matches=(text.match(rx)||[]).length;
-      if(matches>=3){
+      if(matches>=4){
+        // Keep first occurrence, remove subsequent
         const first=text.indexOf(phrase);
         const before=text.slice(0,first+phrase.length);
         const after=text.slice(first+phrase.length).replace(new RegExp('\\s*'+escaped,'g'),'');
@@ -3158,10 +2390,8 @@ function _tsToSec(ts){
 
 // Called from result page "요약 생성" button
 async function generateSummary(){
-  const _h=_curHist();
-  const text=_h?(_h.refined||_h.text):document.getElementById('res-full').textContent;
-  const lang=_h?.lang||document.getElementById('pre-language')?.value||'ko';
-  if(!text||text.length<10){toast('전사 결과가 없습니다');return}
+  const text=document.getElementById('res-full').textContent;
+  const lang=document.getElementById('pre-language')?.value||'ko';
   await generateSummaryFromText(text,lang);
 }
 
@@ -3195,8 +2425,8 @@ class LLMError extends Error {
     }
     if(this.type==='auth') return `${p} API 키가 유효하지 않습니다.\n설정에서 키를 확인해 주세요.`;
     if(this.type==='server') return `${p} 서버 오류가 발생했습니다.\n잠시 후 다시 시도해 주세요.`;
-    if(this.type==='billing') return `${p} 크레딧/할당량이 부족합니다.\n${this.provider==='groq'?'console.groq.com':this.provider==='openai'?'platform.openai.com/account/billing':this.provider==='claude'?'console.anthropic.com':'해당 서비스'}에서 충전 후 다시 시도하거나 다른 프로바이더를 사용하세요.\n\n[상세: ${(this.bodyText||'').slice(0,120)}]`;
-    return `${p} 오류 (${this.status}): ${(this.bodyText||'').slice(0,120)}`;
+    if(this.type==='billing') return `${p} 크레딧/할당량이 부족합니다.\n${this.provider==='groq'?'console.groq.com':this.provider==='openai'?'platform.openai.com/account/billing':this.provider==='claude'?'console.anthropic.com':'해당 서비스'}에서 충전 후 다시 시도하거나 다른 프로바이더를 사용하세요.`;
+    return `${p} 오류 (${this.status}): ${(this.bodyText||'').slice(0,60)}`;
   }
 }
 
@@ -3272,9 +2502,9 @@ function showLLMErrorModal(err, retryFn){
 // ── API call functions with structured errors ──
 // ── Provider registry — single source of truth for labels, costs, limits ──
 const PROVIDERS={
-  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:30000,  maxTokens:16000, canTranscribe:true,  canPostProcess:true},
+  groq:  {label:'Groq (Llama)',    costLabel:'무료',     costPerMin:0,   free:true,  inputChars:50000,  maxTokens:8000, canTranscribe:true,  canPostProcess:true},
   gemini:{label:'Gemini',          costLabel:'무료',     costPerMin:0,   free:true,  inputChars:800000, maxTokens:65536,canTranscribe:true,  canPostProcess:true},
-  google:{label:'Google STT',      costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
+  google:{label:'Google (Chirp)',  costLabel:'~₩1/분',   costPerMin:1,   free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   assemblyai:{label:'AssemblyAI',  costLabel:'~₩3.5/분', costPerMin:3.5, free:false, inputChars:0,      maxTokens:0,    canTranscribe:true,  canPostProcess:false},
   claude:{label:'Claude',          costLabel:'~₩3~5/분', costPerMin:4,   free:false, inputChars:150000, maxTokens:16000,canTranscribe:false, canPostProcess:true},
   openai:{label:'OpenAI',          costLabel:'~₩1~2/분', costPerMin:1.5, free:false, inputChars:100000, maxTokens:16384,canTranscribe:true,  canPostProcess:true},
@@ -3298,8 +2528,6 @@ async function _fetchWithTimeout(url,opts,timeoutMs=90000){
 }
 
 async function callGroqChat(systemPrompt,userPrompt,maxTok){
-  // Longer timeout for large refine outputs (up to 5 min)
-  const timeoutMs=maxTok>4000?300000:180000;
   const res=await _fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.groqKey}`,'Content-Type':'application/json'},
@@ -3308,7 +2536,7 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.groq.maxTokens
     })
-  },timeoutMs);
+  },180000);
   if(!res.ok){
     const retryAfter=parseInt(res.headers.get('retry-after'))||null;
     throw new LLMError('groq',res.status,await res.text(),retryAfter);
@@ -3317,7 +2545,7 @@ async function callGroqChat(systemPrompt,userPrompt,maxTok){
 }
 
 async function callGemini(systemPrompt,userPrompt,maxTok){
-  const model='gemini-2.5-flash';
+  const model='gemini-2.0-flash';
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${state.geminiKey}`;
   const effectiveMax=maxTok||PROVIDERS.gemini.maxTokens;
   const timeoutMs=effectiveMax>16000?300000:180000; // longer timeout for large outputs
@@ -3339,7 +2567,6 @@ async function callGemini(systemPrompt,userPrompt,maxTok){
 }
 
 async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
-  const timeoutMs=maxTok>4000?300000:180000;
   const res=await _fetchWithTimeout('https://api.openai.com/v1/chat/completions',{
     method:'POST',
     headers:{'Authorization':`Bearer ${state.openaiKey}`,'Content-Type':'application/json'},
@@ -3348,7 +2575,7 @@ async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
       messages:[{role:'system',content:systemPrompt},{role:'user',content:userPrompt}],
       temperature:0.3,max_tokens:maxTok||PROVIDERS.openai.maxTokens
     })
-  },timeoutMs);
+  },180000);
   if(!res.ok){
     throw new LLMError('openai',res.status,await res.text(),null);
   }
@@ -3374,34 +2601,22 @@ function _startLiveTimer(el,msg,label){
   },1000);
 }
 
-// ── Get fallback LLM provider chain ──
-function _getLLMFallbackChain(currentProvider){
-  const allLLM=['gemini','groq','openai','claude'];
-  const keyMap={groq:'groqKey',gemini:'geminiKey',openai:'openaiKey',claude:'claudeKey'};
-  return allLLM.filter(p=>p!==currentProvider&&state[keyMap[p]]);
-}
-
-// ── Chunked LLM processing with per-chunk retry, fallback & progress ──
+// ── Chunked LLM processing with per-chunk retry & progress ──
 async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride){
   const limits=_getLLMLimits(provider);
   const maxTok=maxTokOverride||limits.maxTokens;
-  // Chunk size = min(input capacity, estimated output capacity) — prevents output truncation
-  const outputCapacityChars=Math.floor(maxTok*1.5); // Korean: ~1.5 chars per token
-  const chunkSize=Math.min(Math.floor(limits.inputChars*0.8), outputCapacityChars);
+  const chunkSize=Math.floor(limits.inputChars*0.8);
   const chunks=[];
   for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
   const partials=[];
   let totalElapsed=0;
-  let currentProv=provider;
-  let currentLabel=label;
-  let currentMaxTok=maxTok;
-  let providerSwitched=false;
   // Initial ETA estimate based on chunk count (heuristic: ~30-60s per chunk depending on provider)
-  const estPerChunk=currentProv==='groq'?15:currentProv==='gemini'?20:40;
+  const estPerChunk=provider==='groq'?15:provider==='gemini'?20:40;
   const initEtaSec=estPerChunk*chunks.length;
   const initEta=initEtaSec>=60?`예상 총 약 ${Math.ceil(initEtaSec/60)}분`:`예상 약 ${initEtaSec}초`;
   for(let ci=0;ci<chunks.length;ci++){
     const chunkStart=Date.now();
+    // Live elapsed timer — ticks every second so user sees activity
     let eta='';
     if(ci===0){
       eta=` · ${initEta}`;
@@ -3411,104 +2626,60 @@ async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,lab
       const remainSec=Math.ceil(remainMs/1000);
       eta=remainSec>=60?` · 약 ${Math.ceil(remainSec/60)}분 남음`:` · 약 ${remainSec}초 남음`;
     }
-    let _tickTimer=setInterval(()=>{
+    const _tickTimer=setInterval(()=>{
       const sec=Math.floor((Date.now()-chunkStart)/1000);
       const dots='.'.repeat((sec%3)+1);
-      statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중${dots} (${currentLabel}) · ${sec}초 경과${eta}</span>`;
+      statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중${dots} (${label}) · ${sec}초 경과${eta}</span>`;
     },1000);
-    statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중... (${currentLabel})${eta}</span>`;
+    statusEl.innerHTML=`<span style="color:var(--text2)">⏳ 구간 ${ci+1}/${chunks.length} 처리 중... (${label})${eta}</span>`;
 
     let result=null;
     let lastErr=null;
-
-    // Helper: start a live timer on statusEl
-    function _startChunkTimer(msgPrefix){
-      const t0=Date.now();
-      const tid=setInterval(()=>{
-        const sec=Math.floor((Date.now()-t0)/1000);
-        const dots='.'.repeat((sec%3)+1);
-        statusEl.innerHTML=`<span style="color:var(--text2)">${msgPrefix}${dots} · ${sec}초 경과</span>`;
-      },1000);
-      statusEl.innerHTML=`<span style="color:var(--text2)">${msgPrefix}...</span>`;
-      return tid;
-    }
-
-    // Build provider try-list: current first, then fallbacks
-    const tryList=[{prov:currentProv,label:currentLabel,maxTok:currentMaxTok}];
-    for(const fb of _getLLMFallbackChain(currentProv)){
-      const fbL=_getLLMLimits(fb);
-      tryList.push({prov:fb,label:_provLabel(fb),maxTok:fbL.maxTokens});
-    }
-
-    for(let ti=0;ti<tryList.length;ti++){
-      const {prov,label:provLabel,maxTok:provMaxTok}=tryList[ti];
-      const isRetry=ti>0;
-      clearInterval(_tickTimer);
-
-      if(isRetry){
-        // Switching provider — show clear message
-        toast(`${tryList[ti-1].label} 실패 → ${provLabel}로 전환`);
-        statusEl.innerHTML=`<span style="color:var(--amber)">🔄 ${provLabel}로 전환 중...</span>`;
-        await new Promise(r=>setTimeout(r,500));
-      }
-
-      // Up to 2 attempts per provider (but skip retry for timeouts — pointless)
-      const maxAttempts=isRetry?1:2;
-      for(let attempt=0;attempt<maxAttempts;attempt++){
-        const attemptLabel=attempt>0?'재시도':'처리';
-        const icon=attempt>0?'🔄':'⏳';
-        _tickTimer=_startChunkTimer(`${icon} 구간 ${ci+1}/${chunks.length} ${attemptLabel} 중 (${provLabel})`);
-        try{
-          const chunkText=chunks[ci].slice(0,_getLLMLimits(prov).inputChars);
-          result=await _callLLM(prov,chunkPromptFn(ci),chunkText,provMaxTok);
-          // Success — switch to this provider for remaining chunks
-          if(isRetry){
-            currentProv=prov;currentLabel=provLabel;currentMaxTok=provMaxTok;
-            providerSwitched=true;
-            const newLimits=_getLLMLimits(prov);
-            const newChunkSize=Math.min(Math.floor(newLimits.inputChars*0.8),Math.floor(provMaxTok*1.5));
-            if(newChunkSize!==chunkSize&&ci<chunks.length-1){
-              const processedLen=(ci+1)*chunkSize;
-              const remainingText=transcriptText.slice(processedLen);
-              chunks.splice(ci+1);
-              for(let j=0;j<remainingText.length;j+=newChunkSize) chunks.push(remainingText.slice(j,j+newChunkSize));
-            }
-          }
-          break;
-        }catch(e){
-          lastErr=e;
-          clearInterval(_tickTimer);
-          console.warn(`[Chunk ${ci+1}] ${prov} attempt ${attempt+1}:`,e);
-          logError(prov, e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, `${label} 구간 ${ci+1}`);
+    // Try up to 2 times (original + 1 retry)
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],maxTok);
+        break; // success
+      }catch(e){
+        lastErr=e;
+        clearInterval(_tickTimer);
+        console.warn(`[Chunk ${ci+1}/${chunks.length}] attempt ${attempt+1} ${provider} error:`,e);
+        if(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing')){
+          throw e; // Rate limit / auth / billing → stop immediately, show modal
+        }
+        if(attempt===0){
+          // 1st failure → brief wait then retry
           const isTimeout=(e.name==='AbortError'||e.message?.includes('abort'));
-          const isFatal=(e instanceof LLMError&&(e.type==='rate_limit'||e.type==='auth'||e.type==='billing'||e.status===413));
-          // Timeout or fatal → don't retry same provider, try next in list
-          if(isTimeout||isFatal){
-            statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${provLabel} ${isTimeout?'응답 시간 초과':'오류'} — ${ti<tryList.length-1?'다른 AI로 전환합니다':'대안 없음'}</span>`;
-            await new Promise(r=>setTimeout(r,1500));
-            break; // exit attempt loop → try next provider
+          statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} ${isTimeout?'시간 초과':'오류'} — 2초 후 재시도...</span>`;
+          await new Promise(r=>setTimeout(r,2000));
+          // Restart timer for retry
+          const retryStart=Date.now();
+          const _retryTimer=setInterval(()=>{
+            const sec=Math.floor((Date.now()-retryStart)/1000);
+            const dots='.'.repeat((sec%3)+1);
+            statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1} 재시도 중${dots} (${label}) · ${sec}초 경과</span>`;
+          },1000);
+          statusEl.innerHTML=`<span style="color:var(--text2)">🔄 구간 ${ci+1} 재시도 중... (${label})</span>`;
+          try{
+            result=await _callLLM(provider,chunkPromptFn(ci),chunks[ci],maxTok);
+            clearInterval(_retryTimer);
+            break;
+          }catch(e2){
+            clearInterval(_retryTimer);
+            lastErr=e2;
           }
-          // Transient error → retry once after 2s
-          if(attempt===0){
-            statusEl.innerHTML=`<span style="color:var(--amber)">⚠️ 구간 ${ci+1} 일시 오류 — 2초 후 재시도</span>`;
-            await new Promise(r=>setTimeout(r,2000));
-          }
+          break; // exit the for-loop (both attempts done)
         }
       }
-      if(result!==null) break; // success — exit provider loop
     }
-
     clearInterval(_tickTimer);
     if(result===null){
-      // All providers failed → throw with context
-      throw lastErr||new Error('모든 LLM 프로바이더가 실패했습니다');
+      // Both attempts failed → stop and propagate error
+      throw lastErr;
     }
     partials.push(result);
     totalElapsed+=Date.now()-chunkStart;
   }
-  // Mark if provider was switched (caller can use this info)
-  partials._providerSwitched=providerSwitched;
-  partials._finalProvider=currentProv;
   return partials;
 }
 
@@ -3517,7 +2688,7 @@ function _getOutputLang(){
   const sel=document.getElementById('pre-output-lang');
   return sel?sel.value:'ko';
 }
-function buildSummaryPrompts(transcriptText,lang,provider,forceProb){
+function buildSummaryPrompts(transcriptText,lang,provider){
   const outLang=_getOutputLang();
   const useKorean=(outLang==='ko'||(outLang==='same'&&(lang==='ko'||lang==='auto')));
   const limit=_getLLMLimits(provider||'groq').inputChars;
@@ -3528,10 +2699,6 @@ function buildSummaryPrompts(transcriptText,lang,provider,forceProb){
   const pointCount=isLong?Math.max(30,Math.round(lenMin/3))+'개 이상':'10~20개';
   const pointCountEn=isLong?Math.max(30,Math.round(lenMin/3))+'+ points':'10-20 points';
   const ctxNote=state.context?`[주제: ${state.context}]\n\n`:'';
-  // Detect problem-solving lecture patterns (forceProb overrides when pre-detected from original)
-  const probPatterns=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④]|보기\s*[1-4])/g;
-  const probMatches=(text.match(probPatterns)||[]).length;
-  const isProblemSolving=forceProb||probMatches>=3;
   const systemPrompt=useKorean
     ?`${ctxNote}당신은 전문 요약가입니다. 전사 텍스트를 체계적인 마크다운 형식으로 한국어로 요약합니다. 영어 원문이 있으면 한국어로 번역하여 정리하세요.
 
@@ -3540,12 +2707,7 @@ function buildSummaryPrompts(transcriptText,lang,provider,forceProb){
 - 단순 나열 금지. "A는 B이다"로 끝나면 안 됨 → "A는 B이다. 이는 C 때문이며, 실무에서 D와 같은 상황에 적용된다" 수준으로 작성
 - 정의, 예시, 근거, 비교가 언급되었으면 반드시 포함
 - 긴 강의일수록 더 많은 포인트를, 더 상세하게 작성
-- 반드시 ##, -, ** 등 마크다운 문법을 사용
-${isProblemSolving?`
-⚠️ 문제풀이 강의 감지됨! 반드시 문제별 요약 형식을 사용하세요:
-- 각 문제의 번호·정답·핵심 해설을 빠짐없이 기록
-- 오답 분석에서 자주 틀리는 이유를 명시
-- 마지막에 "빈출 유형"과 "주의 포인트"를 정리`:''}`
+- 반드시 ##, -, ** 등 마크다운 문법을 사용`
     :`${ctxNote}You are a professional summarizer. Create thorough, well-structured English summaries using Markdown.
 
 Key principles:
@@ -3553,41 +2715,9 @@ Key principles:
 - Never just list facts. "A is B" is insufficient → "A is B because C, and in practice this means D"
 - Include all definitions, examples, evidence, and comparisons mentioned
 - Longer lectures require MORE points with MORE detail
-- Use proper ## - ** markdown formatting
-${isProblemSolving?`
-⚠️ Problem-solving lecture detected! Use problem-by-problem summary format:
-- Record every problem number, correct answer, and key explanation
-- Note why common wrong answers are incorrect
-- End with "frequently tested patterns" and "watch-out points"`:''}`;
+- Use proper ## - ** markdown formatting`;
   const userPrompt=useKorean
-    ?(isProblemSolving
-      ?`다음 전사 텍스트(약 ${lenMin}분 분량)는 **문제풀이 강의**입니다. 아래 형식으로 한국어로 요약하세요. 영어 부분도 한국어로 번역하세요.
-
-## 핵심 주제
-(이 문제풀이의 과목·범위·핵심 출제 경향 3~5문장)
-
-## 문제별 핵심 요약
-| 번호 | 정답 | 핵심 포인트 |
-|------|------|-------------|
-| 1번 | [정답] | [왜 이것이 정답인지 1~2문장] |
-(전사에 나온 모든 문제를 빠짐없이)
-
-## 오답 분석 & 함정
-- **[문제번호]**: [자주 틀리는 이유, 혼동 포인트]
-- (중요한 오답만 선별)
-
-## 빈출 유형 & 시험 대비
-- [반복 출제되는 패턴/개념]
-- [강사가 강조한 암기 포인트]
-
-## 핵심 키워드 및 정의
-- **용어1**: 정의 및 설명 (1~2문장)
-- (10개 이상)
-
----
-전사 텍스트:
-${text}`
-      :`다음 전사 텍스트(약 ${lenMin}분 분량)를 아래 마크다운 형식으로 한국어로 요약하세요. 영어 부분도 모두 한국어로 번역하여 정리하세요. ${pointCount}의 포인트를 각각 2~4문장으로 상세히 설명하세요. 중요한 내용을 절대 누락하지 마세요.
+    ?`다음 전사 텍스트(약 ${lenMin}분 분량)를 아래 마크다운 형식으로 한국어로 요약하세요. 영어 부분도 모두 한국어로 번역하여 정리하세요. ${pointCount}의 포인트를 각각 2~4문장으로 상세히 설명하세요. 중요한 내용을 절대 누락하지 마세요.
 
 ## 핵심 주제
 (3~5문장으로 전체 핵심과 맥락 설명)
@@ -3605,33 +2735,8 @@ ${text}`
 
 ---
 전사 텍스트:
-${text}`)
-    :(isProblemSolving
-      ?`Summarize the following problem-solving lecture transcript (~${lenMin} min) in English.
-
-## Key Topic
-(Subject, scope, and exam pattern trends in 3-5 sentences)
-
-## Problem-by-Problem Summary
-| # | Answer | Key Point |
-|---|--------|-----------|
-| 1 | [answer] | [why this is correct, 1-2 sentences] |
-(Include ALL problems from the transcript)
-
-## Wrong Answer Analysis & Traps
-- **Problem [#]**: [common mistakes, confusion points]
-
-## Frequently Tested Patterns
-- [Recurring concepts and exam tips]
-
-## Key Terms & Definitions
-- **Term**: definition and explanation (1-2 sentences)
-- (10+ terms)
-
----
-Transcript:
 ${text}`
-      :`Summarize the following transcript (~${lenMin} min) in English. Include ${pointCountEn}, each with 2-4 sentences of explanation. Never omit important content.
+    :`Summarize the following transcript (~${lenMin} min) in English. Include ${pointCountEn}, each with 2-4 sentences of explanation. Never omit important content.
 
 ## Key Topic
 (3-5 sentences with context)
@@ -3649,7 +2754,7 @@ ${text}`
 
 ---
 Transcript:
-${text}`);
+${text}`;
   return{systemPrompt,userPrompt};
 }
 
@@ -3672,110 +2777,22 @@ async function _runSummary(provider,transcriptText,lang){
   summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ ${label}로 요약 생성 중...${isLong?' (긴 텍스트 — 청크 분할 처리)':''}</span>`;
 
   let finalText=transcriptText;
-  // Pre-detect problem-solving from ORIGINAL transcript (before chunking loses patterns)
-  const _probRx=/([1-9]\d*번|정답은|답은\s*[A-Da-d①-④]|[①-④]|보기\s*[1-4])/g;
-  const _probDetected=(transcriptText.match(_probRx)||[]).length>=3;
-  const outLang2=_getOutputLang();
-  const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
-
-  // For very long transcripts that exceed provider limit
+  // For very long transcripts that exceed provider limit: chunk → detailed extract → merge
   if(isLong){
-    const chunkMaxTok=limits.maxTokens;
-    // Estimate chunk count to determine strategy
-    const outputCapChars=Math.floor(chunkMaxTok*1.5);
-    const chunkSize=Math.min(Math.floor(limits.inputChars*0.8),outputCapChars);
-    const estChunks=Math.ceil(transcriptText.length/chunkSize);
-    // Strategy: "very long" (5+ chunks, ~1h+) → section-by-section with exec brief (no lossy compression)
-    const isVeryLong=estChunks>=5;
-
+    const outLang2=_getOutputLang();
+    const useK=(outLang2==='ko'||(outLang2==='same'&&(lang==='ko'||lang==='auto')));
     const sp=useK
-      ?`다음은 긴 강의 전사의 일부(구간)입니다. ${_probDetected?'⚠️ 문제풀이 강의입니다. 각 문제의 번호·정답·해설을 빠짐없이 추출하세요. ':''}${isVeryLong
-        ?'이 구간의 핵심 내용을 빠짐없이 체계적으로 요약하세요. 각 포인트마다 2~3문장으로 무엇을, 왜, 어떻게를 설명. 핵심 키워드·정의·예시·수치를 반드시 포함. 마크다운 사용. 시간 정보가 있으면 포함.'
-        :'이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'}`
-      :`This is a portion of a long lecture transcript. ${_probDetected?'⚠️ Problem-solving lecture. Extract every problem number, correct answer, and explanation. ':''}${isVeryLong
-        ?'Summarize ALL key points of this section systematically. Each point in 2-3 sentences covering what, why, how. Include key terms, definitions, examples, figures. Use markdown.'
-        :'Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.'}`;
+      ?'다음은 긴 강의 전사의 일부입니다. 이 구간의 모든 주요 내용을 빠짐없이 정리하세요. 각 포인트마다 3~5문장으로 내용, 맥락, 이유, 실무 적용을 설명하세요. 시간 정보 포함. 마크다운 사용. 핵심 키워드, 정의, 예시, 논거, 비교를 반드시 포함하세요. 최대한 길고 상세하게 작성하세요. 절대 간략히 쓰지 마세요.'
+      :'This is a portion of a long lecture transcript. Extract ALL key points with 3-5 sentences each, covering content, context, reasoning, and practical application. Include timestamps, definitions, examples, arguments, comparisons. Be as thorough as possible. Use markdown.';
+    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
     const partials=await _processChunks(provider,transcriptText,()=>sp,summaryEl,label,chunkMaxTok);
-
-    if(isVeryLong){
-      // ── "Very long" strategy: preserve ALL section summaries + add executive brief ──
-      summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 최종 단계: 핵심 브리프 생성 중 (${label})...</span>`;
-      // Build section summaries (these are KEPT in full)
-      const switchWarn=partials._providerSwitched?`\n\n> ⚠️ 처리 중 ${_provLabel(partials._finalProvider)}로 프로바이더 전환됨. 일부 구간의 품질이 다를 수 있습니다.\n\n`:'';
-      const sectionSummaries=switchWarn+partials.map((p,i)=>`## 구간 ${i+1}\n${p}`).join('\n\n---\n\n');
-      // Generate executive brief from first portion of section summaries
-      const briefInput=sectionSummaries.slice(0,limits.inputChars);
-      const lenMin=Math.round(transcriptText.length/500);
-      const briefSp=useK
-        ?`당신은 최고의 요약 전문가입니다. 아래 구간별 요약을 읽고 전체 강의(약 ${lenMin}분)의 **핵심 브리프**를 작성하세요.${_probDetected?' 문제풀이 강의입니다.':''}`
-        :`You are an expert summarizer. Read the section summaries below and write an **executive brief** for the entire lecture (~${lenMin} min).${_probDetected?' This is a problem-solving lecture.':''}`;
-      const briefUp=useK
-        ?`아래 구간별 요약을 읽고 다음을 작성하세요:
-
-## 전체 핵심 (30초 브리프)
-[5~8문장으로 전체 강의의 핵심 메시지, 결론, 가장 중요한 포인트 압축]
-
-## 핵심 키워드
-[가장 중요한 키워드 10~15개를 한 줄에 나열]
-
-${_probDetected?`## 정답 요약표\n| 번호 | 정답 | 핵심 개념 |\n|------|------|----------|\n(모든 문제를 표로 정리)\n\n`:''}## 시험/실무 핵심
-[절대 놓치면 안 되는 5~10개 포인트]
-
----
-구간별 요약:
-${briefInput}`
-        :`Read the section summaries below and write:
-
-## Executive Brief (30-second overview)
-[5-8 sentences capturing the core message, conclusions, most important points]
-
-## Key Terms
-[10-15 most important keywords in one line]
-
-${_probDetected?`## Answer Summary Table\n| # | Answer | Key Concept |\n|---|--------|-------------|\n(All problems in table)\n\n`:''}## Must-Know Points
-[5-10 critical points]
-
----
-Section summaries:
-${briefInput}`;
-      const _briefTimer=_startLiveTimer(summaryEl,'핵심 브리프 생성 중',label);
-      try{
-        const brief=await _callLLM(provider,briefSp,briefUp,limits.maxTokens);
-        clearInterval(_briefTimer);
-        // Final output: Executive brief on top + full section summaries below
-        const fullSummary=`${brief}\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
-        summaryEl.style.whiteSpace='normal';
-        summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullSummary)+'</div>';
-        {const _h=_curHist();if(_h) _h.summary=fullSummary;}
-        await saveState();
-        toast(`요약 완료 — ${estChunks}구간 (${label})`);
-        summaryBtn.disabled=false;
-      }catch(e){
-        clearInterval(_briefTimer);
-        // Even if brief fails, still show section summaries (they're the real value)
-        const fallback=`> ⚠️ 핵심 브리프 생성 실패 (${e.message}). 구간별 요약은 아래에 있습니다.\n\n---\n\n# 구간별 상세 요약\n\n${sectionSummaries}`;
-        summaryEl.style.whiteSpace='normal';
-        summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fallback)+'</div>';
-        {const _h=_curHist();if(_h) _h.summary=fallback;}
-        await saveState();
-        toast(`구간별 요약 완료 (브리프 실패)`);
-        summaryBtn.disabled=false;
-      }
-      return; // Done — skip single-call path below
-    }
-
-    // ── "Medium long" strategy (2-4 chunks): merge into single coherent summary ──
     finalText=partials.map((p,i)=>`[구간 ${i+1}]\n${p}`).join('\n\n');
     summaryEl.innerHTML=`<span style="color:var(--text2)">⏳ 2단계: 종합 요약 생성 중 (${label})...</span>`;
-    // If merged still exceeds limit, truncate with warning (rare for 2-4 chunks)
-    if(finalText.length>limits.inputChars){
-      finalText=finalText.slice(0,limits.inputChars);
-    }
   }
 
-  const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider,_probDetected);
+  const{systemPrompt,userPrompt}=buildSummaryPrompts(finalText,lang,provider);
   // Scale output tokens — long lectures need more output
-  const scaledSumMaxTok=limits.maxTokens;
+  const scaledSumMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(finalText.length/10)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
   const _sumTimer=_startLiveTimer(summaryEl,isLong?'2단계: 종합 요약 생성 중':'요약 생성 중',label);
 
   try{
@@ -3783,14 +2800,13 @@ ${briefInput}`;
     clearInterval(_sumTimer);
     summaryEl.style.whiteSpace='normal';
     summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(summary)+'</div>';
-    {const _h=_curHist();if(_h) _h.summary=summary;}
+    if(state.history.length>0) state.history[0].summary=summary;
     await saveState();
     toast(`요약 완료 (${label})`);
     summaryBtn.disabled=false;
   }catch(e){
     clearInterval(_sumTimer);
     summaryBtn.disabled=false;
-    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '요약 생성');
     if(e instanceof LLMError){
       summaryEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} — 한도 초과 또는 오류 발생. 선택지를 확인하세요.</span>`;
       showLLMErrorModal(e, (newProvider)=>{
@@ -3808,10 +2824,8 @@ ${briefInput}`;
 //  LECTURE NOTES (Plaud-style structured output)
 // ═════════════════════════════════════════════════════════════════
 async function generateNotes(){
-  const _h=_curHist();
-  const text=_h?(_h.refined||_h.text):document.getElementById('res-full').textContent;
-  const lang=_h?.lang||document.getElementById('pre-language')?.value||'ko';
-  if(!text||text.length<10){toast('전사 결과가 없습니다');return}
+  const text=document.getElementById('res-full').textContent;
+  const lang=document.getElementById('pre-language')?.value||'ko';
   await generateNotesFromText(text,lang);
 }
 
@@ -3819,100 +2833,81 @@ async function generateNotes(){
 const NOTE_TEMPLATES={
   standard:`당신은 10년차 학습 설계 전문가입니다. 전사 텍스트를 읽고 "이 노트만 있으면 원본을 다시 안 봐도 된다"는 수준의 완벽한 노트를 만드세요.
 
-[핵심 규칙 — 강의 유형 자동 감지]
-⚠️ 전사에 "1번", "2번", "정답은", "답은 A/B/C/D" 같은 패턴이 반복되면 **문제풀이 강의**입니다.
-→ 반드시 문제별로(문제 번호 + 정답 + 해설) 정리하세요. 문제 하나도 빠뜨리지 마세요.
-→ 강사가 설명한 정답 근거, 오답 이유, 팁을 정확히 기록하세요.
-
 [작성 원칙]
 - 발화자가 말한 핵심만 추출하되, 맥락을 잃지 않게 충분히 서술
 - 전문 용어는 반드시 한국어(English) 병기. 예: 감사 위원회(Audit Committee)
 - 발화자가 "이거 중요합니다", "꼭 기억하세요" 등 강조한 부분은 **굵게** 표시
 - 잡담·반복·필러("그래서 뭐냐면", "어..." 등)는 완전히 제거
 - 숫자·날짜·고유명사는 정확히 기록
-- 문제풀이 강의인 경우: 모든 문제의 번호·정답·해설을 빠짐없이 기록
 
-[출력 형식 — 일반 강의]
+[출력 형식]
 # [주제 — 전사 내용에서 핵심 주제를 2~5단어로 추출]
 날짜: [언급된 날짜 또는 오늘]
 키워드: [핵심 용어 5~8개]
 
 ## 핵심 내용 한눈에 보기
-[전체 내용을 3~5줄로 압축한 "30초 브리핑"]
+[전체 내용을 3~5줄로 압축한 "30초 브리핑". 바쁜 사람이 이것만 읽어도 핵심을 파악할 수 있게]
 
 ## 상세 내용
 ### 1. [주제명]
-[3~5문장으로 핵심 설명. "왜 중요한지"를 반드시 포함]
+[3~5문장으로 핵심 설명. "왜 중요한지"를 반드시 포함. 발화자가 든 예시가 있으면 함께 기록]
 
-(내용 분량에 맞게 필요한 만큼)
+### 2. [주제명]
+[동일 수준의 상세 설명]
 
-## 핵심 포인트
-- [절대 잊으면 안 되는 사항들]
-
-[출력 형식 — 문제풀이 강의]
-# [과목/주제] 문제풀이
-범위: [문제 번호 범위]
-키워드: [핵심 용어 5~10개]
-
-## 문제별 정리
-### 문제 1. [문제 핵심 요약]
-- **정답**: [선지 기호 + 내용]
-- **해설**: [강사의 설명 근거 2~3문장]
-- **핵심 개념**: [테스트하는 개념]
-
-(모든 문제를 빠짐없이)
+(내용 분량에 맞게 3~7개 주제)
 
 ## 핵심 포인트
-- [강사가 반복 강조한 사항]
+- [절대 잊으면 안 되는 사항들. 발화자가 반복하거나 강조한 것 위주]
+- [시험·실무에서 바로 써먹을 수 있는 포인트]
 
 ## 시험 대비 포인트
-- [시험 출제 가능한 핵심 사항]`,
+- [시험 출제 가능한 핵심 사항. 클릭하면 Q&A에서 자세히 질문 가능]`,
 
   exam:`당신은 CISA·정보처리기사·CPA 등 자격증 시험 합격률 95%를 달성한 스타 강사입니다. 전사 텍스트에서 "시험에 나오는 것만" 골라내는 능력이 탁월합니다.
 
-[핵심 규칙 — 문제풀이 강의 감지]
-⚠️ 전사 텍스트에 "1번", "2번", "정답은", "답은", "A/B/C/D" 같은 패턴이 있으면 이것은 **문제풀이 강의**입니다.
-이 경우 반드시 아래 "문제풀이 형식"을 사용하세요. 일반 강의 형식을 사용하면 안 됩니다.
+[작성 원칙]
+- 시험에 안 나올 내용은 과감히 제외
+- 모든 개념은 "한 문장으로 설명할 수 있는가?" 기준으로 정의
+- 혼동하기 쉬운 개념 쌍은 반드시 비교 설명
+- 전문 용어 한국어(English) 병기 필수
+- 발화자가 "시험에 나온다", "중요하다" 등 언급한 부분은 ⭐ 표시
 
-[문제풀이 형식 — 우선 적용]
-# [과목명/주제]
+[출력 형식]
+# [주제]
 날짜: [날짜]
-범위: [문제 번호 범위, 예: 1~20번]
-키워드: [시험 빈출 용어 5~10개]
+키워드: [시험 빈출 용어 5~8개]
 
 ## 30초 핵심 정리
-[전체 문제의 핵심 주제와 출제 패턴을 3~5줄로 압축]
-
-## 문제별 정리
-### 문제 1. [문제 핵심 한 줄 요약]
-- **정답**: [정답 선지 기호 + 내용]
-- **해설**: [왜 이것이 정답인지 2~3문장. 강사가 설명한 근거·논리를 그대로 반영]
-- **오답 분석**: [주요 오답이 왜 틀렸는지 간략히]
-- **핵심 개념**: [이 문제가 테스트하는 개념 한 줄]
-
-### 문제 2. [문제 핵심 한 줄 요약]
-(동일 패턴 — 전사에 나온 모든 문제를 빠짐없이 기록)
+[이 내용의 시험 출제 포인트를 3줄로 압축]
 
 ## 필수 암기 개념
-- **[용어(English)]**: [한 문장 정의]
+- **[용어]**: [한 문장 정의] — 예: **RTO(Recovery Time Objective)**: 재해 후 시스템을 복구해야 하는 목표 시간
+- **[용어]**: [한 문장 정의]
 (전사에서 언급된 중요 개념 모두)
 
-## 혼동 주의 포인트
-- [강사가 "헷갈릴 수 있다", "주의하라"고 한 부분]
-- [비슷해 보이지만 다른 개념 비교]
-
-## 시험 대비 포인트
-- ⭐⭐ [가장 중요 — 강사가 반복 강조]
-- ⭐ [중요]
-- [알아두면 좋음]
-
-[일반 강의 형식 — 문제풀이가 아닌 경우에만 사용]
-위와 동일하되, "문제별 정리" 대신 "출제 예상 주제 분석"으로:
+## 출제 예상 주제 분석
 ### 1. [주제명] ⭐
 - **출제 이유**: [왜 시험 출제자가 이걸 좋아하는가]
 - **핵심**: [2~3문장으로 완결된 설명]
-- **함정**: [수험생이 자주 틀리는 포인트]
-- **암기 팁**: [기억법이나 연상 키워드]`,
+- **함정**: [수험생이 자주 틀리는 포인트, 헷갈리는 선지]
+- **암기 팁**: [기억법이나 연상 키워드]
+
+### 2. [주제명]
+(동일 패턴)
+
+## 예상 문제
+1. **Q**: [실제 시험 스타일의 4지선다 또는 서술형 문제]
+   **A**: [정답 + 왜 정답인지 1문장 설명]
+
+2. **Q**: [문제]
+   **A**: [정답 + 설명]
+(5~8개, 난이도 섞어서)
+
+## 시험 대비 포인트
+- ⭐⭐ [가장 중요]
+- ⭐ [중요]
+- [알아두면 좋음]`,
 
   meeting:`당신은 글로벌 컨설팅 회사의 시니어 비즈니스 애널리스트입니다. 회의 전사를 읽고 "참석 못한 팀원이 이것만 읽으면 완벽히 따라잡는" 수준의 회의록을 작성합니다.
 
@@ -4128,75 +3123,14 @@ async function generateNotesFromText(transcriptText,lang){
       ?systemPrompt+'\n\n중요: 이것은 긴 강의의 일부분입니다. 이 구간의 모든 핵심 내용, 정의, 개념, 예시, 논거, 비교, 실무 포인트를 하나도 빠짐없이 상세하게 작성하세요. 각 포인트는 3~5문장으로 충분히 설명하세요. "왜 중요한지", "어떻게 작동하는지", "실무/시험에서 어떻게 나오는지"를 반드시 포함하세요. 간략히 쓰지 마세요. 최대한 길고 상세하게 작성하세요.'
       :systemPrompt+'\n\nIMPORTANT: This is a portion of a long lecture. Extract EVERY key insight, definition, concept, example, argument, comparison, and practical point. Each point must be 3-5 sentences with full explanation including WHY it matters and HOW it works. Be as thorough and detailed as possible. Do NOT abbreviate.';
     // Scale output tokens: long chunks need long output
-    const chunkMaxTok=limits.maxTokens;
+    const chunkMaxTok=Math.min(Math.max(limits.maxTokens,6000),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
     const partials=await _processChunks(provider,transcriptText,(ci)=>chunkSp,notesEl,label,chunkMaxTok);
-
-    // For very long (5+ chunks): add navigation header with TOC + key terms
-    const isVeryLong=partials.length>=5;
-    let header='';
-    if(isVeryLong){
-      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 목차 및 핵심 정리 생성 중 (${label})...</span>`;
-      // Extract first ~200 chars from each section for TOC generation
-      const tocInput=partials.map((p,i)=>`[구간${i+1}] ${p.slice(0,300)}`).join('\n');
-      const tocSp=useKorean
-        ?'전체 노트의 목차와 핵심 키워드를 정리하세요.'
-        :'Create a table of contents and key terms for the full notes.';
-      const lenMin=Math.round(transcriptText.length/500);
-      const tocUp=useKorean
-        ?`다음은 약 ${lenMin}분 강의 노트의 각 구간 시작 부분입니다. 아래를 작성하세요:
-
-# [강의 주제 추출]
-총 길이: 약 ${lenMin}분 | 구간: ${partials.length}개
-
-## 30초 핵심 브리프
-[전체 강의에서 가장 중요한 내용 5~8문장으로 압축]
-
-## 목차
-${partials.map((_,i)=>`${i+1}. [구간 ${i+1}의 주제 추출]`).join('\n')}
-
-## 핵심 키워드 (전체)
-[가장 중요한 용어 15~20개]
-
----
-구간별 시작:
-${tocInput}`
-        :`The following are the beginnings of each section of a ~${lenMin}-min lecture notes. Create:
-
-# [Extract lecture topic]
-Length: ~${lenMin} min | Sections: ${partials.length}
-
-## 30-Second Brief
-[5-8 sentences capturing the most important content]
-
-## Table of Contents
-${partials.map((_,i)=>`${i+1}. [Extract topic of section ${i+1}]`).join('\n')}
-
-## Key Terms (Overall)
-[15-20 most important terms]
-
----
-Section beginnings:
-${tocInput}`;
-      try{
-        header=await _callLLM(provider,tocSp,tocUp,Math.min(limits.maxTokens,4000));
-        header+='\n\n---\n\n';
-      }catch(e){
-        console.warn('TOC generation failed, continuing without header:',e);
-        header='';
-      }
-    }
-
     // Direct concatenation — no double-compression
-    const sections=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
-    // Add provider switch warning if applicable
-    const switchNote=partials._providerSwitched
-      ?`\n\n> ⚠️ 처리 중 프로바이더 전환 발생: 일부 구간은 ${_provLabel(partials._finalProvider)}에서 처리됨. 품질 차이가 있을 수 있습니다.\n\n`:'';
-    const result=header+switchNote+sections;
+    const result=partials.map((p,i)=>partials.length>1?`\n---\n## 구간 ${i+1}\n${p}`:p).join('\n\n');
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
-    {const _h=_curHist();if(_h) _h.notes=result;}
+    if(state.history.length>0) state.history[0].notes=result;
     await saveState();
-    const provInfo=partials._providerSwitched?` → ${_provLabel(partials._finalProvider)}로 전환됨`:'';
-    toast(`노트 생성 완료 — ${partials.length}구간 (${label}${provInfo} · ${templateNames[template]||'표준'})`);
+    toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
     notesBtn.disabled=false;
     return;
   }
@@ -4206,19 +3140,18 @@ ${tocInput}`;
     ?`다음 전사 텍스트를 분석하여 위 형식대로 한국어로 노트를 작성해 주세요. 영어 부분도 한국어로 번역하세요. 모든 핵심 내용을 빠짐없이 포함하고, 각 포인트를 2~4문장으로 충분히 설명하세요.\n\n${transcriptText.slice(0,limits.inputChars)}`
     :`Analyze the following transcript and write notes in the format above, in English. Include ALL key insights — each point with 2-4 sentences of explanation.\n\n${transcriptText.slice(0,limits.inputChars)}`;
   // Scale output tokens with input length
-  const scaledMaxTok=limits.maxTokens;
+  const scaledMaxTok=Math.min(Math.max(limits.maxTokens,Math.ceil(transcriptText.length/8)),provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
   const _notesTimer=_startLiveTimer(notesEl,`노트 생성 중 (${templateNames[template]||'표준'})`,label);
 
   try{
     const result=await _callLLM(provider,systemPrompt,userPrompt,scaledMaxTok);
     clearInterval(_notesTimer);
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(result)+'</div>';
-    {const _h=_curHist();if(_h) _h.notes=result;}
+    if(state.history.length>0) state.history[0].notes=result;
     await saveState();
     toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
   }catch(e){
     clearInterval(_notesTimer);
-    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '노트 생성');
     if(e instanceof LLMError){
       notesEl.innerHTML=`<span style="color:var(--amber)">⚠️ ${label} 오류. 설정을 확인하세요.</span>`;
       showLLMErrorModal(e,(p)=>{ _runNotesWithProvider(p,transcriptText,lang) });
@@ -4370,35 +3303,31 @@ function _buildRefinePrompt(useKorean){
     :'전문 용어와 약어를 문맥에 맞게 교정하세요.';
 
   return useKorean
-    ?`당신은 음성인식(Whisper) 전사본을 교정하는 전문 편집자입니다.
+    ?`당신은 음성인식(Whisper) 전사본을 교정하는 전문 편집자입니다. Whisper의 한국어 인식 특성을 깊이 이해하고 있습니다.
 ${ctxLine}
-[핵심 원칙 — 의미 기반 교정]
-Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 아니라 "문맥상 말이 안 되는 단어가 끼어든 것"입니다.
-따라서 교정 기준은 발음 유사성이 아니라 의미적 일관성입니다.
-모든 단어를 읽으면서 "이 단어가 앞뒤 문맥·강의 주제와 의미적으로 맞는가?"를 판단하세요.
-맞지 않는다면 → 이 자리에 원래 있었을 올바른 단어를 문맥으로 추론해 복원하세요.
+[핵심 원칙]
+Whisper는 한국어 전문 용어를 발음이 유사한 다른 단어로 치환하는 오류를 매우 빈번하게 발생시킵니다.
+모든 문장을 읽을 때 "이 단어가 문맥상 맞는가?"를 반드시 따져보세요.
 
-[교정 대상 — Whisper 공통 오류 유형]
+[교정 대상 — Whisper 한국어 공통 오류]
 
-1. **의미 불일치 단어 (가장 빈번하고 중요한 오류)**
-   문맥상 어색한 단어를 발견하면 강의 주제·앞뒤 내용을 근거로 올바른 단어를 추론합니다.
+1. **발음 유사 단어 치환 (가장 빈번하고 중요한 오류)**
+   Whisper는 전문 용어를 발음이 비슷한 일상어/다른 단어로 잘못 인식합니다.
    ${ctxRule}
-   - 오류 예시 (패턴 이해용): 코딩→코팅, 보증→보정, 초점→표정, 외압→외야, 차질→사진, 위함→위험
-   - 약어 분리 오류: "CAAT"→"C, A, A, T", "ALE"→"AL", "IS 감사"→"나이스 감사/IS3사"
-   - **고유명사 오인식**: 문맥상 어색한 단어가 회사명·브랜드명·제품명·기관명·인명이어야 할 자리라면, 강의 주제와 맥락을 근거로 올바른 고유명사를 추론하세요. 발음이 아닌 의미적 적합성으로 판단하기 때문에 화자의 언어(한국어·영어·광둥어 등)와 무관하게 작동합니다.
+   오류 유형별 예시 (패턴 이해용 — 실제로는 문맥으로 판단):
+   - 외래어→유사 한국어: "소프트웨어"→"속재/석재", "액세스"→"에세스", "에스크로"→"에스쿠로"
+   - 전문어→일상어: "소규모"→"석유모", "감사"→"감수사/감상", "준법"→"중법/주법", "거버넌스"→"거버넣은"
+   - 코딩→코팅, 보증→보정, 초점→표정, 외압→외야, 차질→사진, 위함→위험, 사항→회상
+   - 숫자/약어 분리: "CAAT"→"C, A, A, T", "ALE"→"AL", "IS 감사"→"나이스 감사/IS3사"
+   - 모든 문장에서 문맥에 맞지 않는 단어가 있다면 발음이 유사한 올바른 단어를 찾아 교정하세요.
 
 2. **문장 단위 중복 (Whisper 반복 오류)**
    같은 내용이 약간 다른 표현으로 연속 2~3회 반복되는 경우가 있습니다.
    → 가장 정확하고 완전한 버전 1회만 유지하고 나머지 제거
    예: "직무 분리가 이루어지지 않용자. 그래서 직무 분리가 이루어지지 않았다." → 두 번째만 유지
 
-3. **환각(hallucination) — 침묵/무음 구간에서 Whisper가 생성한 가짜 텍스트 → 해당 타임스탬프 블록 전체 제거**
-   유형별 예시:
-   - 동일 문장 반복: "강의가 시작되면, 강의가 시작되면, 강의가 시작되면..." → 전체 제거
-   - 숫자 나열: "5, 9, 10, 11, 12, 13, 14, 15..." 또는 "81, 81, 81, 81..." → 전체 제거
-   - 무관한 짧은 문장: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you" → 제거
-   - 이전 내용과 완전히 동일한 문장이 다른 타임스탬프에서 반복 → 중복 제거
-   핵심: 같은 구절이 3회 이상 반복되면 환각이므로 해당 블록 전체를 삭제하세요
+3. **환각(hallucination)** — 침묵 구간에서 생성된 무관한 텍스트 → 완전 제거
+   (예: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you", "텍스트를 생성하지 마세요" 등)
 
 4. **영어 음차(transliteration) 복원** — 학술/업무 맥락에서 영어 원문이 통용되는 용어는 영어로 복원
    (예: "오디트"→"audit", "컴플라이언스"→"compliance", "프레임워크"→"framework", "에스크로"→"escrow")
@@ -4414,35 +3343,35 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
 
 [교정 규칙 — 반드시 준수]
 1) 환각·반복 완전 제거 (가장 정확한 1회만 유지)
-2) 의미 불일치 단어 → 문맥 추론으로 올바른 단어 복원 (이것이 가장 중요한 작업)
+2) 발음 유사 오인식 → 문맥에 맞는 올바른 단어로 복원 (이것이 가장 중요한 작업)
 3) 영어 음차 → 영어 원문 복원
-4) 다국어(영어·중국어·광둥어 등) 발화 내용을 모두 한국어로 번역하세요. 번역 시: 고유명사(회사명·제품명·브랜드명·인명·기관명)는 원문 표기를 유지하고, 외국어 경칭(Mr./Ms./Dr./先生/さん/同學 등)은 한국어로 자연스럽게 번역하세요(씨·선생님·박사 등). 음차하지 마세요.
+4) 영어 문장은 영어 그대로 유지. 번역하지 마세요.
 5) 분리된 약어 → 결합 (C, A, A, T → CAAT)
 6) ${ctxRule}
-7) [타임스탬프 구조 검증] 교정 전 입력의 [HH:MM:SS] 타임스탬프 개수를 세세요. 교정 후 출력의 타임스탬프 개수가 입력과 정확히 일치해야 합니다. 새 타임스탬프 생성 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 개수가 달라지면 오류입니다. 각 [HH:MM:SS]는 반드시 새 줄에서 시작해야 합니다.
+7) [MM:SS] 타임스탬프 반드시 유지
 8) 내용 요약·축약 절대 금지 — 오류 교정만 수행
 9) 교정된 본문만 출력 — 설명·주석 없이`
     :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
 ${ctx?`\n[Topic] ${ctx}\n`:''}
-[Core Principle — Semantic Correction]
-Whisper errors are fundamentally semantic mismatches: wrong words that don't fit the context, not just phonetic substitutions.
-Correction basis: semantic coherence, not phonetic similarity.
-For every word, ask: "Does this word make sense given the topic and surrounding context?"
-If not → infer the correct word from context and restore it.
+[Core Principle]
+Whisper frequently replaces Korean specialized terms with similar-sounding everyday words.
+For every sentence, ask: "Does this word make sense in context?"
 
-[Common Whisper Error Types]
+[Common Whisper Korean Errors]
 
-1. **Semantic mismatch words (most frequent and critical)**
-   ${ctx?`Use your knowledge of "${ctx}" to identify semantically out-of-place words.`:'Identify words that don\'t fit the context or topic.'}
-   Error pattern examples (for pattern recognition — always judge by context):
-   - Single-word swaps: 코딩→코팅, 보증→보정, 초점→표정, 외압→외야
+1. **Phonetic substitution (most frequent and critical)**
+   Whisper replaces domain terms with phonetically similar words.
+   ${ctx?`Use your knowledge of "${ctx}" to identify and correct misrecognized terms.`:'Fix misrecognized terms based on context.'}
+   Error pattern examples (for understanding — judge by context in practice):
+   - Foreign loanwords mangled: "소프트웨어"→"속재", "액세스"→"에세스", "에스크로"→"에스쿠로"
+   - Specialized→common: "소규모"→"석유모", "감사"→"감수사", "거버넌스"→"거버넣은"
+   - Single-char swaps: 코딩→코팅, 보증→보정, 초점→표정, 외압→외야
    - Abbreviation splitting: "CAAT"→"C, A, A, T", "ALE"→"AL"
-   - **Proper noun misrecognition**: If a word in a proper-noun position (company, brand, product, institution, person name) seems semantically wrong, infer the correct proper noun from the lecture topic and surrounding context. This works regardless of the speaker's language (Korean, English, Cantonese, etc.) because the judgment is semantic, not phonetic.
+   - Analyze EVERY word that seems out of place and find the phonetically similar correct term.
 
 2. **Sentence-level duplication** — same content repeated 2-3 times with slight variation → keep only the most accurate version
 
-3. **Hallucination — fake text generated during silence/low-audio → delete the ENTIRE timestamp block**
-   Types: repeated phrases ("강의가 시작되면, 강의가 시작되면..."), number sequences ("5, 9, 10, 11..." or "81, 81, 81..."), duplicate sentences at different timestamps. If a phrase repeats 3+ times, it's hallucination — remove the whole block.
+3. **Hallucination** — irrelevant text during silence → remove entirely
 
 4. **Korean transliteration** → restore to original English (e.g., "오디트"→"audit")
 
@@ -4454,12 +3383,12 @@ If not → infer the correct word from context and restore it.
 
 [Rules — Must Follow]
 1) Remove hallucinated/repeated segments (keep most accurate version)
-2) Fix semantic mismatches — restore contextually correct words (this is the MOST IMPORTANT task)
+2) Fix phonetic substitutions — this is the MOST IMPORTANT task
 3) Restore Korean transliterations to English originals
-4) Keep all text in the original language — do NOT translate
+4) Keep English sentences in English — do NOT translate
 5) Combine split abbreviations (C, A, A, T → CAAT)
 6) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
-7) Preserve [HH:MM:SS] timestamps — do NOT add new timestamps at any point. Each [HH:MM:SS] must start on a new line.
+7) Preserve [MM:SS] timestamps
 8) Don't summarize or shorten — only correct errors
 9) Output corrected text only, no explanations`;
 }
@@ -4472,22 +3401,17 @@ async function refineTranscript(){
   const btn=document.getElementById('btn-refine-text');
 
   // Read original text from history (not from DOM — DOM may contain badge/error text)
-  const _rh=_curHist();
-  const srcText=_rh
-    ?( _rh.refined||_rh.text )
+  const srcText=state.history.length>0
+    ?( state.history[0].refined||state.history[0].text )
     :fullEl.textContent;
   if(!srcText||srcText.length<50){toast('전사 결과가 없습니다');return}
 
   btn.disabled=true;
   const label=_provLabelWithCost(provider);
   const limits=_getLLMLimits(provider);
-  // For refinement, output ≈ input length
-  // Estimate: Korean ~1.5-2 chars per token → max output chars ≈ maxTokens * 1.5
-  const modelMaxTok=limits.maxTokens;
-  const maxOutputChars=Math.floor(modelMaxTok*1.5); // conservative: how many chars this model can output
-  const refineMaxTok=modelMaxTok; // always use full model capacity for refine
-  // Force chunking if input exceeds EITHER input limit OR estimated output capacity
-  const isLong=srcText.length>limits.inputChars||srcText.length>maxOutputChars;
+  // For refinement, output ≈ input length — needs large token limit
+  const refineMaxTok=Math.min(Math.ceil(srcText.length/2)+4000, provider==='gemini'?65536:provider==='claude'?16000:provider==='openai'?16384:8000);
+  const isLong=srcText.length>limits.inputChars;
 
   const outLang=_getOutputLang();
   const lang=document.getElementById('pre-language')?.value||'ko';
@@ -4498,20 +3422,15 @@ async function refineTranscript(){
   statusEl.style.display='block';
   let _refTimer=null;
 
-  // 타임스탬프 줄바꿈 보정 — LLM이 [HH:MM:SS] 앞 줄바꿈을 생략하거나
-  // 청크 경계에서 붙어나오는 경우를 코드 레벨에서 강제 교정
-  const _fixTimestampNewlines=(text)=>
-    text.replace(/([^\n])(\[\d{2}:\d{2}:\d{2}\])/g,'$1\n$2');
-
   try{
     let refined;
     if(isLong){
       // _processChunks handles its own live timer per chunk
       const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok);
-      refined=_fixTimestampNewlines(partials.join('\n'));
+      refined=partials.join('\n');
     }else{
       _refTimer=_startLiveTimer(statusEl,'텍스트 정제 중',label);
-      refined=_fixTimestampNewlines(await _callLLM(provider,sp,srcText,refineMaxTok));
+      refined=await _callLLM(provider,sp,srcText,refineMaxTok);
       clearInterval(_refTimer);
     }
 
@@ -4522,7 +3441,7 @@ async function refineTranscript(){
         <span style="color:var(--text3)">— ${_provLabel(provider)} · 외국어 제거 · 오인식 교정</span>
       </div>`+
       `<div style="white-space:pre-wrap;font-size:14px;line-height:1.8">${escHtml(refined)}</div>`;
-    {const _h=_curHist();if(_h) _h.refined=refined;}
+    if(state.history.length>0) state.history[0].refined=refined;
     await saveState();
     toast(`텍스트 정제 완료 (${_provLabel(provider)})`);
     updateResultStats(refined);
@@ -4541,7 +3460,6 @@ async function refineTranscript(){
 
   }catch(e){
     if(_refTimer) clearInterval(_refTimer);
-    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '텍스트 정제');
     // Error — show in statusEl, NOT in fullEl (preserve original transcript)
     const errDetail=e instanceof LLMError?` (HTTP ${e.status}${e.bodyText?': '+e.bodyText.slice(0,80):''})`
       :e.name==='AbortError'?' (90초 시간 초과)':` (${e.message})`;
@@ -4560,7 +3478,6 @@ async function refineTranscript(){
 // ═════════════════════════════════════════════════════════════════
 let qaHistory=[]; // {role:'user'|'assistant', content:string}
 let currentHistoryIdx=-1; // track which history item is loaded
-function _curHist(){return currentHistoryIdx>=0?state.history[currentHistoryIdx]:state.history[0]||null}
 
 async function askQuestion(){
   const input=document.getElementById('qa-input');
@@ -4643,7 +3560,7 @@ ${contextText}`;
         role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]
       }));
       gemContents.push({role:'user',parts:[{text:q}]});
-      const res=await _fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.geminiKey}`,{
+      const res=await _fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${state.geminiKey}`,{
         method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           system_instruction:{parts:[{text:systemPrompt}]},
@@ -4676,7 +3593,6 @@ ${contextText}`;
     }
   }catch(e){
     aiBub.className='qa-bubble qa-ai';
-    logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, 'Q&A');
     if(e instanceof LLMError){
       aiBub.innerHTML=`<span style="color:var(--amber)">⚠️ ${e.friendlyMessage}</span>`;
     }else if(e.name==='AbortError'||e.message?.includes('abort')){
@@ -4748,7 +3664,7 @@ function _iq(s){
 // Helper: pick best LLM provider based on settings with priority ordering
 function _populateResultLLMSelect(){
   const keyMap={groq:'groqKey',gemini:'geminiKey',claude:'claudeKey',openai:'openaiKey'};
-  const opts=[{v:'auto',t:'비용 절약 (무료 우선)'},{v:'quality-llm',t:'품질 우선 (Claude→OpenAI)'}];
+  const opts=[{v:'auto',t:'자동'}];
   const freeKeys=['groq','gemini'].filter(id=>state[keyMap[id]]);
   if(freeKeys.length>=2) opts.push({v:'free-only',t:'무료만 (Groq→Gemini)'});
   ['groq','gemini','claude','openai'].forEach(id=>{
@@ -4777,7 +3693,6 @@ function _pickLLMProvider(){
   // Priority orders
   const orders={
     'auto':['groq','gemini','claude','openai'],
-    'quality-llm':['claude','openai','gemini','groq'],
     'free-only':['groq','gemini'],
     'groq-first':['groq','gemini','claude','openai'],
     'gemini-first':['gemini','groq','claude','openai'],
@@ -4846,38 +3761,7 @@ function updateProgress(cur,total,text){
   document.getElementById('proc-detail').textContent=`${cur} / ${total} 청크`;
 }
 
-// ── Title editing ──
-function _saveTitle(val){
-  const title=val.trim();
-  const h=_curHist();
-  if(h){
-    h.title=title;
-    h.name=title||h.name;
-    saveState();renderHistory();
-  }
-}
-function _editTitle(){
-  const el=document.getElementById('res-title');
-  el.focus();el.select();
-}
-function _showProviderInfo(chunks){
-  // Show which providers were used (and any fallback switches)
-  const provMap={};
-  chunks.forEach(ch=>{
-    if(ch.status==='done') provMap[ch.api]=(provMap[ch.api]||0)+1;
-  });
-  const entries=Object.entries(provMap);
-  if(entries.length<=1) {document.getElementById('res-provider-info').style.display='none';return;}
-  const info=entries.map(([api,n])=>`${_provLabel(api)} ×${n}`).join(', ');
-  const el=document.getElementById('res-provider-info');
-  el.textContent=`⚠️ 복수 프로바이더 사용: ${info}`;
-  el.style.display='block';
-  el.style.color='var(--amber)';
-}
-
-let _activeTab='full';
 function switchTab(name,btn){
-  _activeTab=name;
   document.querySelectorAll('#result-tabs button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   ['full','notes','summary','qa'].forEach(t=>{
@@ -4886,68 +3770,39 @@ function switchTab(name,btn){
   });
 }
 
-function _getActiveTabText(){
-  const tabMap={full:'res-full',notes:'res-notes',summary:'res-summary',qa:'qa-messages'};
-  const el=document.getElementById(tabMap[_activeTab]||'res-full');
-  return el?el.textContent:'';
-}
-function _getActiveTabLabel(){
-  return{full:'전문',notes:'노트',summary:'요약',qa:'Q&A'}[_activeTab]||'전문';
-}
 function copyResult(){
-  // 노트/요약은 마크다운 원문 복사 (Notion, Obsidian 등에 바로 사용 가능)
-  const text=(_activeTab==='notes'||_activeTab==='summary')?_getActiveTabMarkdown():_getActiveTabText();
-  navigator.clipboard.writeText(text)
-    .then(()=>toast(`${_getActiveTabLabel()} 클립보드에 복사됨`));
+  navigator.clipboard.writeText(document.getElementById('res-full').textContent)
+    .then(()=>toast('클립보드에 복사됨'));
 }
 function downloadResult(){
-  const text=_getActiveTabText();
-  const label=_getActiveTabLabel();
+  const text=document.getElementById('res-full').textContent;
   const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download=`${label}_${fmtNow()}.txt`;a.click();
+  a.href=URL.createObjectURL(blob);a.download=`전사_${fmtNow()}.txt`;a.click();
   URL.revokeObjectURL(a.href);
 }
 function downloadRefinedText(){
-  const h=_curHist();
-  if(!h||!h.refined){toast('정제된 텍스트가 없습니다');return}
-  const name=h.name||'전사';
-  const blob=new Blob([h.refined],{type:'text/plain;charset=utf-8'});
+  const refined=state.history.length>0?state.history[0].refined:null;
+  if(!refined){toast('정제된 텍스트가 없습니다');return}
+  const name=state.history[0].name||'전사';
+  const blob=new Blob([refined],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=`정제_${name.replace(/\.[^.]+$/,'')}_${fmtNow()}.txt`;
   a.click();URL.revokeObjectURL(a.href);
   toast('정제본 저장됨');
 }
-function _getActiveTabMarkdown(){
-  // 원본 마크다운을 state에서 직접 반환 (HTML 렌더링 전 원문)
-  const h=_curHist();
-  if(_activeTab==='notes') return h&&h.notes?h.notes:'';
-  if(_activeTab==='summary') return h&&h.summary?h.summary:'';
-  // full, qa는 마크다운 원본이 없으므로 textContent 사용
-  return _getActiveTabText();
-}
 function downloadMarkdown(){
-  const label=_getActiveTabLabel();
-  let md='';
-  if(_activeTab==='full'){
-    // 전체 통합 MD (전문 탭에서 누르면 전체 포함)
-    const transcript=document.getElementById('res-full').textContent;
-    const hh=_curHist();
-    const notes=hh&&hh.notes?hh.notes:'';
-    const summary=hh&&hh.summary?hh.summary:'';
-    md=`# 전사 노트\n생성일: ${new Date().toLocaleString('ko-KR')}\n\n`;
-    if(notes){ md+=`---\n\n## 노트\n\n${notes}\n\n`; }
-    if(summary){ md+=`---\n\n## 요약\n\n${summary}\n\n`; }
-    md+=`---\n\n## 전문\n\n${transcript}\n`;
-  } else {
-    // 현재 활성 탭의 원본 마크다운으로 저장
-    const rawMd=_getActiveTabMarkdown();
-    md=`# ${label}\n생성일: ${new Date().toLocaleString('ko-KR')}\n\n${rawMd}\n`;
-  }
+  const transcript=document.getElementById('res-full').textContent;
+  const notes=state.history.length>0&&state.history[0].notes?state.history[0].notes:'';
+  const summary=state.history.length>0&&state.history[0].summary?state.history[0].summary:'';
+  let md=`# 전사 노트\n생성일: ${new Date().toLocaleString('ko-KR')}\n\n`;
+  if(notes){ md+=`---\n\n## 노트\n\n${notes}\n\n`; }
+  if(summary){ md+=`---\n\n## 요약\n\n${summary}\n\n`; }
+  md+=`---\n\n## 전문\n\n${transcript}\n`;
   const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download=`${label}_${fmtNow()}.md`;a.click();
+  a.href=URL.createObjectURL(blob);a.download=`노트_${fmtNow()}.md`;a.click();
   URL.revokeObjectURL(a.href);
 }
 function updateResultStats(text){
@@ -4961,72 +3816,22 @@ function updateResultStats(text){
   el.style.display='block';
 }
 
-function renderProjects(){
-  // Render project cards
-  const projectsHtml=state.projects.map(p=>{
-    const filesInProject=state.history.filter(h=>h.projectId===p.id);
-    const latestDate=filesInProject.length>0?filesInProject[0].date:'없음';
-    return `
-    <div class="card" style="cursor:pointer;transition:all .2s" onclick="openProjectDetail('${p.id}')">
-      <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
-        <div style="flex:1;min-width:0">
-          <div class="hi-name">${escHtml(p.name)}</div>
-          <div class="hi-meta">${filesInProject.length}개 파일 · 최신: ${latestDate}</div>
-        </div>
-        <div style="font-size:20px">📁</div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('projects-list').innerHTML=projectsHtml||'<p style="color:var(--text3);font-size:13px;padding:12px">프로젝트를 생성하여 강의를 체계적으로 정리하세요</p>';
-
-  // Render unclassified files
-  const unclassified=state.history.filter(h=>!h.projectId);
-  const hasProjects=state.projects.length>0;
-  const unclassifiedHtml=unclassified.map((h,i)=>{
-    const histIdx=state.history.indexOf(h);
-    return `
-    <div class="history-item" style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer" onclick="showHistoryItem(${histIdx})">
+function renderHistory(){
+  if(!state.history.length){document.getElementById('history-section').style.display='none';return}
+  document.getElementById('history-section').style.display='block';
+  document.getElementById('history-list').innerHTML=state.history.map((h,i)=>`
+    <div class="history-item" style="position:relative">
+      <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;cursor:pointer" onclick="showHistoryItem(${i})">
         <div class="hi-icon">📄</div>
-        <div class="hi-info" style="flex:1;min-width:0">
-          <div class="hi-name">${escHtml(h.title||h.name)}</div>
-          <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분${h.summary?' · 📊':''}${h.notes?' · 📝':''}</div>
-          ${h.tags&&h.tags.length?`<div style="font-size:10px;color:var(--text3);margin-top:4px">${h.tags.map(t=>`<span style="display:inline-block;background:var(--surface);padding:2px 6px;border-radius:4px;margin-right:4px">${escHtml(t)}</span>`).join('')}</div>`:''}
+        <div class="hi-info">
+          <div class="hi-name">${escHtml(h.name)}</div>
+          <div class="hi-meta">${h.date} · ${Math.round(h.duration/60)}분</div>
         </div>
+        <div class="hi-arrow">›</div>
       </div>
-      ${hasProjects?`<button onclick="event.stopPropagation();quickMoveToProject(${histIdx})" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text2);font-size:11px;padding:4px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0" title="프로젝트로 이동">📁 이동</button>`:''}
-      <button onclick="event.stopPropagation();deleteHistoryItem(${histIdx})" style="background:none;border:none;color:var(--text3);font-size:14px;padding:6px;cursor:pointer;opacity:0.5;flex-shrink:0" title="삭제">✕</button>
-    </div>`;
-  }).join('');
-  // Show/hide unclassified section
-  document.getElementById('unclassified-section').style.display=unclassified.length||!state.history.length?'block':'none';
-  document.getElementById('unclassified-list').innerHTML=unclassifiedHtml||'<p style="color:var(--text3);font-size:13px;padding:12px">분류되지 않은 파일이 없습니다</p>';
-  _updateSearchVisibility();
+      <button onclick="event.stopPropagation();deleteHistoryItem(${i})" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:16px;padding:8px;cursor:pointer;opacity:0.5;z-index:1" title="삭제">✕</button>
+    </div>`).join('');
 }
-
-// Show search bar when there are items
-function _updateSearchVisibility(){
-  const el=document.getElementById('home-search-wrap');
-  if(el) el.style.display=(state.history.length>=3||state.projects.length>=2)?'block':'none';
-}
-
-// Filter projects and files on home page
-function filterHomeList(query){
-  const q=query.toLowerCase().trim();
-  // Filter project cards
-  document.querySelectorAll('#projects-list .card').forEach(card=>{
-    const text=card.textContent.toLowerCase();
-    card.style.display=(!q||text.includes(q))?'':'none';
-  });
-  // Filter unclassified items
-  document.querySelectorAll('#unclassified-list .history-item').forEach(item=>{
-    const text=item.textContent.toLowerCase();
-    item.style.display=(!q||text.includes(q))?'':'none';
-  });
-}
-
-// Alias for backward compatibility
-function renderHistory(){ renderProjects(); }
 async function deleteHistoryItem(i){
   if(!confirm('이 기록을 삭제할까요?')) return;
   state.history.splice(i,1);
@@ -5049,9 +3854,7 @@ function showHistoryItem(i){
   const h=state.history[i];if(!h)return;
   currentHistoryIdx=i;
   const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
-  document.getElementById('res-title').value=h.title||h.name.replace(/\.[^.]+$/,'');
   document.getElementById('res-info').textContent=`${h.name} · ${Math.round(h.duration/60)}분`;
-  document.getElementById('res-provider-info').style.display='none';
   // Show refined text if available, else original
   if(h.refined){
     document.getElementById('res-full').innerHTML=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border-radius:6px">✅ 정제 완료본</div>`+
@@ -5062,7 +3865,7 @@ function showHistoryItem(i){
 
   // Show refine button + download button + reset status
   const refineBtn=document.getElementById('btn-refine-text');
-  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.disabled=false;refineBtn.textContent=h.refined?'🔧 다시 정제':'🔧 텍스트 정제'}
+  if(refineBtn){refineBtn.style.display=hasLLM?'flex':'none';refineBtn.textContent=h.refined?'🔧 다시 정제':'🔧 텍스트 정제'}
   const dlRefinedBtn=document.getElementById('btn-download-refined');
   if(dlRefinedBtn) dlRefinedBtn.style.display=h.refined?'flex':'none';
   const refineStatus=document.getElementById('refine-status');
@@ -5071,7 +3874,6 @@ function showHistoryItem(i){
   // Summary
   const summaryEl=document.getElementById('res-summary');
   const summaryBtn=document.getElementById('btn-generate-summary');
-  summaryBtn.disabled=false;
   if(h.summary){summaryEl.style.whiteSpace='normal';summaryEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(h.summary)+'</div>';summaryBtn.style.display='flex'}
   else{summaryEl.innerHTML='<span style="color:var(--text3)">전사 내용을 간결하게 요약합니다.</span>';summaryBtn.style.display=hasLLM?'flex':'none'}
 
@@ -5079,7 +3881,6 @@ function showHistoryItem(i){
   const notesEl=document.getElementById('res-notes');
   const notesBtn=document.getElementById('btn-generate-notes');
   const notesTemplateRow=document.getElementById('notes-template-row');
-  notesBtn.disabled=false;
   if(h.notes){notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(h.notes)+'</div>';notesBtn.style.display='flex'}
   else{notesEl.innerHTML='<span style="color:var(--text3)">전사 내용을 기반으로 체계적인 노트를 생성합니다.</span>';notesBtn.style.display=hasLLM?'flex':'none'}
   if(notesTemplateRow) notesTemplateRow.style.display=hasLLM?'flex':'none';
@@ -5100,317 +3901,7 @@ function showHistoryItem(i){
     msgBox.appendChild(bub);
   });
 
-  // Populate project select and tags
-  populateProjectSelect();
-  document.getElementById('res-tags-input').value=h.tags&&h.tags.join(', ')||'';
-  renderTags();
-
   showPage('result');
-}
-
-// ═════════════════════════════════════════════════════════════════
-//  PROJECT MANAGEMENT
-// ═════════════════════════════════════════════════════════════════
-let currentProjectId=null;
-
-// ── Create / Rename / Delete Project ──
-function createNewProject(){
-  const name=prompt('프로젝트명을 입력하세요');
-  if(!name||!name.trim()) return;
-  const id=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-  state.projects.push({id,name:name.trim(),createdAt:fmtNow(),tags:[]});
-  saveState();renderProjects();
-  toast('프로젝트 생성됨: '+name.trim());
-}
-function updateProjectTitle(){
-  if(!currentProjectId) return;
-  const proj=state.projects.find(p=>p.id===currentProjectId);
-  if(proj){
-    proj.name=document.getElementById('proj-title').value.trim()||'(제목없음)';
-    saveState();
-  }
-}
-function updateProjectTags(){
-  if(!currentProjectId) return;
-  const proj=state.projects.find(p=>p.id===currentProjectId);
-  if(proj){
-    proj.tags=document.getElementById('proj-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
-    saveState();
-  }
-}
-function deleteProject(){
-  if(!currentProjectId) return;
-  const proj=state.projects.find(p=>p.id===currentProjectId);
-  if(!proj) return;
-  const files=state.history.filter(h=>h.projectId===currentProjectId);
-  const msg=files.length
-    ?`"${proj.name}" 프로젝트를 삭제할까요?\n(소속 파일 ${files.length}개는 미분류로 이동됩니다. 파일 자체는 삭제되지 않습니다.)`
-    :`"${proj.name}" 프로젝트를 삭제할까요?`;
-  if(!confirm(msg)) return;
-  // Move files to unclassified
-  files.forEach(h=>{h.projectId=null});
-  state.projects=state.projects.filter(p=>p.id!==currentProjectId);
-  currentProjectId=null;
-  saveState();renderProjects();
-  showPage('home');
-  toast('프로젝트 삭제됨');
-}
-
-// ── Open project detail ──
-function openProjectDetail(projectId){
-  const proj=state.projects.find(p=>p.id===projectId);
-  if(!proj) return;
-  currentProjectId=projectId;
-  document.getElementById('proj-title').value=proj.name;
-  document.getElementById('proj-tags').value=(proj.tags||[]).join(', ');
-  renderProjectFiles();
-  showPage('project');
-}
-
-// ── Render file list inside project ──
-function renderProjectFiles(){
-  if(!currentProjectId) return;
-  const files=state.history.filter(h=>h.projectId===currentProjectId);
-  document.getElementById('proj-file-count').textContent=`${files.length}개 파일`;
-  const html=files.map(h=>{
-    const histIdx=state.history.indexOf(h);
-    const dur=h.duration?Math.round(h.duration/60)+'분':'';
-    const hasSummary=h.summary?'📊':'';
-    const hasNotes=h.notes?'📝':'';
-    return `
-    <div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px">
-      <input type="checkbox" data-idx="${histIdx}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0" onchange="updateActionBar()">
-      <div style="flex:1;cursor:pointer;min-width:0" onclick="showHistoryItem(${histIdx})">
-        <div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(h.title||h.name)}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">${h.date||''} · ${dur} ${hasSummary}${hasNotes}</div>
-      </div>
-      <div style="color:var(--text3);font-size:16px;cursor:pointer" onclick="showHistoryItem(${histIdx})">›</div>
-    </div>`;
-  }).join('');
-  document.getElementById('proj-files-list').innerHTML=html||'<p style="color:var(--text3);font-size:13px;padding:16px;text-align:center">파일이 없습니다. 미분류 파일을 추가하거나<br>새로 전사한 파일을 이 프로젝트에 할당하세요.</p>';
-  // Show/hide select-all, reset action bar
-  document.getElementById('proj-select-all-wrap').style.display=files.length>1?'flex':'none';
-  const selAll=document.getElementById('proj-select-all');
-  if(selAll) selAll.checked=false;
-  document.getElementById('proj-action-bar').style.display='none';
-}
-
-function updateActionBar(){
-  const all=document.querySelectorAll('#proj-files-list input[type="checkbox"]');
-  const checked=document.querySelectorAll('#proj-files-list input[type="checkbox"]:checked');
-  const bar=document.getElementById('proj-action-bar');
-  if(checked.length>0){
-    bar.style.display='flex';
-    document.getElementById('proj-sel-count').textContent=`${checked.length}개 선택`;
-  }else{
-    bar.style.display='none';
-  }
-  // Sync select-all checkbox
-  const selAll=document.getElementById('proj-select-all');
-  if(selAll) selAll.checked=all.length>0&&checked.length===all.length;
-}
-function toggleSelectAll(checked){
-  document.querySelectorAll('#proj-files-list input[type="checkbox"]').forEach(cb=>{cb.checked=checked});
-  updateActionBar();
-}
-
-// ── Remove selected files from project (→ unclassified) ──
-function removeFromProject(){
-  const checked=document.querySelectorAll('#proj-files-list input[type="checkbox"]:checked');
-  if(!checked.length) return;
-  const indices=Array.from(checked).map(cb=>parseInt(cb.dataset.idx));
-  indices.forEach(i=>{if(state.history[i]) state.history[i].projectId=null});
-  saveState();renderProjectFiles();
-  toast(`${indices.length}개 파일이 미분류로 이동됨`);
-}
-
-// ── Add unclassified files to this project (dialog) ──
-function showAddFileDialog(){
-  const unclassified=state.history.filter(h=>!h.projectId);
-  if(!unclassified.length){toast('미분류 파일이 없습니다');return}
-  // Build a simple selection modal
-  const items=unclassified.map(h=>{
-    const idx=state.history.indexOf(h);
-    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
-      <input type="checkbox" value="${idx}" style="width:18px;height:18px;cursor:pointer">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(h.title||h.name)}</div>
-        <div style="font-size:11px;color:var(--text2)">${h.date||''} · ${h.duration?Math.round(h.duration/60)+'분':''}</div>
-      </div>
-    </label>`;
-  }).join('');
-  const modal=document.createElement('div');
-  modal.id='add-file-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML=`<div style="background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:440px;max-height:70vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:16px;font-weight:600;color:var(--text)">미분류 파일 추가</div>
-      <button onclick="document.getElementById('add-file-modal').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">✕</button>
-    </div>
-    <div id="add-file-items">${items}</div>
-    <button onclick="addFilesToProject()" class="btn btn-primary" style="width:100%;margin-top:16px">선택한 파일 추가</button>
-  </div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener('click',e=>{if(e.target===modal) modal.remove()});
-}
-function addFilesToProject(){
-  const checks=document.querySelectorAll('#add-file-items input[type="checkbox"]:checked');
-  if(!checks.length){toast('파일을 선택하세요');return}
-  const indices=Array.from(checks).map(cb=>parseInt(cb.value));
-  indices.forEach(i=>{if(state.history[i]) state.history[i].projectId=currentProjectId});
-  saveState();renderProjectFiles();
-  document.getElementById('add-file-modal')?.remove();
-  toast(`${indices.length}개 파일이 프로젝트에 추가됨`);
-}
-
-// ── Merge selected files → generate ──
-function _getSelectedFiles(){
-  const checked=document.querySelectorAll('#proj-files-list input[type="checkbox"]:checked');
-  if(!checked.length){toast('파일을 선택하세요');return null}
-  return Array.from(checked).map(cb=>{
-    const i=parseInt(cb.dataset.idx);
-    return state.history[i];
-  }).filter(Boolean);
-}
-
-function mergeSelectedFiles(type){
-  const files=_getSelectedFiles();
-  if(!files) return;
-  const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
-  if(type!=='text'&&type!=='qa'&&!hasLLM){toast(_noLLMKeyMsg());showPage('settings');return}
-
-  const proj=state.projects.find(p=>p.id===currentProjectId);
-  const projName=proj?proj.name:'통합';
-
-  // Build merged transcript body (separator between files)
-  const mergedText=files.map(h=>{
-    const body=h.refined||h.text||'';
-    return `## ${h.title||h.name}\n\n${body}`;
-  }).join('\n\n---\n\n');
-
-  // Create a new history item so results are properly saved
-  const mergedTitle=`[통합] ${projName} (${files.length}개 파일)`;
-  const totalDuration=files.reduce((s,h)=>s+(h.duration||0),0);
-  const newItem={
-    name:`${projName}_merged_${Date.now()}.txt`,
-    title:mergedTitle,
-    date:fmtNow(),
-    duration:totalDuration,
-    lang:'ko',
-    text:mergedText,
-    projectId:currentProjectId,
-    tags:['통합'],
-    merged:true,
-    mergedFrom:files.map(h=>h.title||h.name)
-  };
-  state.history.unshift(newItem);
-  saveState();
-  // showHistoryItem sets currentHistoryIdx=0 so subsequent saves (summary/notes/refine) target this item
-  showHistoryItem(0);
-
-  if(type==='text'){
-    // Merged transcript is already displayed in the 전문 tab
-    switchTab('full',document.querySelectorAll('#result-tabs button')[0]);
-    toast(`✅ ${files.length}개 파일 통합 전문 생성됨`);
-  }else if(type==='summary'){
-    switchTab('summary',document.querySelectorAll('#result-tabs button')[2]);
-    generateSummaryFromText(mergedText,'ko');
-  }else if(type==='notes'){
-    switchTab('notes',document.querySelectorAll('#result-tabs button')[1]);
-    generateNotesFromText(mergedText,'ko');
-  }else if(type==='qa'){
-    qaHistory=[];
-    document.getElementById('qa-messages').innerHTML=
-      '<div class="qa-system-msg">📚 통합 Q&A 모드 ('+files.length+'개 파일). 질문을 입력하세요.</div>';
-    switchTab('qa',document.querySelectorAll('#result-tabs button')[3]);
-    toast('통합 Q&A 준비 완료');
-  }
-}
-
-// ── Export entire project as one markdown ──
-function exportProject(){
-  if(!currentProjectId) return;
-  const proj=state.projects.find(p=>p.id===currentProjectId);
-  if(!proj) return;
-  const files=state.history.filter(h=>h.projectId===currentProjectId);
-  if(!files.length){toast('내보낼 파일이 없습니다');return}
-  let md=`# ${proj.name}\n\n생성일: ${new Date().toLocaleString('ko-KR')}\n파일 수: ${files.length}개\n\n`;
-  files.forEach((h,i)=>{
-    md+=`---\n\n## ${i+1}. ${h.title||h.name}\n\n`;
-    md+=`> ${h.date||''} · ${h.duration?Math.round(h.duration/60)+'분':''}\n\n`;
-    if(h.summary){md+=`### 요약\n\n${h.summary}\n\n`}
-    if(h.notes){md+=`### 노트\n\n${h.notes}\n\n`}
-    md+=`### 전문\n\n${h.refined||h.text}\n\n`;
-  });
-  const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`${proj.name}_${fmtNow()}.md`;
-  a.click();URL.revokeObjectURL(a.href);
-  toast('프로젝트 내보내기 완료');
-}
-
-// ── Quick move: from unclassified list, move file to a project ──
-function quickMoveToProject(histIdx){
-  if(!state.projects.length){toast('프로젝트를 먼저 생성하세요');return}
-  const h=state.history[histIdx];
-  if(!h) return;
-  const buttons=state.projects.map(p=>`<button onclick="doQuickMove(${histIdx},'${p.id}')" style="width:100%;text-align:left;padding:14px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:10px"><span>📁</span><span style="flex:1;text-align:left">${escHtml(p.name)}</span><span style="font-size:12px;color:var(--text3)">${state.history.filter(x=>x.projectId===p.id).length}개 파일</span></button>`).join('');
-  const modal=document.createElement('div');
-  modal.id='move-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:flex-end;justify-content:center';
-  modal.innerHTML=`<div style="background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:440px;max-height:60vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:16px;font-weight:600;color:var(--text)">프로젝트 선택</div>
-      <button onclick="document.getElementById('move-modal').remove()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer">✕</button>
-    </div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">"${escHtml(h.title||h.name)}"을(를) 이동</div>
-    <div style="display:flex;flex-direction:column;gap:6px">${buttons}</div>
-  </div>`;
-  document.body.appendChild(modal);
-  modal.addEventListener('click',e=>{if(e.target===modal) modal.remove()});
-}
-function doQuickMove(histIdx,projectId){
-  const h=state.history[histIdx];
-  if(!h) return;
-  h.projectId=projectId;
-  saveState();renderProjects();
-  document.getElementById('move-modal')?.remove();
-  const proj=state.projects.find(p=>p.id===projectId);
-  toast(`"${proj?proj.name:'프로젝트'}"로 이동됨`);
-}
-
-// ── Project select (result page) ──
-function populateProjectSelect(){
-  const select=document.getElementById('res-project-select');
-  if(!select) return;
-  const h=state.history[currentHistoryIdx];
-  select.innerHTML='<option value="">미분류</option>'+
-    state.projects.map(p=>`<option value="${p.id}" ${h&&h.projectId===p.id?'selected':''}>${escHtml(p.name)}</option>`).join('');
-}
-function assignToProject(){
-  if(currentHistoryIdx==null) return;
-  const h=state.history[currentHistoryIdx];
-  if(!h) return;
-  const val=document.getElementById('res-project-select').value;
-  h.projectId=val||null;
-  saveState();
-  const projName=val?state.projects.find(p=>p.id===val)?.name:'미분류';
-  toast(`→ ${projName}`);
-}
-function updateFileTags(){
-  if(currentHistoryIdx==null) return;
-  const h=state.history[currentHistoryIdx];
-  if(!h) return;
-  h.tags=document.getElementById('res-tags-input').value.split(',').map(t=>t.trim()).filter(t=>t);
-  saveState();renderTags();
-}
-function renderTags(){
-  const el=document.getElementById('res-tags-display');
-  if(!el) return;
-  const h=state.history[currentHistoryIdx];
-  if(!h||!h.tags||!h.tags.length){el.innerHTML='';return}
-  el.innerHTML=h.tags.map(t=>`<span style="display:inline-block;background:var(--surface2);padding:3px 8px;border-radius:4px;font-size:11px;color:var(--text2)">${escHtml(t)}</span>`).join(' ');
 }
 
 // ═════════════════════════════════════════════════════════════════
