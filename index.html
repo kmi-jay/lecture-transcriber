@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.54</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.55</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -4394,6 +4394,7 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
    - 동일 문장 반복: "강의가 시작되면, 강의가 시작되면, 강의가 시작되면..." → 전체 제거
    - 숫자 나열: "5, 9, 10, 11, 12, 13, 14, 15..." 또는 "81, 81, 81, 81..." → 전체 제거
    - 무관한 짧은 문장: "아멘", "감사합니다", "시청해 주셔서 감사합니다", "Thank you" → 제거
+   - **단독 영어 감탄사·필러**: 타임스탬프 블록 안에 단 한 단어만 있고 그것이 "Wow", "Wow.", "Oh", "Ah", "Uh", "Hmm", "Yeah", "OK" 등의 감탄사인 경우, Whisper가 무음 구간에 삽입한 환각으로 판단하여 해당 블록 전체를 제거하세요. (단, 실질적인 문장과 함께 등장하면 번역하여 유지)
    - 이전 내용과 완전히 동일한 문장이 다른 타임스탬프에서 반복 → 중복 제거
    핵심: 같은 구절이 3회 이상 반복되면 환각이므로 해당 블록 전체를 삭제하세요
 
@@ -4416,7 +4417,7 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
 4) 다국어(영어·중국어·광둥어 등) 발화 내용을 모두 한국어로 번역하세요. 번역 시: 고유명사(회사명·제품명·브랜드명·인명·기관명)는 원문 표기를 유지하고, 외국어 경칭(Mr./Ms./Dr./先生/さん/同學 등)은 한국어로 자연스럽게 번역하세요(씨·선생님·박사 등). 음차하지 마세요.
 5) 분리된 약어 → 결합 (C, A, A, T → CAAT)
 6) ${ctxRule}
-7) [타임스탬프 구조 검증] 교정 전 입력의 [HH:MM:SS] 타임스탬프 개수를 세세요. 교정 후 출력의 타임스탬프 개수가 입력과 정확히 일치해야 합니다. 새 타임스탬프 생성 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 개수가 달라지면 오류입니다. 각 [HH:MM:SS]는 반드시 새 줄에서 시작해야 합니다.
+7) [타임스탬프 구조 검증] 새 타임스탬프 생성 절대 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 단, 규칙 3에 따라 환각 블록을 제거할 경우 해당 타임스탬프는 함께 제거되므로 개수가 줄어들 수 있습니다(이는 정상). 각 [HH:MM:SS]는 반드시 새 줄에서 시작해야 합니다.
 8) 내용 요약·축약 절대 금지 — 오류 교정만 수행
 9) 교정된 본문만 출력 — 설명·주석 없이`
     :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
@@ -4440,6 +4441,7 @@ If not → infer the correct word from context and restore it.
 
 3. **Hallucination — fake text generated during silence/low-audio → delete the ENTIRE timestamp block**
    Types: repeated phrases ("강의가 시작되면, 강의가 시작되면..."), number sequences ("5, 9, 10, 11..." or "81, 81, 81..."), duplicate sentences at different timestamps. If a phrase repeats 3+ times, it's hallucination — remove the whole block.
+   **Isolated single-word exclamations**: If a timestamp block contains ONLY a single exclamation word ("Wow", "Oh", "Ah", "Uh", "Hmm", "Yeah", "OK", "Thanks", etc.) with no other content, treat it as a Whisper silence hallucination and remove the entire block. (If the exclamation appears together with real sentences, translate it to Korean and keep it.)
 
 4. **Korean transliteration** → restore to original English (e.g., "오디트"→"audit")
 
