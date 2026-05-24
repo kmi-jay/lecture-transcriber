@@ -348,7 +348,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.50</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.51</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -4418,7 +4418,7 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
 4) 다국어(영어·중국어·광둥어 등) 발화 내용을 모두 한국어로 번역하세요. 번역 시: 고유명사(회사명·제품명·브랜드명·인명·기관명)는 원문 표기를 유지하고, 외국어 경칭(Mr./Ms./Dr./先生/さん/同學 등)은 한국어로 자연스럽게 번역하세요(씨·선생님·박사 등). 음차하지 마세요.
 5) 분리된 약어 → 결합 (C, A, A, T → CAAT)
 6) ${ctxRule}
-7) [타임스탬프 구조 검증] 교정 전 입력의 [HH:MM:SS] 타임스탬프 개수를 세세요. 교정 후 출력의 타임스탬프 개수가 입력과 정확히 일치해야 합니다. 새 타임스탬프 생성 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 개수가 달라지면 오류입니다.
+7) [타임스탬프 구조 검증] 교정 전 입력의 [HH:MM:SS] 타임스탬프 개수를 세세요. 교정 후 출력의 타임스탬프 개수가 입력과 정확히 일치해야 합니다. 새 타임스탬프 생성 금지 — 언어 전환·화자 교체·긴 단락 어디에도 불가. 개수가 달라지면 오류입니다. 각 [HH:MM:SS]는 반드시 새 줄에서 시작해야 합니다.
 8) 내용 요약·축약 절대 금지 — 오류 교정만 수행
 9) 교정된 본문만 출력 — 설명·주석 없이`
     :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
@@ -4458,7 +4458,7 @@ If not → infer the correct word from context and restore it.
 4) Keep all text in the original language — do NOT translate
 5) Combine split abbreviations (C, A, A, T → CAAT)
 6) ${ctx?`Correct terminology specific to "${ctx}" domain`:'Correct terminology based on context'}
-7) Preserve [HH:MM:SS] timestamps — do NOT add new timestamps (especially [00:00:00]) at language switch points or anywhere else
+7) Preserve [HH:MM:SS] timestamps — do NOT add new timestamps at any point. Each [HH:MM:SS] must start on a new line.
 8) Don't summarize or shorten — only correct errors
 9) Output corrected text only, no explanations`;
 }
@@ -4497,15 +4497,20 @@ async function refineTranscript(){
   statusEl.style.display='block';
   let _refTimer=null;
 
+  // 타임스탬프 줄바꿈 보정 — LLM이 [HH:MM:SS] 앞 줄바꿈을 생략하거나
+  // 청크 경계에서 붙어나오는 경우를 코드 레벨에서 강제 교정
+  const _fixTimestampNewlines=(text)=>
+    text.replace(/([^\n])(\[\d{2}:\d{2}:\d{2}\])/g,'$1\n$2');
+
   try{
     let refined;
     if(isLong){
       // _processChunks handles its own live timer per chunk
       const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok);
-      refined=partials.join('\n');
+      refined=_fixTimestampNewlines(partials.join('\n'));
     }else{
       _refTimer=_startLiveTimer(statusEl,'텍스트 정제 중',label);
-      refined=await _callLLM(provider,sp,srcText,refineMaxTok);
+      refined=_fixTimestampNewlines(await _callLLM(provider,sp,srcText,refineMaxTok));
       clearInterval(_refTimer);
     }
 
