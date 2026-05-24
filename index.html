@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.60</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.61</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3767,7 +3767,79 @@ async function _runMergedNotesSections(provider,sections,lang,notesEl,notesBtn,l
         :partials[0]||'';
       sectionNotes.push({idx:sec.idx,title:sec.title,notes:secNotes});
     }
-    const fullNotes=sectionNotes.map(s=>`# 📚 ${s.idx}번 강의 노트: ${s.title}\n\n${s.notes}`).join('\n\n---\n\n');
+    // ── Synthesis step: merge duplicates, unify glossary/exam questions ──
+    let synthesisHeader='';
+    if(sectionNotes.length>=2){
+      notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 통합 정리 중 — 중복 제거 및 핵심 합성 (${label})…</span>`;
+      // Feed section notes (not raw transcript) into synthesis — bounded input
+      const synthInput=sectionNotes.map(s=>`[${s.idx}번 강의: "${s.title}"]\n${s.notes.slice(0,3000)}`).join('\n\n---\n\n');
+      const synthSp=useKorean
+        ?`당신은 학습 노트 편집 전문가입니다. ${sections.length}개 강의 파일의 노트를 받아 "통합 핵심 정리"를 작성합니다.
+
+[작성 규칙]
+1. 여러 파일에서 중복되는 개념은 한 번만 통합하여 서술 (중복 금지)
+2. 각 파일에서만 나오는 고유한 내용을 "파일별 핵심 추가 내용"에 정리
+3. 모든 파일의 전문 용어를 하나의 용어 사전으로 통합 (중복 제거)
+4. 모든 파일을 아우르는 새로운 예상 시험 문제 3~5개 (이미 각 파일에서 나온 것과 겹치지 않게)
+
+[출력 형식]
+# 📊 통합 핵심 정리 (${sections.length}개 강의 파일)
+
+## 핵심 공통 개념
+[여러 파일에 걸쳐 공통으로 다뤄진 핵심 개념들 — 한 번만 통합 서술. 각 항목 3~5문장]
+
+## 파일별 핵심 추가 내용
+${sectionNotes.map(s=>`**${s.idx}번 파일 ("${s.title}") 고유 내용**\n[이 파일에서만 다룬 새로운 내용들]`).join('\n\n')}
+
+## 통합 용어 사전
+| 용어 | 정의 |
+|------|------|
+| **[용어(English)]** | [정의] |
+(모든 파일의 전문 용어 통합 — 중복 제거)
+
+## 통합 예상 시험 문제
+**Q1.** [여러 파일 내용을 종합해야 답할 수 있는 질문]
+**A.** [모범 답안 3~5문장]
+(3~5개 — 각 파일의 개별 Q와 겹치지 않는 새로운 질문)`
+        :`You are a learning note editor. Given notes from ${sections.length} lecture files, create an "Integrated Summary" that:
+
+1. Merges duplicate concepts (appear in multiple files) into one unified entry — no repetition
+2. Lists unique content per file in "File-Specific Additions"
+3. Unifies all glossary terms (deduplicated)
+4. Creates 3-5 new exam questions spanning all files (not duplicating per-file questions)
+
+[Output Format]
+# 📊 Integrated Summary (${sections.length} lecture files)
+
+## Core Common Concepts
+[Concepts covered across multiple files — merged once, 3-5 sentences each]
+
+## File-Specific Additions
+${sectionNotes.map(s=>`**File ${s.idx} ("${s.title}") Unique Content**\n[Content only in this file]`).join('\n\n')}
+
+## Unified Glossary
+| Term | Definition |
+|------|-----------|
+| **[Term(Korean)]** | [Definition] |
+
+## Unified Exam Questions
+**Q1.** [Question requiring knowledge across multiple files]
+**A.** [3-5 sentence answer]
+(3-5 questions — not duplicating per-file questions)`;
+      const synthUp=useKorean
+        ?`다음은 ${sections.length}개 강의 파일의 노트입니다. 위 규칙에 따라 통합 핵심 정리를 작성하세요:\n\n${synthInput}`
+        :`Here are notes from ${sections.length} lecture files. Write the integrated summary per the rules above:\n\n${synthInput}`;
+      try{
+        synthesisHeader=await _callLLM(provider,synthSp,synthUp,Math.min(limits.maxTokens,5000));
+        synthesisHeader+='\n\n---\n\n';
+      }catch(e){
+        // Synthesis failed — silently skip, still show per-section notes
+        synthesisHeader=useKorean?'> ⚠️ 통합 정리 생성 실패 — 파일별 노트를 확인하세요.\n\n':'> ⚠️ Synthesis failed — see per-file notes below.\n\n';
+      }
+    }
+    const sectionLabel=useKorean?'📚 강의 상세 노트':'📚 Lecture Detailed Notes';
+    const perSectionNotes=sectionNotes.map(s=>`# ${sectionLabel} ${s.idx}번: ${s.title}\n\n${s.notes}`).join('\n\n---\n\n');
+    const fullNotes=synthesisHeader+perSectionNotes;
     notesEl.innerHTML='<div class="notes-rendered">'+renderNotesMarkdown(fullNotes)+'</div>';
     {const _h=_curHist();if(_h) _h.notes=fullNotes;}
     await saveState();
