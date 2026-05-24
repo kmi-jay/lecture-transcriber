@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.65</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.66</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3548,6 +3548,7 @@ function buildSummaryPrompts(transcriptText,lang,provider,forceProb){
 - 용어 사전은 단순 정의만이 아니라 "이 강의에서 왜 중요한지" 맥락 1~2문장 포함.
 - 예상 시험 문제는 반드시 3~5문장 완결형 모범 답안 포함.
 - 긴 강의일수록 더 많은 ### 섹션을, 더 상세하게 작성.
+- ⚠️ 고유명사 주의: 전사에 음차·오인식된 기업명·제품명이 있을 수 있습니다. 확실한 경우만 교정(예: 앤스로픽→Anthropic, 클로드→Claude). 불확실하면 원문 그대로 사용하세요.
 ${isProblemSolving?`
 ⚠️ 문제풀이 강의 감지됨! 반드시 문제별 요약 형식을 사용하세요:
 - 각 문제의 번호·정답·핵심 해설(3~5문장)을 빠짐없이 기록
@@ -3561,6 +3562,7 @@ ${isProblemSolving?`
 - Glossary entries must include not just definitions but WHY the term matters in this lecture context.
 - Exam questions must include complete 3-5 sentence model answers.
 - Longer lectures require MORE ### sections with MORE detail.
+- ⚠️ Proper noun caution: transcript may contain mistranscribed company/product names (e.g., 앤스로픽→Anthropic, 클로드→Claude). Correct only when certain; otherwise use the transcript text as-is.
 ${isProblemSolving?`
 ⚠️ Problem-solving lecture detected! Use problem-by-problem format:
 - Record every problem number, correct answer, and 3-5 sentence explanation
@@ -3754,6 +3756,7 @@ async function _runMergedSummarySections(provider,sections,lang,summaryEl,summar
 - 한 줄짜리 bullet 나열 금지. 각 주제는 3~5문장 이상 서술.
 - 강의에서 언급된 수치·날짜·사례·조직명·인물명을 정확히 기록.
 - "~이 중요하다" 같은 추상적 문장 금지. 왜 중요한지 구체적 근거를 쓸 것.
+- ⚠️ 고유명사 주의: 전사에 음차·오인식된 기업명·제품명이 있을 수 있습니다. 확실한 경우만 교정(예: 앤스로픽→Anthropic, 클로드→Claude). 불확실하면 원문 그대로 사용하세요.
 
 [출력 형식]
 # ${sec.title} 요약
@@ -3776,6 +3779,7 @@ async function _runMergedSummarySections(provider,sections,lang,summaryEl,summar
 - No one-line bullet lists. Each topic must be 3-5 sentences in prose.
 - Record all specific figures, dates, cases, organization names, and people mentioned.
 - No abstract sentences like "this is important." State WHY with specific evidence.
+- ⚠️ Proper noun caution: transcript may contain mistranscribed company/product names (e.g., 앤스로픽→Anthropic, 클로드→Claude). Correct only when certain; otherwise use the transcript text as-is.
 
 [Output Format]
 # ${sec.title} Summary
@@ -3934,12 +3938,14 @@ async function _runMergedNotesSections(provider,sections,lang,notesEl,notesBtn,l
 1. 이 파일에 등장하는 모든 핵심 내용을 빠짐없이 상세하게 작성하세요.
 2. 각 포인트는 3~5문장으로 설명하고 정의·예시·논거·실무 적용을 포함하세요.
 3. ⭐ 특히 중요: 이 파일에만 등장하는 구체적 사실 — 인물명, 조직명, 금액/비용, 날짜, 인증명, 프로그램명, 수치, 목표 수치 등 — 을 반드시 정확히 기록하세요. 예: "ISACA AI 인증 시험 비용 약 500달러", "FY27에 300명 이상 AAIA 보유자 목표" 같은 구체적 사실은 절대 빠뜨리지 마세요.
-4. 다른 파일에서도 다룰 수 있는 일반 개념(예: AI 거버넌스의 정의)은 간략하게, 이 파일에서만 다루는 구체적 내용은 상세하게 작성하세요.`
+4. 다른 파일에서도 다룰 수 있는 일반 개념(예: AI 거버넌스의 정의)은 간략하게, 이 파일에서만 다루는 구체적 내용은 상세하게 작성하세요.
+5. ⚠️ 고유명사 주의: 전사에 음차·오인식된 기업명·제품명이 있을 수 있습니다. 확실한 경우만 교정(예: 앤스로픽→Anthropic, 클로드→Claude). 불확실하면 원문 그대로 기록하세요 — 틀린 이름으로 교정하는 것이 원문보다 더 나쁩니다.`
         :baseSystemPrompt+`\n\nIMPORTANT — Notes for file ${i+1}/${sections.length} ("${sec.title}"):
 1. Cover ALL key content from this file comprehensively — every point with 3-5 sentences.
 2. Include definitions, examples, arguments, and practical applications.
 3. ⭐ Critical: Record ALL specific facts unique to this file — names, organizations, costs, dates, certification names, program names, numeric targets, etc. E.g., "ISACA AI certification ~$500", "FY27 target 300+ AAIA holders." Never omit specific facts.
-4. Write general concepts (e.g., definition of AI governance) briefly; write content unique to this file in detail.`;
+4. Write general concepts (e.g., definition of AI governance) briefly; write content unique to this file in detail.
+5. ⚠️ Proper noun caution: transcript may contain mistranscribed company/product names (e.g., 앤스로픽→Anthropic, 클로드→Claude). Correct only when certain; otherwise use the transcript text as-is — a wrong name is worse than the original.`;
       const partials=await _processChunks(provider,sec.text,()=>chunkSp,notesEl,label,limits.maxTokens);
       const secNotes=partials.length>1
         ?partials.map((p,j)=>j===0?p:`\n---\n**[이어서 ${j+1}구간]**\n${p}`).join('\n\n')
@@ -3951,7 +3957,11 @@ async function _runMergedNotesSections(provider,sections,lang,notesEl,notesBtn,l
     if(sectionNotes.length>=2){
       notesEl.innerHTML=`<span style="color:var(--text2)">⏳ 통합 정리 중 — 중복 제거 및 핵심 합성 (${label})…</span>`;
       // Feed section notes (not raw transcript) into synthesis — bounded input
-      const synthInput=sectionNotes.map(s=>`[${s.idx}번 강의: "${s.title}"]\n${s.notes.slice(0,5000)}`).join('\n\n---\n\n');
+      // Adaptive per-file limit: total budget scales with provider, divided by file count
+      // 2 files → 5000 each, 4 files → 3500 each, 6 files → 2500 each (floor 1500)
+      const _synthBudget=Math.min(Math.floor(limits.inputChars*0.6),30000);
+      const _perFileLimit=Math.max(1500,Math.min(5000,Math.floor(_synthBudget/sectionNotes.length)));
+      const synthInput=sectionNotes.map(s=>`[${s.idx}번 강의: "${s.title}"]\n${s.notes.slice(0,_perFileLimit)}`).join('\n\n---\n\n');
       const synthSp=useKorean
         ?`당신은 수준 높은 학습 노트 통합 전문가입니다. ${sections.length}개 강의 파일의 노트를 받아 "통합 핵심 정리"를 작성합니다.
 
@@ -4045,7 +4055,9 @@ ${sectionNotes.map(s=>`### 📄 File ${s.idx} ("${s.title}") Unique Content\nCon
         ?`다음은 ${sections.length}개 강의 파일의 노트입니다. 위 규칙에 따라 통합 핵심 정리를 작성하세요:\n\n${synthInput}`
         :`Here are notes from ${sections.length} lecture files. Write the integrated summary per the rules above:\n\n${synthInput}`;
       try{
-        synthesisHeader=await _callLLM(provider,synthSp,synthUp,Math.min(limits.maxTokens,5000));
+        // Scale output tokens with file count: 2 files → 4000, 5 files → 7000
+        const _synthMaxTok=Math.min(limits.maxTokens,3000+sectionNotes.length*1000);
+        synthesisHeader=await _callLLM(provider,synthSp,synthUp,_synthMaxTok);
         synthesisHeader+='\n\n---\n\n';
       }catch(e){
         // Synthesis failed — silently skip, still show per-section notes
@@ -4965,8 +4977,8 @@ async function generateNotesFromText(transcriptText,lang){
   }
 
   const langInstruction=useKorean
-    ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 긴 강의일수록 더 상세하고 빠짐없이 노트를 작성하세요.'
-    :'\n\nIMPORTANT: Write entirely in English. For long lectures, be thorough and comprehensive.';
+    ?'\n\n중요: 반드시 한국어로 작성하세요. 영어 원문이 있으면 한국어로 번역하여 정리하세요. 긴 강의일수록 더 상세하고 빠짐없이 노트를 작성하세요.\n⚠️ 고유명사 주의: 전사에 음차·오인식된 기업명·제품명이 있을 수 있습니다. 확실한 경우만 교정(예: 앤스로픽→Anthropic, 클로드→Claude). 불확실하면 원문 그대로 사용하세요 — 틀린 이름으로 교정하는 것이 원문보다 더 나쁩니다.'
+    :'\n\nIMPORTANT: Write entirely in English. For long lectures, be thorough and comprehensive.\n⚠️ Proper noun caution: the transcript may contain mistranscribed company/product names (e.g., 앤스로픽→Anthropic, 클로드→Claude). Correct only when certain; when uncertain, use the transcript text as-is — a wrong name is worse than the original.';
 
   const systemPrompt=(NOTE_TEMPLATES[template]||NOTE_TEMPLATES.standard)+langInstruction;
 
@@ -5237,7 +5249,14 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
    ${ctxRule}
    - 오류 예시 (패턴 이해용): 코딩→코팅, 보증→보정, 초점→표정, 외압→외야, 차질→사진, 위함→위험
    - 약어 분리 오류: "CAAT"→"C, A, A, T", "ALE"→"AL", "IS 감사"→"나이스 감사/IS3사"
-   - **고유명사 오인식**: 문맥상 어색한 단어가 회사명·브랜드명·제품명·기관명·인명이어야 할 자리라면, 강의 주제와 맥락을 근거로 올바른 고유명사를 추론하세요. 발음이 아닌 의미적 적합성으로 판단하기 때문에 화자의 언어(한국어·영어·광둥어 등)와 무관하게 작동합니다.
+   - **고유명사 오인식**: 문맥상 어색한 단어가 회사명·브랜드명·제품명·기관명·인명이어야 할 자리라면, 강의 주제와 맥락을 근거로 올바른 고유명사를 추론하세요. 발음이 아닌 의미적 적합성으로 판단합니다.
+     ⚠️ 고유명사 교정 시 주의: 잘 알려진 AI·기술 기업·제품명은 아래 정확한 표기를 사용하세요. 불확실하면 원문 그대로 유지 — 잘못된 이름으로 교정하는 것이 원문보다 더 나쁩니다.
+     · Anthropic (앤스로픽/アンソロピック/anthropik 등 → Anthropic)
+     · Claude (클로드/クロード → Claude, "Cloud Methods" 같은 식으로 절대 교정 금지)
+     · OpenAI, ChatGPT, GPT-4, o1, Gemini, Copilot, Perplexity
+     · Microsoft, Google, Meta, Apple, Amazon, NVIDIA, Intel
+     · ISACA, ISO, OECD, UNESCO, NIST, EU, GDPR
+     · 불확실한 고유명사 → 원문 그대로 보존 (틀린 이름으로 교정하지 말 것)
 
 2. **문장 단위 중복 (Whisper 반복 오류)**
    같은 내용이 약간 다른 표현으로 연속 2~3회 반복되는 경우가 있습니다.
@@ -5292,6 +5311,13 @@ If not → infer the correct word from context and restore it.
    - Single-word swaps: 코딩→코팅, 보증→보정, 초점→표정, 외압→외야
    - Abbreviation splitting: "CAAT"→"C, A, A, T", "ALE"→"AL"
    - **Proper noun misrecognition**: If a word in a proper-noun position (company, brand, product, institution, person name) seems semantically wrong, infer the correct proper noun from the lecture topic and surrounding context. This works regardless of the speaker's language (Korean, English, Cantonese, etc.) because the judgment is semantic, not phonetic.
+     ⚠️ Known correct spellings for tech/org proper nouns — use these if you recognise the referent; otherwise preserve the original as-is:
+     · Anthropic (앤스로픽/anthropik/アンソロピック → Anthropic)
+     · Claude (클로드/クロード → Claude; NEVER "Cloud Methods" or any phonetic guess)
+     · OpenAI, ChatGPT, GPT-4, o1, Gemini, Copilot, Perplexity
+     · Microsoft, Google, Meta, Apple, Amazon, NVIDIA, Intel
+     · ISACA, ISO, OECD, UNESCO, NIST, EU, GDPR
+     · Uncertain proper nouns → preserve original (a wrong name is worse than an unchanged one)
 
 2. **Sentence-level duplication** — same content repeated 2-3 times with slight variation → keep only the most accurate version
 
