@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.69</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.70</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -457,7 +457,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div style="position:relative">
       <input type="text" id="home-search" placeholder="파일명, 태그, 프로젝트 검색..."
         oninput="filterHomeList(this.value)"
-        style="width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none">
+        style="width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;outline:none"
+        placeholder="파일명, 태그, 프로젝트·내부 파일 검색...">
       <svg style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
     </div>
   </div>
@@ -474,6 +475,17 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
       <div class="card" style="padding:4px 16px">
         <div id="unclassified-list"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 이모지 선택 모달 -->
+<div id="emoji-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:#0008;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border-radius:16px;padding:20px;max-width:320px;width:90%;box-shadow:0 8px 32px #0004">
+    <div style="font-size:15px;font-weight:600;margin-bottom:12px">프로젝트 아이콘 선택</div>
+    <div id="emoji-grid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin-bottom:14px;max-height:200px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeEmojiModal()" class="btn btn-ghost" style="flex:1">취소</button>
     </div>
   </div>
 </div>
@@ -806,6 +818,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <button class="nav-btn" onclick="showPage('home');renderProjects()" style="width:36px;height:36px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
     </button>
+    <button id="proj-emoji-btn" onclick="openEmojiModal()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:20px;padding:4px 8px;cursor:pointer;flex-shrink:0" title="아이콘 변경">📁</button>
     <input id="proj-title" type="text" placeholder="프로젝트명"
       style="flex:1;font-size:18px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:4px 0;outline:none"
       onchange="updateProjectTitle()">
@@ -832,7 +845,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div id="proj-action-bar" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:12px;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="font-size:12px;color:var(--text2)" id="proj-sel-count"></span>
       <div style="flex:1"></div>
-      <button onclick="executeMerge()" class="btn btn-primary" style="font-size:12px;padding:6px 14px">🔗 병합하기</button>
+      <button onclick="executeMerge()" class="btn btn-primary" style="font-size:12px;padding:6px 14px">🔗 병합</button>
+      <button onclick="moveToAnotherProject()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px">📁 이동</button>
       <button onclick="removeFromProject()" class="btn btn-ghost" style="font-size:12px;padding:6px 12px;color:var(--amber)">📤 제거</button>
     </div>
     <div id="proj-files-list" style="display:flex;flex-direction:column;gap:4px"></div>
@@ -6165,17 +6179,23 @@ function updateResultStats(text){
 
 function renderProjects(){
   // Render project cards
-  const projectsHtml=state.projects.map(p=>{
+  const projectsHtml=state.projects.map((p,pi)=>{
     const filesInProject=state.history.filter(h=>h.projectId===p.id);
     const latestDate=filesInProject.length>0?filesInProject[0].date:'없음';
+    const icon=p.emoji||'📁';
+    const isFirst=pi===0, isLast=pi===state.projects.length-1;
     return `
-    <div class="card" style="cursor:pointer;transition:all .2s" onclick="openProjectDetail('${p.id}')">
-      <div style="display:flex;align-items:center;gap:12px;justify-content:space-between">
+    <div class="card" data-proj-id="${p.id}" style="cursor:pointer;transition:all .2s;margin-bottom:6px" onclick="openProjectDetail('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:22px;flex-shrink:0">${icon}</div>
         <div style="flex:1;min-width:0">
           <div class="hi-name">${escHtml(p.name)}</div>
-          <div class="hi-meta">${filesInProject.length}개 파일 · 최신: ${latestDate}</div>
+          <div class="hi-meta">${filesInProject.length}개 파일 · 최신: ${latestDate}${p.tags&&p.tags.length?' · '+p.tags.map(t=>`<span style="background:var(--surface2);padding:1px 5px;border-radius:3px;margin-left:3px;font-size:10px">${escHtml(t)}</span>`).join(''):''}</div>
         </div>
-        <div style="font-size:20px">📁</div>
+        <div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0" onclick="event.stopPropagation()">
+          <button onclick="moveProjectUp('${p.id}')" ${isFirst?'disabled':''} style="background:${isFirst?'none':'var(--surface)'};border:${isFirst?'none':'1px solid var(--border)'};border-radius:4px;color:${isFirst?'var(--text3)':'var(--text)'};font-size:11px;padding:2px 6px;cursor:${isFirst?'default':'pointer'};line-height:1">▲</button>
+          <button onclick="moveProjectDown('${p.id}')" ${isLast?'disabled':''} style="background:${isLast?'none':'var(--surface)'};border:${isLast?'none':'1px solid var(--border)'};border-radius:4px;color:${isLast?'var(--text3)':'var(--text)'};font-size:11px;padding:2px 6px;cursor:${isLast?'default':'pointer'};line-height:1">▼</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -6212,18 +6232,27 @@ function _updateSearchVisibility(){
   if(el) el.style.display=(state.history.length>=3||state.projects.length>=2)?'block':'none';
 }
 
-// Filter projects and files on home page
+// Filter projects and files on home page (이름·태그·프로젝트 내 파일 제목/태그 모두 검색)
 function filterHomeList(query){
   const q=query.toLowerCase().trim();
-  // Filter project cards
+  // Filter project cards — 프로젝트명·태그·내부 파일 제목·파일 태그 검색
   document.querySelectorAll('#projects-list .card').forEach(card=>{
-    const text=card.textContent.toLowerCase();
-    card.style.display=(!q||text.includes(q))?'':'none';
+    if(!q){card.style.display='';return;}
+    const projId=card.dataset.projId;
+    const nameMatch=card.textContent.toLowerCase().includes(q);
+    const fileMatch=projId&&state.history.some(h=>{
+      if(h.projectId!==projId) return false;
+      const titleHit=(h.title||h.name||'').toLowerCase().includes(q);
+      const tagHit=(h.tags||[]).some(t=>t.toLowerCase().includes(q));
+      return titleHit||tagHit;
+    });
+    card.style.display=(nameMatch||fileMatch)?'':'none';
   });
-  // Filter unclassified items
+  // Filter unclassified items — 제목·태그 검색
   document.querySelectorAll('#unclassified-list .history-item').forEach(item=>{
+    if(!q){item.style.display='';return;}
     const text=item.textContent.toLowerCase();
-    item.style.display=(!q||text.includes(q))?'':'none';
+    item.style.display=text.includes(q)?'':'none';
   });
 }
 
@@ -6319,6 +6348,64 @@ function showHistoryItem(i){
 let currentProjectId=null;
 let _mergeOrder=[]; // histIdx 탭 순서 배열 → 병합 순서
 
+// ── Project reorder ──
+function moveProjectUp(id){
+  const i=state.projects.findIndex(p=>p.id===id);
+  if(i<=0) return;
+  [state.projects[i-1],state.projects[i]]=[state.projects[i],state.projects[i-1]];
+  saveState();renderProjects();
+}
+function moveProjectDown(id){
+  const i=state.projects.findIndex(p=>p.id===id);
+  if(i<0||i>=state.projects.length-1) return;
+  [state.projects[i],state.projects[i+1]]=[state.projects[i+1],state.projects[i]];
+  saveState();renderProjects();
+}
+
+// ── Emoji picker ──
+const _EMOJIS=['📁','📂','🗂️','📚','📖','📝','🎓','🔬','💡','🏛️','⚖️','💻','🖥️','📱','🎙️','🎤','📊','📈','📉','🗒️','📌','📍','🔑','🏆','⭐','🌟','💎','🔥','🎯','🧠','🌐','🏥','💊','🔭','🎨','🎵','📷','🌿','🏋️','✈️','🏠'];
+let _emojiCallback=null;
+function openEmojiModal(){
+  if(!currentProjectId) return;
+  const grid=document.getElementById('emoji-grid');
+  grid.innerHTML=_EMOJIS.map(e=>`<button onclick="selectEmoji('${e}')" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:22px;padding:6px;cursor:pointer;width:100%">${e}</button>`).join('');
+  document.getElementById('emoji-modal').style.display='flex';
+}
+function selectEmoji(e){
+  if(!currentProjectId) return;
+  const proj=state.projects.find(p=>p.id===currentProjectId);
+  if(proj){proj.emoji=e;saveState();}
+  document.getElementById('proj-emoji-btn').textContent=e;
+  closeEmojiModal();
+  toast('아이콘 변경됨');
+}
+function closeEmojiModal(){
+  document.getElementById('emoji-modal').style.display='none';
+}
+
+// ── Move selected files to another project ──
+function moveToAnotherProject(){
+  if(!_mergeOrder.length){toast('파일을 선택하세요');return;}
+  const others=state.projects.filter(p=>p.id!==currentProjectId);
+  if(!others.length){toast('이동할 다른 프로젝트가 없습니다');return;}
+  const btns=others.map(p=>`<button onclick="doMoveFilesToProject('${p.id}')" style="width:100%;text-align:left;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:10px"><span>${p.emoji||'📁'}</span><span>${escHtml(p.name)}</span></button>`).join('');
+  showModal('프로젝트로 이동',`<div style="display:flex;flex-direction:column;gap:8px">${btns}</div>`,[{label:'취소',onclick:'closeModal()'}]);
+}
+function doMoveFilesToProject(targetId){
+  const targetProj=state.projects.find(p=>p.id===targetId);
+  _mergeOrder.forEach(idx=>{const h=state.history[idx];if(h) h.projectId=targetId;});
+  saveState();renderProjectFiles();closeModal();
+  toast(`${_mergeOrder.length}개 파일 → ${targetProj?.name||'프로젝트'} 이동 완료`);
+}
+
+// ── Delete file from within project ──
+function deleteFileInProject(histIdx){
+  if(!confirm('이 파일을 완전히 삭제할까요?\n(삭제 후 복구 불가)')) return;
+  state.history.splice(histIdx,1);
+  saveState();renderProjectFiles();
+  toast('파일 삭제됨');
+}
+
 // ── Create / Rename / Delete Project ──
 function createNewProject(){
   const name=prompt('프로젝트명을 입력하세요');
@@ -6369,6 +6456,8 @@ function openProjectDetail(projectId){
   currentProjectId=projectId;
   document.getElementById('proj-title').value=proj.name;
   document.getElementById('proj-tags').value=(proj.tags||[]).join(', ');
+  const emojiBtn=document.getElementById('proj-emoji-btn');
+  if(emojiBtn) emojiBtn.textContent=proj.emoji||'📁';
   renderProjectFiles();
   showPage('project');
 }
@@ -6395,6 +6484,7 @@ function renderProjectFiles(){
         <div style="font-size:12px;color:var(--text2);margin-top:2px">${h.date||''} · ${dur} ${hasRefined}${hasSummary}${hasNotes}</div>
       </div>
       <div style="color:var(--text3);font-size:16px;cursor:pointer" onclick="showHistoryItem(${histIdx})">›</div>
+      <button onclick="event.stopPropagation();deleteFileInProject(${histIdx})" style="background:none;border:none;color:var(--text3);font-size:13px;padding:4px 6px;cursor:pointer;opacity:0.5;flex-shrink:0" title="파일 삭제">✕</button>
     </div>`;
   }).join('');
   document.getElementById('proj-files-list').innerHTML=html||'<p style="color:var(--text3);font-size:13px;padding:16px;text-align:center">파일이 없습니다. 미분류 파일을 추가하거나<br>새로 전사한 파일을 이 프로젝트에 할당하세요.</p>';
