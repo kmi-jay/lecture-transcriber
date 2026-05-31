@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.68</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.69</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -706,8 +706,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 
   <div class="result-tabs" id="result-tabs">
     <button class="active" onclick="switchTab('full',this)">전문</button>
-    <button onclick="switchTab('notes',this)">노트</button>
     <button onclick="switchTab('summary',this)">요약</button>
+    <button onclick="switchTab('notes',this)">노트</button>
     <button onclick="switchTab('qa',this)">Q&A</button>
   </div>
 
@@ -794,7 +794,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div style="display:flex;gap:10px;margin-top:14px">
     <button class="btn btn-ghost" onclick="copyResult()" style="flex:1">📋 복사</button>
     <button class="btn btn-ghost" onclick="downloadResult()" style="flex:1">💾 TXT</button>
-    <button class="btn btn-ghost" onclick="downloadMarkdown()" style="flex:1">📄 MD</button>
+    <button id="btn-download-md" class="btn btn-ghost" onclick="downloadMarkdown()" style="flex:1">📄 MD</button>
+    <button class="btn btn-ghost" onclick="downloadAllResults()" style="flex:1;color:var(--accent);border-color:var(--accent)">📦 전체</button>
   </div>
   <button class="btn btn-ghost" onclick="_goBackFromResult()" style="margin-top:8px">← 뒤로</button>
 </div>
@@ -1185,6 +1186,7 @@ const OVERLAP_SEC = 30;
 //  PERSISTENCE (IndexedDB)
 // ═════════════════════════════════════════════════════════════════
 const DB_NAME='lecture_transcriber', STORE='config';
+const MAX_HISTORY=100; // 히스토리 항목 최대 개수 — 초과 시 오래된 항목 자동 삭제
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function dbGet(k){const db=await openDB();return new Promise(r=>{const tx=db.transaction(STORE,'readonly');const rq=tx.objectStore(STORE).get(k);rq.onsuccess=()=>r(rq.result);rq.onerror=()=>r(null)})}
 async function dbSet(k,v){const db=await openDB();return new Promise(r=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(v,k);tx.oncomplete=()=>r()})}
@@ -1708,6 +1710,7 @@ async function _loadTranscriptText(fileName, text, lang){
     state.qaHistoryMap=shifted;
   }
   state.history.unshift({name:fileName,title:defaultTitle,date:fmtNow(),duration:estimatedMin*60,lang,text,projectId:null,tags:[],imported:true});
+  if(state.history.length>MAX_HISTORY) state.history.splice(MAX_HISTORY);
   currentHistoryIdx=0;
   await saveState();renderHistory();
 
@@ -2161,6 +2164,7 @@ async function startTranscription(){
   }
   const _title=document.getElementById('res-title').value||file.name.replace(/\.[^.]+$/,'');
   state.history.unshift({name:file.name,title:_title,date:fmtNow(),duration:Math.round(duration),lang,text:fullText,projectId:null,tags:[]});
+  if(state.history.length>MAX_HISTORY) state.history.splice(MAX_HISTORY);
   await saveState();renderHistory();
 
   // Prepare tabs
@@ -4365,6 +4369,7 @@ ${briefInput}`;
         {const _h=_curHist();if(_h) _h.summary=fullSummary;}
         await saveState();
         toast(`요약 완료 — ${estChunks}구간 (${label})`);
+        _switchTabByName('summary');
         summaryBtn.disabled=false;
       }catch(e){
         clearInterval(_briefTimer);
@@ -4375,6 +4380,7 @@ ${briefInput}`;
         {const _h=_curHist();if(_h) _h.summary=fallback;}
         await saveState();
         toast(`구간별 요약 완료 (브리프 실패)`);
+        _switchTabByName('summary');
         summaryBtn.disabled=false;
       }
       return; // Done — skip single-call path below
@@ -4402,6 +4408,7 @@ ${briefInput}`;
     {const _h=_curHist();if(_h) _h.summary=summary;}
     await saveState();
     toast(`요약 완료 (${label})`);
+    _switchTabByName('summary');
     summaryBtn.disabled=false;
   }catch(e){
     clearInterval(_sumTimer);
@@ -5217,6 +5224,7 @@ ${tocInput}`;
     await saveState();
     const provInfo=partials._providerSwitched?` → ${_provLabel(partials._finalProvider)}로 전환됨`:'';
     toast(`노트 생성 완료 — ${partials.length}구간 (${label}${provInfo} · ${templateNames[template]||'표준'})`);
+    _switchTabByName('notes');
     notesBtn.disabled=false;
     return;
   }
@@ -5236,6 +5244,7 @@ ${tocInput}`;
     {const _h=_curHist();if(_h) _h.notes=result;}
     await saveState();
     toast(`노트 생성 완료 (${label} · ${templateNames[template]||'표준'})`);
+    _switchTabByName('notes');
   }catch(e){
     clearInterval(_notesTimer);
     logError(provider||'LLM', e instanceof LLMError?e.status:'ERR', e instanceof LLMError?(e.bodyText||'').slice(0,300):e.message, '노트 생성');
@@ -5617,9 +5626,10 @@ async function refineTranscript(){
     const hasLLM=!!(state.groqKey||state.geminiKey||state.claudeKey||state.openaiKey);
     if(hasLLM){
       toast('정제본으로 노트·요약 자동 생성 중...');
-      try{ await generateNotesFromText(refined,lang); }catch(e2){}
       try{ await generateSummaryFromText(refined,lang); }catch(e2){}
-      toast('✅ 정제본 기반 노트·요약 생성 완료');
+      try{ await generateNotesFromText(refined,lang); }catch(e2){}
+      toast('✅ 정제본 기반 노트·요약 생성 완료 — 요약·노트 탭에서 확인하세요');
+      _switchTabByName('summary');
     }
 
   }catch(e){
@@ -6048,6 +6058,14 @@ function switchTab(name,btn){
   // Auto-generate suggested questions when Q&A tab is opened
   if(name==='qa') generateSuggestedQuestions();
 }
+// 탭 이름으로 자동 전환 (버튼 참조 불필요)
+// 탭 순서: 전문(1) 요약(2) 노트(3) Q&A(4)
+function _switchTabByName(name){
+  const order={full:1,summary:2,notes:3,qa:4};
+  const n=order[name];if(!n)return;
+  const btn=document.querySelector(`#result-tabs button:nth-child(${n})`);
+  if(btn) switchTab(name,btn);
+}
 
 function _getActiveTabText(){
   const tabMap={full:'res-full',notes:'res-notes',summary:'res-summary',qa:'qa-messages'};
@@ -6113,6 +6131,27 @@ function downloadMarkdown(){
   a.href=URL.createObjectURL(blob);a.download=`${label}_${fmtNow()}.md`;a.click();
   URL.revokeObjectURL(a.href);
 }
+function downloadAllResults(){
+  const hh=_curHist();
+  const title=document.getElementById('res-title')?.value||hh?.name||'강의';
+  const transcript=hh?.text||document.getElementById('res-full').textContent||'';
+  const refined=hh?.refined||'';
+  const summary=hh?.summary||'';
+  const notes=hh?.notes||'';
+  if(!transcript&&!summary&&!notes){toast('저장할 내용이 없습니다');return;}
+  let md=`# ${title}\n생성일: ${new Date().toLocaleString('ko-KR')}\n\n`;
+  if(summary) md+=`---\n\n## 📌 요약\n\n${summary}\n\n`;
+  if(notes)   md+=`---\n\n## 📝 노트\n\n${notes}\n\n`;
+  if(refined) md+=`---\n\n## ✅ 정제본\n\n${refined}\n\n`;
+  if(transcript) md+=`---\n\n## 📄 원본 전사\n\n${transcript}\n`;
+  const blob=new Blob([md],{type:'text/markdown;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${title}_전체_${fmtNow()}.md`;
+  a.click();URL.revokeObjectURL(a.href);
+  toast('전체 결과 저장 완료');
+}
+
 function updateResultStats(text){
   const el=document.getElementById('res-stats');
   if(!el||!text) return;
