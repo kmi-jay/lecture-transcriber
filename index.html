@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.66</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.67</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -408,6 +408,23 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   </div>
   <input type="file" id="text-file-input" accept=".txt,.srt,.vtt,.md,.text,.csv,.tsv" style="display:none"
     onchange="handleTextFile(this.files[0])">
+
+  <div class="action-card" onclick="pickFromGoogleDrive()">
+    <div class="action-icon" style="background:#1a73e820">
+      <svg width="20" height="20" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+        <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+        <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+        <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+        <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+        <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+        <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+      </svg>
+    </div>
+    <div>
+      <h3>Google Drive에서 불러오기</h3>
+      <p>전사본을 Google Drive에서 직접 선택합니다</p>
+    </div>
+  </div>
 
   <!-- PWA Install Banner -->
   <div id="install-banner" style="display:none;margin-top:14px">
@@ -979,6 +996,28 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     </div>
   </div>
 
+  <!-- Google Drive -->
+  <div class="api-card" style="border-color:#1a73e840">
+    <h3><span style="color:#1a73e8">●</span> Google Drive 연동 <span class="badge" style="background:#1a73e820;color:#1a73e8">무료</span></h3>
+    <div class="field">
+      <div class="field-label">OAuth 클라이언트 ID</div>
+      <input type="password" id="set-gdrive-client-id" placeholder="xxxx.apps.googleusercontent.com">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <div class="field-label">API 키</div>
+      <input type="password" id="set-gdrive-api-key" placeholder="AIza...">
+    </div>
+    <div class="hint">
+      <strong style="color:#1a73e8">무료</strong> — Google Drive 파일 피커 직접 연동.<br>
+      iOS 파일 앱 동기화 지연 없이 Drive 파일을 즉시 불러옵니다.<br>
+      <strong>발급 방법:</strong> <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> →<br>
+      ① 프로젝트 생성 → ② API 라이브러리에서 <em>Google Drive API</em>, <em>Google Picker API</em> 사용 설정<br>
+      ③ Google 인증 플랫폼 → 브랜딩(앱 이름 입력) → 대상(외부) → 클라이언트(웹 애플리케이션)<br>
+      &nbsp;&nbsp;&nbsp;승인된 JavaScript 원본: <code>https://kmi-jay.github.io</code><br>
+      ④ 사용자 인증 정보 → API 키 만들기 → Google Drive API, Picker API 제한
+    </div>
+  </div>
+
   <!-- Claude Key -->
   <div class="api-card" style="border-color:var(--accent2,#e9456030)">
     <h3><span style="color:var(--accent)">●</span> Claude API Key <span class="badge badge-paid">유료·최고품질</span></h3>
@@ -1100,6 +1139,8 @@ let state = {
   autoRefine:false,
   quota:{ date:'', usedSec:0 },
   history:[],
+  gdriveClientId:'',
+  gdriveApiKey:'',
   qaHistoryMap:{}, // per-history-index Q&A persistence
   projects:[] // [{id, name, createdAt, tags:[]}]
 };
@@ -1165,6 +1206,8 @@ function applyStateToUI(){
   document.getElementById('set-gemini-key').value=state.geminiKey||'';
   document.getElementById('set-claude-key').value=state.claudeKey||'';
   document.getElementById('set-google-stt-key').value=state.googleSttKey||'';
+  document.getElementById('set-gdrive-client-id').value=state.gdriveClientId||'';
+  document.getElementById('set-gdrive-api-key').value=state.gdriveApiKey||'';
   document.getElementById('set-llm-provider').value=state.llmProvider||'auto';
   document.getElementById('set-chunk-min').value=state.chunkMin;
   const ctxEl=document.getElementById('pre-context');
@@ -1314,9 +1357,119 @@ function saveSettings(){
   state.geminiKey=document.getElementById('set-gemini-key').value.trim();
   state.claudeKey=document.getElementById('set-claude-key').value.trim();
   state.googleSttKey=document.getElementById('set-google-stt-key').value.trim();
+  state.gdriveClientId=document.getElementById('set-gdrive-client-id').value.trim();
+  state.gdriveApiKey=document.getElementById('set-gdrive-api-key').value.trim();
   state.llmProvider=document.getElementById('set-llm-provider').value;
   state.chunkMin=parseInt(document.getElementById('set-chunk-min').value);
   saveState();toast('설정 저장됨');showPage('home');
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  GOOGLE DRIVE PICKER
+// ═════════════════════════════════════════════════════════════════
+let _gdriveTokenClient=null;
+let _gdriveAccessToken=null;
+let _gdrivePickerLoaded=false;
+let _gapiLoaded=false;
+
+function _loadScript(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector(`script[src="${src}"]`)){resolve();return;}
+    const s=document.createElement('script');
+    s.src=src;s.onload=resolve;s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function pickFromGoogleDrive(){
+  const clientId=state.gdriveClientId;
+  const apiKey=state.gdriveApiKey;
+  if(!clientId||!apiKey){
+    toast('설정 → Google Drive 연동에서 Client ID와 API 키를 먼저 입력해주세요');
+    showPage('settings');
+    return;
+  }
+  try{
+    // 1. Load Google APIs
+    await _loadScript('https://apis.google.com/js/api.js');
+    await _loadScript('https://accounts.google.com/gsi/client');
+
+    // 2. Load gapi modules
+    if(!_gapiLoaded){
+      await new Promise(r=>gapi.load('client:picker',r));
+      await gapi.client.init({apiKey,discoveryDocs:['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']});
+      _gapiLoaded=true;
+    }
+    if(!_gdrivePickerLoaded){
+      await new Promise(r=>gapi.load('picker',r));
+      _gdrivePickerLoaded=true;
+    }
+
+    // 3. Get OAuth token
+    await new Promise((resolve,reject)=>{
+      _gdriveTokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:clientId,
+        scope:'https://www.googleapis.com/auth/drive.readonly',
+        callback:(resp)=>{
+          if(resp.error){reject(new Error(resp.error));return;}
+          _gdriveAccessToken=resp.access_token;
+          resolve();
+        }
+      });
+      if(_gdriveAccessToken){
+        // Already have token — check validity by skipping prompt
+        _gdriveTokenClient.requestAccessToken({prompt:''});
+        resolve();
+      } else {
+        _gdriveTokenClient.requestAccessToken({prompt:'consent'});
+      }
+    });
+
+    // 4. Show Picker
+    _showGdrivePicker(apiKey);
+  }catch(e){
+    toast('Google Drive 연동 오류: '+e.message);
+    console.error(e);
+  }
+}
+
+function _showGdrivePicker(apiKey){
+  const view=new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setMimeTypes('text/plain,text/markdown,text/x-markdown,application/octet-stream')
+    .setSelectFolderEnabled(false);
+
+  const picker=new google.picker.PickerBuilder()
+    .setAppId('728058280900')
+    .setOAuthToken(_gdriveAccessToken)
+    .setDeveloperKey(apiKey)
+    .setTitle('전사본 파일 선택 (.txt / .md)')
+    .addView(view)
+    .addView(new google.picker.DocsView().setIncludeFolders(true))
+    .setCallback(_onGdriveFilePicked)
+    .build();
+  picker.setVisible(true);
+}
+
+async function _onGdriveFilePicked(data){
+  if(data.action!==google.picker.Action.PICKED) return;
+  const file=data.docs[0];
+  if(!file) return;
+  toast('Google Drive에서 불러오는 중...');
+  try{
+    const resp=await gapi.client.drive.files.get({
+      fileId:file.id,
+      alt:'media'
+    });
+    const text=resp.body;
+    if(!text||!text.trim()){toast('파일이 비어있습니다');return;}
+    // Fake a File object so handleTextFile can process it
+    const blob=new Blob([text],{type:'text/plain'});
+    const fakeFile=new File([blob],file.name,{type:'text/plain'});
+    handleTextFile(fakeFile);
+  }catch(e){
+    toast('파일 다운로드 실패: '+e.message);
+    console.error(e);
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════
