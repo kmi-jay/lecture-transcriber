@@ -5520,7 +5520,7 @@ A. Answer choices are always A, B, C, D only. In answer-announcing context ("정
 B. Remove lone "Q." or "A." timestamp blocks — silence hallucination; delete entire block. Especially at [00:00:00].
 C. Fix misrecognized question numbers by reading the sequential flow of problems.
 D. Use your knowledge of${ctx?` "${ctx}"`:'the lecture topic'} to semantically detect and fix domain-specific term misrecognitions — no hardcoded list; only correct when confident.
-`
+
 [Core Principle — Semantic Correction]
 Whisper errors are fundamentally semantic mismatches: wrong words that don't fit the context, not just phonetic substitutions.
 Correction basis: semantic coherence, not phonetic similarity.
