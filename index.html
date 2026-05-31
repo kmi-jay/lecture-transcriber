@@ -1010,11 +1010,14 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
     <div class="hint">
       <strong style="color:#1a73e8">무료</strong> — Google Drive 파일 피커 직접 연동.<br>
       iOS 파일 앱 동기화 지연 없이 Drive 파일을 즉시 불러옵니다.<br>
-      <strong>발급 방법:</strong> <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> →<br>
-      ① 프로젝트 생성 → ② API 라이브러리에서 <em>Google Drive API</em>, <em>Google Picker API</em> 사용 설정<br>
-      ③ Google 인증 플랫폼 → 브랜딩(앱 이름 입력) → 대상(외부) → 클라이언트(웹 애플리케이션)<br>
+      ⚠️ <strong>본인 Google Cloud 프로젝트</strong>를 만들어 입력하세요 (타인과 공유 불가).<br>
+      <strong>발급 방법 (5분):</strong> <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> →<br>
+      ① 새 프로젝트 생성 (이름 자유)<br>
+      ② API 라이브러리 → <em>Google Drive API</em>, <em>Google Picker API</em> 각각 사용 설정<br>
+      ③ Google 인증 플랫폼 → 브랜딩(앱 이름 입력) → 대상(외부) → 클라이언트(웹 애플리케이션 선택)<br>
       &nbsp;&nbsp;&nbsp;승인된 JavaScript 원본: <code>https://kmi-jay.github.io</code><br>
-      ④ 사용자 인증 정보 → API 키 만들기 → Google Drive API, Picker API 제한
+      ④ 사용자 인증 정보 → API 키 만들기 → Drive API·Picker API 제한 선택<br>
+      ⑤ 위에서 만든 OAuth 클라이언트 ID와 API 키를 각각 입력
     </div>
   </div>
 
@@ -1434,12 +1437,16 @@ async function pickFromGoogleDrive(){
 }
 
 function _showGdrivePicker(apiKey){
+  // Client ID 형식: "{PROJECT_NUMBER}-xxxx.apps.googleusercontent.com"
+  // → 대시 앞 숫자가 프로젝트 번호 (setAppId에 필요)
+  const appId=(state.gdriveClientId||'').split('-')[0];
+
   const view=new google.picker.DocsView(google.picker.ViewId.DOCS)
     .setMimeTypes('text/plain,text/markdown,text/x-markdown,application/octet-stream')
     .setSelectFolderEnabled(false);
 
   const picker=new google.picker.PickerBuilder()
-    .setAppId('728058280900')
+    .setAppId(appId)
     .setOAuthToken(_gdriveAccessToken)
     .setDeveloperKey(apiKey)
     .setTitle('전사본 파일 선택 (.txt / .md)')
