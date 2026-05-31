@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.67</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.68</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -5393,9 +5393,40 @@ function _buildRefinePrompt(useKorean){
     ?`"${ctx}" 분야의 전문 용어, 약어, 개념을 정확하게 교정하세요. 이 분야에서 자주 사용되는 용어가 유사한 발음의 다른 단어로 잘못 인식되었을 가능성이 높습니다.`
     :'전문 용어와 약어를 문맥에 맞게 교정하세요.';
 
+  // 시험·문제풀이 강의 여부 판별 (특정 도메인 무관, 형식적 특성으로만 감지)
+  const isExam=/시험|문제풀이|문제\s*풀이|도메인|기사|자격증|수험|퀴즈|quiz|exam/i.test(ctx)
+    || /문제|풀이|정답|선택지|보기/.test(ctx);
+  const examRules=isExam?`
+⚠️ [시험·문제풀이 강의 특수 교정 규칙] — 아래는 어떤 도메인의 시험 강의에도 공통으로 적용되는 규칙입니다.
+
+A. 【선택지 단일 알파벳 오인식 교정】
+   시험 문제 답은 반드시 A, B, C, D 중 하나입니다.
+   "정답은", "답은", "이 됩니다", "가 된다" 등 정답 언급 문맥에서 T·V·L·F·E·S·R 같이 선택지가 될 수 없는 단일 알파벳이 나오면 → 문맥을 읽어 올바른 A/B/C/D로 교정하세요.
+   ▶ 가장 빈번한 패턴: 한국어 발화에서 "D(디)"가 "T(티)"로 오인식됨.
+     예) "정답은 T입니다" → 앞뒤 보기 설명을 읽고 "정답은 D입니다"로 교정
+     예) "T가 됩니다", "우리 T가 된다" → 정답 맥락이면 A/B/C/D 중 하나로 교정
+   ▶ 교정 기준: 해당 문제의 보기(A·B·C·D)와 강사 설명을 함께 읽어 논리적으로 정답을 추론하세요.
+
+B. 【침묵·무음 구간 환각 Q./A. 제거】
+   타임스탬프 블록에 "Q.", "Q. ", "A." 등 실질 내용 없이 단독 약어만 있는 경우 → 침묵 구간 Whisper 환각이므로 해당 블록 전체 제거.
+   특히 첫 블록([00:00:00])이 이런 패턴이면 반드시 제거하세요.
+
+C. 【문제 번호 오인식 교정】
+   강의에서 "N번" 형식으로 문제 번호를 말할 때 Whisper가 엉뚱한 단어로 전사하는 경우가 있습니다.
+   앞뒤 문제 번호 흐름(순서)을 보고 올바른 "N번" 형태로 교정하세요.
+   예) "체반" → 문맥상 7번째 문제면 "7번", "제반" → 순서상 N번 등
+
+D. 【강의 주제 기반 전문 용어 오인식 교정】
+   특정 단어 목록을 하드코딩하는 대신, 당신이 가진 [강의 주제] "${ctx}"에 대한 지식을 활용해 의미적으로 어긋난 단어를 탐지·교정하세요.
+   교정 절차:
+   ① 단어가 앞뒤 문맥 및 강의 주제와 의미적으로 맞는지 판단
+   ② 안 맞으면 → 이 강의 주제에서 발음이 비슷한 올바른 전문 용어가 무엇인지 추론
+   ③ 확신할 수 있을 때만 교정, 불확실하면 원문 유지 (틀린 교정이 오인식보다 나쁨)
+`:'';
+
   return useKorean
     ?`당신은 음성인식(Whisper) 전사본을 교정하는 전문 편집자입니다.
-${ctxLine}
+${ctxLine}${examRules}
 [핵심 원칙 — 의미 기반 교정]
 Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 아니라 "문맥상 말이 안 되는 단어가 끼어든 것"입니다.
 따라서 교정 기준은 발음 유사성이 아니라 의미적 일관성입니다.
@@ -5456,7 +5487,13 @@ Whisper 오류의 본질은 "발음이 비슷한 엉뚱한 단어로 대체"가 
 9) 교정된 본문만 출력 — 설명·주석 없이
 10) [구조 마커 보존] 전사 본문 중 "## N번 강의:", "---", "> 📍" 로 시작하는 줄은 파일 병합 구조 정보입니다. 교정 대상이 아니므로 원문 그대로 유지하세요. 삭제하거나 수정하지 마세요.`
     :`You are a professional editor correcting Whisper speech-to-text transcripts. You deeply understand Whisper's Korean recognition characteristics.
-${ctx?`\n[Topic] ${ctx}\n`:''}
+${ctx?`\n[Topic] ${ctx}\n`:''}${isExam?`
+⚠️ [EXAM / Q&A LECTURE SPECIAL RULES] — Apply these with top priority (domain-agnostic).
+A. Answer choices are always A, B, C, D only. If an invalid letter (T, V, L, F, E, S, R) appears as an answer in answer-announcing context ("정답은", "답은", "이 됩니다", "가 된다" etc.), infer the correct A/B/C/D from the surrounding explanation and replace it. Most common: Korean "D"(디) → misrecognized as "T"(티).
+B. Remove lone "Q." or "A." timestamp blocks — if a block contains only such an abbreviation with no real content, it is a silence hallucination; delete the entire block. Especially remove if it appears at [00:00:00].
+C. Fix misrecognized question numbers — read the sequence of problems and restore the correct "N번" form for garbled number references.
+D. Use your knowledge of the lecture topic "${ctx}" to detect and fix domain-specific term misrecognitions semantically — do NOT rely on a hardcoded list. Only correct when confident; otherwise preserve as-is.
+`:''}
 [Core Principle — Semantic Correction]
 Whisper errors are fundamentally semantic mismatches: wrong words that don't fit the context, not just phonetic substitutions.
 Correction basis: semantic coherence, not phonetic similarity.
