@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.70</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.71</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1214,6 +1214,20 @@ async function loadState(){
   if(now-windowStart>3600000) state.quota={windowStart:0,usedSec:0};
   applyStateToUI();
   renderHistory();
+  // Recover any in-progress transcription draft (from crash or browser close)
+  if(state._draft&&state._draft.text&&state._draft.text.trim().length>50){
+    const draftName=state._draft.name||'이전 전사';
+    state.history.unshift({
+      ...state._draft,
+      title:(state._draft.title||draftName)+' [중단 복구]',
+      partial:false
+    });
+    if(state.history.length>MAX_HISTORY) state.history.splice(MAX_HISTORY);
+    delete state._draft;
+    await saveState();
+    renderHistory();
+    toast(`⚠️ 중단된 전사 복구됨: ${draftName}`);
+  }
 }
 
 async function saveState(){await dbSet('state',state)}
@@ -2063,6 +2077,10 @@ async function startTranscription(){
 
   renderChunks(chunks);
 
+  // Draft save: protect long transcriptions from crash/browser-close data loss
+  state._draft={name:file.name,title:file.name.replace(/\.[^.]+$/,''),date:fmtNow(),duration:Math.round(duration),lang,text:'',projectId:null,tags:[]};
+  await saveState();
+
   // Process
   for(let i=0;i<chunks.length;i++){
     if(transcriptionAborted) break;
@@ -2117,16 +2135,32 @@ async function startTranscription(){
       ch.text=cleanHallucinations(result.text);
       ch.segments=result.segments||[];
       ch.status='done';
+      // Progressive draft save every 3 chunks to survive app crash/closure
+      if(state._draft&&(i%3===2||i===nChunks-1)){
+        state._draft.text=_removeHallucinations(mergeChunks(chunks));
+        await saveState();
+      }
       break; // success — exit retry loop
     }catch(e){
       // On first attempt, retry if error is transient
       if(_retry===0&&_isRetryable(e)){
-        console.warn(`[Chunk ${i}] ${ch.api}: error, retrying in 3s...`,e.message||e);
-        logError(ch.api, e instanceof LLMError?e.status:'ERR', `재시도 예정 — ${e instanceof LLMError?(e.bodyText||'').slice(0,150):e.message}`, `청크 ${i+1}/${nChunks} 전사`);
-        updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — 오류 발생, 3초 후 재시도...`);
+        // 429 rate-limit: wait for retry-after header, or 60s minimum; other errors: 3s
+        const is429=(e instanceof LLMError&&e.status===429);
+        const waitSec=is429?(e.retryAfter||60):3;
+        console.warn(`[Chunk ${i}] ${ch.api}: error, retrying in ${waitSec}s...`,e.message||e);
+        logError(ch.api, e instanceof LLMError?e.status:'ERR', `재시도 예정 (${waitSec}초 대기) — ${e instanceof LLMError?(e.bodyText||'').slice(0,150):e.message}`, `청크 ${i+1}/${nChunks} 전사`);
         ch.status='processing';
         renderChunks(chunks);
-        await sleep(3000);
+        // Show live countdown for long waits
+        if(waitSec>5){
+          for(let s=waitSec;s>0;s-=5){
+            updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — 한도 초과, ${s}초 후 재시도...`);
+            await sleep(Math.min(5000,s*1000));
+          }
+        }else{
+          updateProgress(i,nChunks,`청크 ${i+1}/${nChunks} — 오류 발생, ${waitSec}초 후 재시도...`);
+          await sleep(waitSec*1000);
+        }
         continue;
       }
       console.error(`Chunk ${i} error:`,e);
@@ -2177,6 +2211,8 @@ async function startTranscription(){
     state.qaHistoryMap=shifted;
   }
   const _title=document.getElementById('res-title').value||file.name.replace(/\.[^.]+$/,'');
+  // Clear draft — replaced by permanent history entry
+  delete state._draft;
   state.history.unshift({name:file.name,title:_title,date:fmtNow(),duration:Math.round(duration),lang,text:fullText,projectId:null,tags:[]});
   if(state.history.length>MAX_HISTORY) state.history.splice(MAX_HISTORY);
   await saveState();renderHistory();
@@ -2487,7 +2523,10 @@ async function transcribeOpenAI(blob,lang){
   if(_wCtx) form.append('prompt', _wCtx);
   const res=await _fetchWithTimeout('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',headers:{'Authorization':`Bearer ${state.openaiKey}`},body:form},180000);
-  if(!res.ok) throw new LLMError('openai',res.status,await res.text(),null);
+  if(!res.ok){
+    const _ra=parseInt(res.headers.get('retry-after')||'0')||null;
+    throw new LLMError('openai',res.status,await res.text(),_ra);
+  }
   const data=await res.json();
   const segments=(data.segments||[]).map(s=>({start:s.start,end:s.end,text:s.text}));
   return{text:data.text||'',segments};
@@ -3535,7 +3574,8 @@ async function callOpenAIChat(systemPrompt,userPrompt,maxTok){
     })
   },timeoutMs);
   if(!res.ok){
-    throw new LLMError('openai',res.status,await res.text(),null);
+    const _ra=parseInt(res.headers.get('retry-after')||'0')||null;
+    throw new LLMError('openai',res.status,await res.text(),_ra);
   }
   return(await res.json()).choices?.[0]?.message?.content||'(결과 없음)';
 }
@@ -5984,7 +6024,7 @@ async function callClaudeChat(systemPrompt, userPrompt, maxTokens=3000){
     headers:{
       'Content-Type':'application/json',
       'x-api-key':state.claudeKey,
-      'anthropic-version':'2024-06-01',
+      'anthropic-version':'2023-06-01',
       'anthropic-dangerous-direct-browser-access':'true'
     },
     body:JSON.stringify({
