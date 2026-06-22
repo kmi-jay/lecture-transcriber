@@ -354,7 +354,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
   <div class="logo" onclick="showPage('home')" style="cursor:pointer">
     <div class="logo-icon">📝</div>
     <span class="logo-text">Lispen</span>
-    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.71</span>
+    <span style="font-size:10px;color:var(--text3);margin-left:4px;opacity:0.6">v4.72</span>
   </div>
   <button class="nav-btn" onclick="showPage('settings')" aria-label="설정">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -3606,15 +3606,44 @@ function _getLLMFallbackChain(currentProvider){
   return allLLM.filter(p=>p!==currentProvider&&state[keyMap[p]]);
 }
 
+// ── Timestamp-aware text splitter — avoids cutting mid-sentence or mid-question ──
+function _splitAtBoundary(text, chunkSize){
+  const result=[];
+  let start=0;
+  while(start<text.length){
+    if(start+chunkSize>=text.length){ result.push(text.slice(start)); break; }
+    let end=start+chunkSize;
+    // Look backward up to 1000 chars for a timestamp [HH:MM:SS] boundary
+    const searchStart=Math.max(start, end-1000);
+    const window=text.slice(searchStart, end);
+    const lastTs=window.lastIndexOf('\n[');
+    if(lastTs>0){
+      end=searchStart+lastTs; // split just before the timestamp
+    }else{
+      // Fall back: double newline (paragraph boundary)
+      const lastPara=text.lastIndexOf('\n\n', end);
+      if(lastPara>start+chunkSize*0.5) end=lastPara;
+    }
+    result.push(text.slice(start, end));
+    start=end;
+  }
+  return result;
+}
+
 // ── Chunked LLM processing with per-chunk retry, fallback & progress ──
-async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride){
+// outputMult: chars-per-token multiplier for output capacity estimate.
+//   default 1.5 = English-safe; use 0.85 for Korean refine (preserve-all tasks)
+//   where output ≈ input length (Korean ~1.3–1.5 chars/token, not 1.5+)
+async function _processChunks(provider,transcriptText,chunkPromptFn,statusEl,label,maxTokOverride,outputMult){
   const limits=_getLLMLimits(provider);
   const maxTok=maxTokOverride||limits.maxTokens;
-  // Chunk size = min(input capacity, estimated output capacity) — prevents output truncation
-  const outputCapacityChars=Math.floor(maxTok*1.5); // Korean: ~1.5 chars per token
+  // outputMult: 1.5 for summary/notes (output << input, large chunks OK)
+  //             0.85 for refine (output ≈ input — must fit within max_tokens)
+  const _mult=outputMult||1.5;
+  const outputCapacityChars=Math.floor(maxTok*_mult);
   const chunkSize=Math.min(Math.floor(limits.inputChars*0.8), outputCapacityChars);
-  const chunks=[];
-  for(let i=0;i<transcriptText.length;i+=chunkSize) chunks.push(transcriptText.slice(i,i+chunkSize));
+  // Use timestamp-aware splitting to avoid cutting questions mid-sentence
+  const chunks=_splitAtBoundary(transcriptText, chunkSize);
   const partials=[];
   let totalElapsed=0;
   let currentProv=provider;
@@ -5630,7 +5659,11 @@ async function refineTranscript(){
   // For refinement, output ≈ input length
   // Estimate: Korean ~1.5-2 chars per token → max output chars ≈ maxTokens * 1.5
   const modelMaxTok=limits.maxTokens;
-  const maxOutputChars=Math.floor(modelMaxTok*1.5); // conservative: how many chars this model can output
+  // Refine: output ≈ input length → use conservative 0.85 chars/token for Korean
+  // (Korean tokenizers produce ~1.3–1.5 chars/token, NOT 1.5. Using 0.85 gives safe headroom.)
+  // Root cause of 125→83 question truncation: 1.5 multiplier overestimates Korean output capacity.
+  const REFINE_OUTPUT_MULT=0.85;
+  const maxOutputChars=Math.floor(modelMaxTok*REFINE_OUTPUT_MULT);
   const refineMaxTok=modelMaxTok; // always use full model capacity for refine
   // Force chunking if input exceeds EITHER input limit OR estimated output capacity
   const isLong=srcText.length>limits.inputChars||srcText.length>maxOutputChars;
@@ -5652,8 +5685,8 @@ async function refineTranscript(){
   try{
     let refined;
     if(isLong){
-      // _processChunks handles its own live timer per chunk
-      const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok);
+      // Pass REFINE_OUTPUT_MULT so _processChunks uses conservative Korean-safe chunk sizes
+      const partials=await _processChunks(provider,srcText,()=>sp,statusEl,label,refineMaxTok,REFINE_OUTPUT_MULT);
       refined=_fixTimestampNewlines(partials.join('\n'));
     }else{
       _refTimer=_startLiveTimer(statusEl,'텍스트 정제 중',label);
